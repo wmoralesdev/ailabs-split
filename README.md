@@ -27,7 +27,8 @@ pnpm dev
 | Script | Purpose |
 |--------|---------|
 | `pnpm dev` | Local app on :3000 |
-| `pnpm build` | `prisma generate && vite build` |
+| `pnpm build` | `prisma generate && vite build` (Nitro → `.output` / Vercel BOA) |
+| `pnpm start` | Run local Nitro node-server build |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | ESLint |
 | `pnpm test` | Vitest (settle math) |
@@ -52,4 +53,12 @@ Room code is the only access control. Your display name is how you reclaim yours
 
 ## Deploy
 
-Vercel (or same host as ailabs). Env: `DATABASE_URL`, optional `DIRECT_URL`, optional `MISTRAL_API_KEY`. Point DNS `split.ailabs.sv` at the deployment.
+TanStack Start → **Nitro** → Vercel (auto-detects `vercel` preset when `VERCEL=1`).
+
+1. Link the repo in Vercel (framework: Other / Nitro Build Output API)
+2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `MISTRAL_API_KEY`
+3. Build: `pnpm build` (runs `prisma generate` + `vite build`)
+4. Run migrations against Neon once: `pnpm exec prisma migrate deploy`
+5. Point DNS `split.ailabs.sv` at the deployment
+
+Local prod smoke: `pnpm build && pnpm start`
