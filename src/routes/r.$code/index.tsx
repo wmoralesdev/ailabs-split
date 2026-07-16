@@ -568,138 +568,144 @@ function ExpenseDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[85dvh] overflow-y-auto rounded-t-2xl sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-content sm:-translate-x-1/2"
+        className="max-h-[85dvh] overflow-y-auto rounded-t-2xl"
       >
-        <SheetHeader>
-          <SheetTitle>{editing ? "Edit expense" : expense.title}</SheetTitle>
-          <SheetDescription>
-            {expense.paidByName} paid ·{" "}
-            {splitModeLabel(expense.splitMode, expense.isPersonal)}
-          </SheetDescription>
-        </SheetHeader>
+        <div className="mx-auto flex w-full max-w-content flex-col">
+          <SheetHeader>
+            <SheetTitle>{editing ? "Edit expense" : expense.title}</SheetTitle>
+            <SheetDescription>
+              {expense.paidByName} paid ·{" "}
+              {splitModeLabel(expense.splitMode, expense.isPersonal)}
+            </SheetDescription>
+          </SheetHeader>
 
-        <div className="flex flex-col gap-5 px-6 pb-2">
-          {editing ? (
-            <>
-              <div className="grid grid-cols-[1fr_auto] gap-3">
+          <div className="flex flex-col gap-5 px-6 pb-2">
+            {editing ? (
+              <>
+                <div className="grid grid-cols-[1fr_auto] gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-expense-amount">Amount</Label>
+                    <Input
+                      id="edit-expense-amount"
+                      inputMode="numeric"
+                      value={formatAtmAmount(amountDigits, fractionDigits)}
+                      onChange={(event) =>
+                        setAmountDigits(atmDigitsFromInput(event.target.value))
+                      }
+                      className="text-right tabular-nums"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Currency</Label>
+                    <div className="flex h-9 min-w-16 items-center justify-center rounded-md border border-border bg-muted/40 px-3 text-sm font-medium">
+                      {expense.currency}
+                    </div>
+                  </div>
+                </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-expense-amount">Amount</Label>
+                  <Label htmlFor="edit-expense-title">Title</Label>
                   <Input
-                    id="edit-expense-amount"
-                    inputMode="numeric"
-                    value={formatAtmAmount(amountDigits, fractionDigits)}
-                    onChange={(event) =>
-                      setAmountDigits(atmDigitsFromInput(event.target.value))
-                    }
-                    className="text-right tabular-nums"
+                    id="edit-expense-title"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Currency</Label>
-                  <div className="flex h-9 min-w-16 items-center justify-center rounded-md border border-border bg-muted/40 px-3 text-sm font-medium">
-                    {expense.currency}
-                  </div>
+                  <Label htmlFor="edit-expense-category">Category</Label>
+                  <Input
+                    id="edit-expense-category"
+                    value={category}
+                    onChange={(event) => setCategory(event.target.value)}
+                    placeholder="Food, lodging, taxi…"
+                  />
                 </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-expense-title">Title</Label>
-                <Input
-                  id="edit-expense-title"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-expense-category">Category</Label>
-                <Input
-                  id="edit-expense-category"
-                  value={category}
-                  onChange={(event) => setCategory(event.target.value)}
-                  placeholder="Food, lodging, taxi…"
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <p className="font-display text-3xl font-semibold tabular-nums">
-                  {formatMoney(expense.amountCents, expense.currency)}
-                </p>
-                {isForeign ? (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    ≈ {formatMoney(baseCents, room.currency)}
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="font-display text-3xl font-semibold tabular-nums">
+                    {formatMoney(expense.amountCents, expense.currency)}
                   </p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">
-                  {splitModeLabel(expense.splitMode, expense.isPersonal)}
-                </Badge>
-                {expense.category ? (
-                  <Badge variant="outline">{expense.category}</Badge>
-                ) : null}
-              </div>
-              <div>
-                <h3 className="text-sm font-medium">Share breakdown</h3>
-                <ul className="mt-2 divide-y divide-border/60">
-                  {expense.shares.map((share) => (
-                    <li
-                      key={share.memberId}
-                      className="flex items-center justify-between gap-3 py-2"
-                    >
-                      <span className="text-sm">{share.memberName}</span>
-                      <span className="text-sm font-medium tabular-nums">
-                        {formatMoney(share.amountCents, expense.currency)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          )}
-        </div>
+                  {isForeign ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      ≈ {formatMoney(baseCents, room.currency)}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">
+                    {splitModeLabel(expense.splitMode, expense.isPersonal)}
+                  </Badge>
+                  {expense.category ? (
+                    <Badge variant="outline">{expense.category}</Badge>
+                  ) : null}
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium">Share breakdown</h3>
+                  <ul className="mt-2 divide-y divide-border/60">
+                    {expense.shares.map((share) => (
+                      <li
+                        key={share.memberId}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="text-sm">{share.memberName}</span>
+                        <span className="text-sm font-medium tabular-nums">
+                          {formatMoney(share.amountCents, expense.currency)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
+          </div>
 
-        <SheetFooter>
-          {editing ? (
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setEditing(false)}
-                disabled={updateMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={saveEdit}
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? "Saving…" : "Save"}
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setEditing(true)}
-              >
-                <HugeiconsIcon icon={Edit02Icon} size={14} strokeWidth={2} />
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={deleteCurrentExpense}
-                disabled={deleteMutation.isPending}
-              >
-                <HugeiconsIcon icon={Delete02Icon} size={14} strokeWidth={2} />
-                {deleteMutation.isPending ? "Deleting…" : "Delete"}
-              </Button>
-            </div>
-          )}
-        </SheetFooter>
+          <SheetFooter>
+            {editing ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditing(false)}
+                  disabled={updateMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={saveEdit}
+                  disabled={updateMutation.isPending}
+                >
+                  {updateMutation.isPending ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditing(true)}
+                >
+                  <HugeiconsIcon icon={Edit02Icon} size={14} strokeWidth={2} />
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={deleteCurrentExpense}
+                  disabled={deleteMutation.isPending}
+                >
+                  <HugeiconsIcon
+                    icon={Delete02Icon}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                  {deleteMutation.isPending ? "Deleting…" : "Delete"}
+                </Button>
+              </div>
+            )}
+          </SheetFooter>
+        </div>
       </SheetContent>
     </Sheet>
   )
