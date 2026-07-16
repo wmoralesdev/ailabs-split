@@ -44,6 +44,8 @@ model Expense {
   currency    String?
   // How shares were derived: EQUAL | PARTS | AMOUNT.
   splitMode   String         @default("EQUAL")
+  // Personal expenses are only visible to the payer and do not affect group settle.
+  isPersonal  Boolean        @default(false)
   paidById    String
   createdAt   DateTime       @default(now())
   room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)

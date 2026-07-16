@@ -42,7 +42,8 @@ function initials(name: string): string {
     .join("")
 }
 
-function splitModeLabel(mode: string): string {
+function splitModeLabel(mode: string, isPersonal: boolean): string {
+  if (isPersonal) return "Personal"
   if (mode === "PARTS") return "Parts"
   if (mode === "AMOUNT") return "Amounts"
   return "Equal"
@@ -50,8 +51,8 @@ function splitModeLabel(mode: string): string {
 
 function RoomHomePage() {
   const { code } = roomRoute.useParams()
-  const { data: room } = useQuery(roomQueryOptions(code))
   const { memberId, switchIdentity } = useRoomIdentity()
+  const { data: room } = useQuery(roomQueryOptions(code, memberId))
   const [copied, setCopied] = useState<"code" | "link" | "invite" | null>(null)
 
   const me = room?.members.find((member) => member.id === memberId)
@@ -60,18 +61,20 @@ function RoomHomePage() {
     if (!room) return []
     return computeNets(
       room.members,
-      room.expenses.map((expense) => ({
-        paidById: expense.paidById,
-        shares: expense.shares.map((share) => ({
-          memberId: share.memberId,
-          amountCents: convertToBase(
-            share.amountCents,
-            expense.currency,
-            room.currency,
-            room.fxRates
-          ),
-        })),
-      }))
+      room.expenses
+        .filter((expense) => !expense.isPersonal)
+        .map((expense) => ({
+          paidById: expense.paidById,
+          shares: expense.shares.map((share) => ({
+            memberId: share.memberId,
+            amountCents: convertToBase(
+              share.amountCents,
+              expense.currency,
+              room.currency,
+              room.fxRates
+            ),
+          })),
+        }))
     )
   }, [room])
 
@@ -309,9 +312,17 @@ function ExpenseRow({
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{expense.title}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate text-sm font-medium">{expense.title}</p>
+              {expense.isPersonal ? (
+                <Badge variant="secondary" className="shrink-0">
+                  Personal
+                </Badge>
+              ) : null}
+            </div>
             <p className="text-muted-foreground truncate text-xs">
-              {expense.paidByName} paid · {splitModeLabel(expense.splitMode)}
+              {expense.paidByName} paid ·{" "}
+              {splitModeLabel(expense.splitMode, expense.isPersonal)}
             </p>
           </div>
         </div>

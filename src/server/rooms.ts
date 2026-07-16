@@ -9,6 +9,7 @@ import {
   addExpenseSchema,
   claimMemberSchema,
   createRoomSchema,
+  getRoomByCodeSchema,
   joinRoomSchema,
 } from "@/lib/schemas"
 import { equalSplitCents, partsSplitCents } from "@/lib/settle"
@@ -31,6 +32,7 @@ export type ExpenseDto = {
   amountCents: number
   currency: string
   splitMode: string
+  isPersonal: boolean
   paidById: string
   paidByName: string
   createdAt: string
@@ -89,7 +91,10 @@ function limitWrites(action: string) {
   })
 }
 
-async function loadRoomByCode(code: string): Promise<RoomDto | null> {
+async function loadRoomByCode(
+  code: string,
+  viewerMemberId?: string | null
+): Promise<RoomDto | null> {
   const room = await prisma.room.findUnique({
     where: { code },
     include: {
@@ -111,6 +116,12 @@ async function loadRoomByCode(code: string): Promise<RoomDto | null> {
       ? Array.from(new Set([room.currency, ...room.currencies]))
       : [room.currency]
 
+  const visibleExpenses = room.expenses.filter(
+    (expense) =>
+      !expense.isPersonal ||
+      (viewerMemberId != null && expense.paidById === viewerMemberId)
+  )
+
   return {
     id: room.id,
     code: room.code,
@@ -123,12 +134,13 @@ async function loadRoomByCode(code: string): Promise<RoomDto | null> {
       id: member.id,
       name: member.name,
     })),
-    expenses: room.expenses.map((expense) => ({
+    expenses: visibleExpenses.map((expense) => ({
       id: expense.id,
       title: expense.title,
       amountCents: expense.amountCents,
       currency: expense.currency ?? room.currency,
       splitMode: expense.splitMode,
+      isPersonal: expense.isPersonal,
       paidById: expense.paidById,
       paidByName: expense.paidBy.name,
       createdAt: expense.createdAt.toISOString(),
@@ -182,11 +194,9 @@ export const createRoom = createServerFn({ method: "POST" })
   })
 
 export const getRoomByCode = createServerFn({ method: "GET" })
-  .validator((data: unknown) =>
-    parseOrThrow(joinRoomSchema.pick({ code: true }), data)
-  )
+  .validator((data: unknown) => parseOrThrow(getRoomByCodeSchema, data))
   .handler(async ({ data }): Promise<RoomDto | null> => {
-    return await loadRoomByCode(data.code)
+    return await loadRoomByCode(data.code, data.viewerMemberId)
   })
 
 export const joinRoom = createServerFn({ method: "POST" })
@@ -204,7 +214,9 @@ export const joinRoom = createServerFn({ method: "POST" })
           member.name.toLowerCase() === data.memberName.toLowerCase()
       )
       if (match) {
-        return { room: existing, memberId: match.id }
+        const room = await loadRoomByCode(data.code, match.id)
+        if (!room) throw new Error("Trip not found")
+        return { room, memberId: match.id }
       }
 
       await prisma.member.create({
@@ -214,13 +226,15 @@ export const joinRoom = createServerFn({ method: "POST" })
         },
       })
 
-      const room = await loadRoomByCode(data.code)
-      if (!room) throw new Error("Trip not found")
-      const created = room.members.find(
+      const roomAnon = await loadRoomByCode(data.code)
+      if (!roomAnon) throw new Error("Trip not found")
+      const created = roomAnon.members.find(
         (member) =>
           member.name.toLowerCase() === data.memberName.toLowerCase()
       )
       if (!created) throw new Error("Could not claim member")
+      const room = await loadRoomByCode(data.code, created.id)
+      if (!room) throw new Error("Trip not found")
       return { room, memberId: created.id }
     }
   )
@@ -264,9 +278,20 @@ export const addExpense = createServerFn({ method: "POST" })
         ? data.currency
         : (data.currency ?? room.currency)
 
+    const isPersonal = data.isPersonal
+    const splitMode = isPersonal ? "EQUAL" : data.splitMode
+
     let shares: Array<{ memberId: string; amountCents: number; weight: number | null }>
 
-    if (data.splitMode === "PARTS") {
+    if (isPersonal) {
+      shares = [
+        {
+          memberId: data.paidById,
+          amountCents: data.amountCents,
+          weight: null,
+        },
+      ]
+    } else if (splitMode === "PARTS") {
       const parts = partsSplitCents(
         data.amountCents,
         data.splits.map((split) => ({
@@ -279,7 +304,7 @@ export const addExpense = createServerFn({ method: "POST" })
         amountCents: part.amountCents,
         weight: part.weight,
       }))
-    } else if (data.splitMode === "AMOUNT") {
+    } else if (splitMode === "AMOUNT") {
       const sum = data.splits.reduce(
         (total, split) => total + (split.amountCents ?? 0),
         0
@@ -305,7 +330,8 @@ export const addExpense = createServerFn({ method: "POST" })
         title: data.title,
         amountCents: data.amountCents,
         currency,
-        splitMode: data.splitMode,
+        splitMode,
+        isPersonal,
         paidById: data.paidById,
         shares: {
           create: shares.map((share) => ({
@@ -327,6 +353,7 @@ export const addExpense = createServerFn({ method: "POST" })
       amountCents: expense.amountCents,
       currency: expense.currency ?? room.currency,
       splitMode: expense.splitMode,
+      isPersonal: expense.isPersonal,
       paidById: expense.paidById,
       paidByName: expense.paidBy.name,
       createdAt: expense.createdAt.toISOString(),

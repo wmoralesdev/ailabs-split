@@ -14,6 +14,7 @@ import {
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Form,
   FormControl,
@@ -43,7 +44,7 @@ import {
   rememberLastCurrency,
   resolveLastCurrency,
 } from "@/lib/last-currency"
-import { recallMember } from "@/lib/member-storage"
+import { useRoomIdentity } from "@/lib/room-identity"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import {
@@ -110,6 +111,7 @@ type AddExpensePayload = {
   currency?: string
   paidById: string
   splitMode: SplitMode
+  isPersonal: boolean
   splits: Array<{ memberId: string; weight?: number; amountCents?: number }>
 }
 
@@ -117,28 +119,37 @@ function AddExpensePage() {
   const { code } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: room } = useQuery(roomQueryOptions(code))
+  const { memberId } = useRoomIdentity()
+  const { data: room } = useQuery(roomQueryOptions(code, memberId))
 
   if (!room) return null
-  return <AddExpenseForm room={room} code={code} navigate={navigate} queryClient={queryClient} />
+  return (
+    <AddExpenseForm
+      room={room}
+      code={code}
+      selfMemberId={memberId}
+      navigate={navigate}
+      queryClient={queryClient}
+    />
+  )
 }
 
 function AddExpenseForm({
   room,
   code,
+  selfMemberId,
   navigate,
   queryClient,
 }: {
   room: RoomDto
   code: string
+  selfMemberId: string
   navigate: ReturnType<typeof useNavigate>
   queryClient: ReturnType<typeof useQueryClient>
 }) {
-  const remembered = recallMember(room.code)
-  const defaultPaidBy =
-    remembered && room.members.some((m) => m.id === remembered)
-      ? remembered
-      : (room.members[0]?.id ?? "")
+  const defaultPaidBy = room.members.some((m) => m.id === selfMemberId)
+    ? selfMemberId
+    : (room.members[0]?.id ?? "")
   const defaultCurrency = resolveLastCurrency(
     room.code,
     room.currencies,
@@ -155,6 +166,7 @@ function AddExpenseForm({
     },
   })
 
+  const [isPersonal, setIsPersonal] = useState(false)
   const [splitMode, setSplitMode] = useState<SplitMode>("EQUAL")
   const [included, setIncluded] = useState<Set<string>>(
     () => new Set(room.members.map((m) => m.id))
@@ -166,6 +178,24 @@ function AddExpenseForm({
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [splitError, setSplitError] = useState<string | null>(null)
   const [ocrPending, setOcrPending] = useState(false)
+
+  function setPersonalMode(next: boolean) {
+    setIsPersonal(next)
+    setSplitError(null)
+    if (next) {
+      form.setValue("paidById", selfMemberId, { shouldValidate: true })
+      setSplitMode("EQUAL")
+      setIncluded(new Set([selfMemberId]))
+      setWeights(
+        Object.fromEntries(
+          room.members.map((m) => [m.id, m.id === selfMemberId ? 1 : 0])
+        )
+      )
+      return
+    }
+    setIncluded(new Set(room.members.map((m) => m.id)))
+    setWeights(Object.fromEntries(room.members.map((m) => [m.id, 1])))
+  }
 
   const amountDigits = form.watch("amount")
   const currency = form.watch("currency")
@@ -179,16 +209,20 @@ function AddExpenseForm({
   )
 
   const activeMemberIds = useMemo(() => {
+    if (isPersonal) return [selfMemberId]
     if (splitMode === "PARTS") {
       return room.members
         .filter((m) => (weights[m.id] ?? 0) > 0)
         .map((m) => m.id)
     }
     return room.members.filter((m) => included.has(m.id)).map((m) => m.id)
-  }, [splitMode, room.members, weights, included])
+  }, [isPersonal, selfMemberId, splitMode, room.members, weights, included])
 
   const preview = useMemo<Record<string, number>>(() => {
     if (amountCents <= 0) return {}
+    if (isPersonal) {
+      return { [selfMemberId]: amountCents }
+    }
     if (splitMode === "EQUAL") {
       if (activeMemberIds.length === 0) return {}
       return Object.fromEntries(
@@ -218,6 +252,8 @@ function AddExpenseForm({
     )
   }, [
     amountCents,
+    isPersonal,
+    selfMemberId,
     splitMode,
     activeMemberIds,
     weights,
@@ -235,7 +271,7 @@ function AddExpenseForm({
   const mutation = useMutation({
     mutationFn: (input: AddExpensePayload) => addExpense({ data: input }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.detail(code) })
+      await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
       toast.success("Expense added")
       await navigate({ to: "/r/$code", params: { code } })
     },
@@ -304,8 +340,14 @@ function AddExpenseForm({
     }
 
     let splits: Array<{ memberId: string; weight?: number; amountCents?: number }>
+    let paidById = values.paidById
+    let mode: SplitMode = splitMode
 
-    if (splitMode === "PARTS") {
+    if (isPersonal) {
+      paidById = selfMemberId
+      mode = "EQUAL"
+      splits = [{ memberId: selfMemberId }]
+    } else if (splitMode === "PARTS") {
       const positive = room.members
         .filter((m) => (weights[m.id] ?? 0) > 0)
         .map((m) => ({ memberId: m.id, weight: weights[m.id] ?? 0 }))
@@ -347,8 +389,9 @@ function AddExpenseForm({
       title: values.title.trim(),
       amountCents: cents,
       currency: values.currency,
-      paidById: values.paidById,
-      splitMode,
+      paidById,
+      splitMode: mode,
+      isPersonal,
       splits,
     })
   }
@@ -463,199 +506,244 @@ function AddExpenseForm({
             </label>
           </div>
 
-          <FormField
-            control={form.control}
-            name="paidById"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Paid by</FormLabel>
-                <FormControl>
-                  <Select
-                    items={memberItems}
-                    value={field.value}
-                    onValueChange={(value) => value && field.onChange(value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Who paid?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {room.members.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <label className="border-border bg-muted/30 flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3">
+            <Checkbox
+              checked={isPersonal}
+              onCheckedChange={(checked) => setPersonalMode(checked === true)}
+              className="mt-0.5"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Personal</span>
+              <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">
+                Only you can see this. It won’t change group balances.
+              </span>
+            </span>
+          </label>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <FormLabelStatic>Split between</FormLabelStatic>
-              <Tabs
-                value={splitMode}
-                onValueChange={(value) => {
-                  setSplitMode(value as SplitMode)
-                  setSplitError(null)
-                }}
-              >
-                <TabsList className="h-9">
-                  <TabsTrigger value="EQUAL" className="text-xs">
-                    Equal
-                  </TabsTrigger>
-                  <TabsTrigger value="PARTS" className="text-xs">
-                    Parts
-                  </TabsTrigger>
-                  <TabsTrigger value="AMOUNT" className="text-xs">
-                    Amounts
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            <ul className="divide-border/60 divide-y">
-              {room.members.map((member) => {
-                const isParts = splitMode === "PARTS"
-                const weight = weights[member.id] ?? 0
-                const active = isParts ? weight > 0 : included.has(member.id)
-                const shareCents = preview[member.id] ?? 0
-                return (
-                  <li
-                    key={member.id}
-                    className="flex items-center justify-between gap-3 py-2.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        isParts
-                          ? setWeight(member.id, weight > 0 ? 0 : 1)
-                          : toggleMember(member.id)
-                      }
-                      className="flex min-w-0 items-center gap-3 text-left"
+          {isPersonal ? null : (
+            <FormField
+              control={form.control}
+              name="paidById"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Paid by</FormLabel>
+                  <FormControl>
+                    <Select
+                      items={memberItems}
+                      value={field.value}
+                      onValueChange={(value) => value && field.onChange(value)}
                     >
-                      <Avatar
-                        className={
-                          active
-                            ? "size-9"
-                            : "size-9 opacity-40 grayscale"
-                        }
-                      >
-                        <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
-                          {initials(member.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span
-                        className={
-                          active
-                            ? "truncate font-medium"
-                            : "text-muted-foreground truncate"
-                        }
-                      >
-                        {member.name}
-                      </span>
-                    </button>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Who paid?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {room.members.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
 
-                    {isParts ? (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="size-8 rounded-full"
-                          onClick={() => setWeight(member.id, weight - 1)}
-                          disabled={weight <= 0}
-                          aria-label={`Fewer parts for ${member.name}`}
+          {isPersonal ? (
+            <div className="border-border/60 flex items-center justify-between gap-3 border-y py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar className="size-9">
+                  <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+                    {initials(
+                      room.members.find((m) => m.id === selfMemberId)?.name ??
+                        "You"
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {room.members.find((m) => m.id === selfMemberId)?.name ??
+                      "You"}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Assigned to you
+                  </p>
+                </div>
+              </div>
+              {amountCents > 0 ? (
+                <span className="text-sm font-medium tabular-nums">
+                  {formatMoney(amountCents, currency)}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <FormLabelStatic>Split between</FormLabelStatic>
+                <Tabs
+                  value={splitMode}
+                  onValueChange={(value) => {
+                    setSplitMode(value as SplitMode)
+                    setSplitError(null)
+                  }}
+                >
+                  <TabsList className="h-9">
+                    <TabsTrigger value="EQUAL" className="text-xs">
+                      Equal
+                    </TabsTrigger>
+                    <TabsTrigger value="PARTS" className="text-xs">
+                      Parts
+                    </TabsTrigger>
+                    <TabsTrigger value="AMOUNT" className="text-xs">
+                      Amounts
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              <ul className="divide-border/60 divide-y">
+                {room.members.map((member) => {
+                  const isParts = splitMode === "PARTS"
+                  const weight = weights[member.id] ?? 0
+                  const active = isParts ? weight > 0 : included.has(member.id)
+                  const shareCents = preview[member.id] ?? 0
+                  return (
+                    <li
+                      key={member.id}
+                      className="flex items-center justify-between gap-3 py-2.5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          isParts
+                            ? setWeight(member.id, weight > 0 ? 0 : 1)
+                            : toggleMember(member.id)
+                        }
+                        className="flex min-w-0 items-center gap-3 text-left"
+                      >
+                        <Avatar
+                          className={
+                            active
+                              ? "size-9"
+                              : "size-9 opacity-40 grayscale"
+                          }
                         >
-                          <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
-                        </Button>
-                        <span className="w-5 text-center text-sm font-semibold tabular-nums">
-                          {weight}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="size-8 rounded-full"
-                          onClick={() => setWeight(member.id, weight + 1)}
-                          aria-label={`More parts for ${member.name}`}
+                          <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+                            {initials(member.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span
+                          className={
+                            active
+                              ? "truncate font-medium"
+                              : "text-muted-foreground truncate"
+                          }
                         >
-                          <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-                        </Button>
-                        <span className="text-muted-foreground w-16 text-right text-xs tabular-nums">
-                          {formatMoney(active ? shareCents : 0, currency)}
+                          {member.name}
                         </span>
-                      </div>
-                    ) : splitMode === "AMOUNT" ? (
-                      active ? (
-                        <Input
-                          inputMode="numeric"
-                          autoComplete="off"
-                          value={formatAtmAmount(
-                            amounts[member.id] ?? "",
-                            fractionDigits
-                          )}
-                          onChange={(e) => {
-                            setSplitError(null)
-                            setAmounts((prev) => ({
-                              ...prev,
-                              [member.id]: atmDigitsFromInput(e.target.value),
-                            }))
-                          }}
-                          placeholder={formatAtmAmount("", fractionDigits)}
-                          size="sm"
-                          className="w-28 text-right tabular-nums"
-                        />
+                      </button>
+
+                      {isParts ? (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 rounded-full"
+                            onClick={() => setWeight(member.id, weight - 1)}
+                            disabled={weight <= 0}
+                            aria-label={`Fewer parts for ${member.name}`}
+                          >
+                            <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
+                          </Button>
+                          <span className="w-5 text-center text-sm font-semibold tabular-nums">
+                            {weight}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 rounded-full"
+                            onClick={() => setWeight(member.id, weight + 1)}
+                            aria-label={`More parts for ${member.name}`}
+                          >
+                            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+                          </Button>
+                          <span className="text-muted-foreground w-16 text-right text-xs tabular-nums">
+                            {formatMoney(active ? shareCents : 0, currency)}
+                          </span>
+                        </div>
+                      ) : splitMode === "AMOUNT" ? (
+                        active ? (
+                          <Input
+                            inputMode="numeric"
+                            autoComplete="off"
+                            value={formatAtmAmount(
+                              amounts[member.id] ?? "",
+                              fractionDigits
+                            )}
+                            onChange={(e) => {
+                              setSplitError(null)
+                              setAmounts((prev) => ({
+                                ...prev,
+                                [member.id]: atmDigitsFromInput(e.target.value),
+                              }))
+                            }}
+                            placeholder={formatAtmAmount("", fractionDigits)}
+                            size="sm"
+                            className="w-28 text-right tabular-nums"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            Not included
+                          </span>
+                        )
+                      ) : active ? (
+                        <span className="text-sm font-medium tabular-nums">
+                          {formatMoney(shareCents, currency)}
+                        </span>
                       ) : (
                         <span className="text-muted-foreground text-sm">
                           Not included
                         </span>
-                      )
-                    ) : active ? (
-                      <span className="text-sm font-medium tabular-nums">
-                        {formatMoney(shareCents, currency)}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">
-                        Not included
-                      </span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
 
-            <div className="text-muted-foreground flex items-center justify-between text-xs">
-              <span>
-                {activeMemberIds.length} of {room.members.length} people
-              </span>
-              {splitMode === "AMOUNT" && amountCents > 0 ? (
-                <span
-                  className={
-                    remainingCents === 0
-                      ? "text-primary font-medium"
-                      : "text-destructive font-medium"
-                  }
-                >
-                  {remainingCents === 0
-                    ? "Balanced"
-                    : remainingCents > 0
-                      ? `${formatMoney(remainingCents, currency)} left`
-                      : `${formatMoney(-remainingCents, currency)} over`}
+              <div className="text-muted-foreground flex items-center justify-between text-xs">
+                <span>
+                  {activeMemberIds.length} of {room.members.length} people
                 </span>
-              ) : amountCents > 0 ? (
-                <span>{formatMoney(assignedCents, currency)} split</span>
+                {splitMode === "AMOUNT" && amountCents > 0 ? (
+                  <span
+                    className={
+                      remainingCents === 0
+                        ? "text-primary font-medium"
+                        : "text-destructive font-medium"
+                    }
+                  >
+                    {remainingCents === 0
+                      ? "Balanced"
+                      : remainingCents > 0
+                        ? `${formatMoney(remainingCents, currency)} left`
+                        : `${formatMoney(-remainingCents, currency)} over`}
+                  </span>
+                ) : amountCents > 0 ? (
+                  <span>{formatMoney(assignedCents, currency)} split</span>
+                ) : null}
+              </div>
+
+              {splitError ? (
+                <p className="text-destructive text-xs" role="alert">
+                  {splitError}
+                </p>
               ) : null}
             </div>
-
-            {splitError ? (
-              <p className="text-destructive text-xs" role="alert">
-                {splitError}
-              </p>
-            ) : null}
-          </div>
+          )}
 
           <Button
             type="submit"

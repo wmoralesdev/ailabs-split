@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { useRoomIdentity } from "@/lib/room-identity"
 import { roomQueryOptions } from "@/lib/room-query"
 import {
   computeNets,
@@ -57,7 +58,8 @@ function initials(name: string): string {
 
 function SettlePage() {
   const { code } = roomRoute.useParams()
-  const { data: room } = useQuery(roomQueryOptions(code))
+  const { memberId } = useRoomIdentity()
+  const { data: room } = useQuery(roomQueryOptions(code, memberId))
   const [copiedAll, setCopiedAll] = useState(false)
   const [copiedOne, setCopiedOne] = useState<number | null>(null)
 
@@ -65,18 +67,20 @@ function SettlePage() {
     if (!room) return []
     const nets = computeNets(
       room.members,
-      room.expenses.map((expense) => ({
-        paidById: expense.paidById,
-        shares: expense.shares.map((share) => ({
-          memberId: share.memberId,
-          amountCents: convertToBase(
-            share.amountCents,
-            expense.currency,
-            room.currency,
-            room.fxRates
-          ),
-        })),
-      }))
+      room.expenses
+        .filter((expense) => !expense.isPersonal)
+        .map((expense) => ({
+          paidById: expense.paidById,
+          shares: expense.shares.map((share) => ({
+            memberId: share.memberId,
+            amountCents: convertToBase(
+              share.amountCents,
+              expense.currency,
+              room.currency,
+              room.fxRates
+            ),
+          })),
+        }))
     )
     return simplifyTransfers(nets)
   }, [room])

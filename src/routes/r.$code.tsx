@@ -59,16 +59,16 @@ function RoomLayout() {
   const { as: asName } = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: room } = useQuery(roomQueryOptions(code))
-
   const [memberId, setMemberId] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
 
+  const { data: room } = useQuery(roomQueryOptions(code, memberId))
+
   const members = room?.members
   const invalidateRoom = () =>
-    queryClient.invalidateQueries({ queryKey: roomKeys.detail(code) })
+    queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
 
   useEffect(() => {
     if (!memberId || !room) return

@@ -45,6 +45,11 @@ export const claimMemberSchema = z.object({
   memberId: z.string().min(1, "Missing member"),
 })
 
+export const getRoomByCodeSchema = z.object({
+  code: roomCodeSchema,
+  viewerMemberId: z.string().min(1).optional(),
+})
+
 export const expenseSplitSchema = z.object({
   memberId: z.string().min(1),
   weight: z.number().int().min(0).optional(),
@@ -59,9 +64,21 @@ export const addExpenseSchema = z
     currency: currencyCodeSchema.optional(),
     paidById: z.string().min(1, "Pick who paid"),
     splitMode: splitModeSchema.default("EQUAL"),
+    isPersonal: z.boolean().default(false),
     splits: z.array(expenseSplitSchema).min(1, "Pick at least one person"),
   })
   .superRefine((value, ctx) => {
+    if (value.isPersonal) {
+      if (value.splits.length !== 1 || value.splits[0]?.memberId !== value.paidById) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Personal expenses must be assigned only to you",
+          path: ["splits"],
+        })
+      }
+      return
+    }
+
     if (value.splitMode === "AMOUNT") {
       let sum = 0
       for (const split of value.splits) {
