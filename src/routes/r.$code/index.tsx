@@ -568,7 +568,7 @@ function ExpenseDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[85dvh] overflow-y-auto rounded-t-2xl"
+        className="max-h-[85dvh] overflow-y-auto rounded-t-2xl sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-content sm:-translate-x-1/2"
       >
         <SheetHeader>
           <SheetTitle>{editing ? "Edit expense" : expense.title}</SheetTitle>
