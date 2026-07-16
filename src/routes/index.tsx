@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
+import { RecentTripsList } from "@/components/recent-trips-list"
 import { SiteLogo } from "@/components/site-logo"
 import { SplitAtmosphere } from "@/components/split-atmosphere"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -34,8 +35,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
 import { rememberMember } from "@/lib/member-storage"
-import { formatRecentTripOpened, listRecentTrips } from "@/lib/recent-trips"
-import type { RecentTrip } from "@/lib/recent-trips"
+import { isStandaloneDisplay } from "@/lib/pwa-install"
+import { resolveMostRecentTripCode, getMostRecentTripCode } from "@/lib/resume-trip"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
 import { fetchFxRates } from "@/server/fx"
@@ -47,7 +48,17 @@ import {
 } from "@/server/rooms"
 import type { RoomDto } from "@/server/rooms"
 
+type LandingSearch = {
+  stay?: boolean
+}
+
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>): LandingSearch => ({
+    stay:
+      search.stay === "1" ||
+      search.stay === true ||
+      search.stay === "true",
+  }),
   component: LandingPage,
 })
 
@@ -68,11 +79,50 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
-  const [recentTrips, setRecentTrips] = useState<RecentTrip[]>([])
+  const { stay } = Route.useSearch()
+  const [resuming, setResuming] = useState(() => {
+    if (typeof window === "undefined") return false
+    if (stay) return false
+    return isStandaloneDisplay() && Boolean(getMostRecentTripCode())
+  })
 
   useEffect(() => {
-    setRecentTrips(listRecentTrips())
-  }, [])
+    if (stay || !isStandaloneDisplay()) return
+
+    let cancelled = false
+
+    void resolveMostRecentTripCode()
+      .then((code) => {
+        if (cancelled) return
+        if (!code) {
+          setResuming(false)
+          return
+        }
+        void navigate({
+          to: "/r/$code",
+          params: { code },
+          replace: true,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setResuming(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [navigate, stay])
+
+  if (resuming) {
+    return (
+      <SplitAtmosphere as="main" className="overflow-hidden">
+        <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col items-center justify-center pb-12 pt-5">
+          <SiteLogo showWordmark={false} markClassName="size-8" />
+          <p className="text-muted-foreground mt-6 text-sm">Opening your trip…</p>
+        </div>
+      </SplitAtmosphere>
+    )
+  }
 
   return (
     <SplitAtmosphere as="main" className="overflow-hidden">
@@ -116,47 +166,10 @@ function LandingPage() {
               </TabsContent>
             </Tabs>
           </div>
-          <RecentTrips trips={recentTrips} />
+          <RecentTripsList />
         </div>
       </div>
     </SplitAtmosphere>
-  )
-}
-
-function RecentTrips({ trips }: { trips: RecentTrip[] }) {
-  if (trips.length === 0) return null
-
-  return (
-    <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="font-display text-sm font-semibold text-foreground">
-          Recent trips
-        </h2>
-        <span className="text-xs text-muted-foreground">This device</span>
-      </div>
-      <div className="grid gap-2">
-        {trips.slice(0, 4).map((trip) => (
-          <Link
-            key={trip.code}
-            to="/r/$code"
-            params={{ code: trip.code }}
-            className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5 text-left transition-colors hover:bg-background/80"
-          >
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium">
-                {trip.name}
-              </span>
-              <span className="mt-0.5 block text-xs tracking-wider text-muted-foreground">
-                {trip.code}
-              </span>
-            </span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {formatRecentTripOpened(trip.updatedAt)}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </section>
   )
 }
 
