@@ -80,15 +80,29 @@ function AddExpensePage() {
   async function onScan(file: File | null) {
     if (!file) return
     setError(null)
+
+    if (!file.type.startsWith("image/")) {
+      setError("Pick an image file (JPEG, PNG, or WebP)")
+      return
+    }
+    if (file.size > 1_000_000) {
+      setError("Image is too large (max 1MB). Try a clearer crop.")
+      return
+    }
+
     setOcrPending(true)
     try {
       const buffer = await file.arrayBuffer()
       const bytes = new Uint8Array(buffer)
       let binary = ""
-      for (const byte of bytes) binary += String.fromCharCode(byte)
+      const chunk = 0x8000
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+      }
       const imageBase64 = btoa(binary)
       const draft = await scanReceipt({
         data: {
+          code: room.code,
           imageBase64,
           mimeType: file.type || "image/jpeg",
         },

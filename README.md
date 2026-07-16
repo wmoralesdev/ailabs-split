@@ -44,6 +44,12 @@ pnpm dev
 
 Room code is the only access control. Your display name is how you reclaim yourself across devices; localStorage only remembers the last pick on that browser.
 
+## Cost / connection hygiene
+
+- Postgres: one shared `pg` Pool per isolate (`PG_POOL_MAX=1`), short idle timeout, Neon **pooled** `DATABASE_URL`
+- OCR: requires a real room code, IP + room rate limits, ~1MB image cap, 20s timeout; no persistent Mistral socket
+- Writes (create/join/add expense): light per-IP rate limits
+
 ## Deploy
 
 Vercel (or same host as ailabs). Env: `DATABASE_URL`, optional `DIRECT_URL`, optional `MISTRAL_API_KEY`. Point DNS `split.ailabs.sv` at the deployment.

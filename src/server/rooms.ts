@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start"
+import { getRequestHeader } from "@tanstack/react-start/server"
 
 import { prisma } from "@/lib/prisma"
+import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode, normalizeRoomCode } from "@/lib/room-code"
 import { equalSplitCents } from "@/lib/settle"
 
@@ -51,6 +53,23 @@ function asStringArray(value: unknown, field: string): string[] {
       throw new Error(`Invalid ${field}[${index}]`)
     }
     return entry.trim()
+  })
+}
+
+function clientIp(): string {
+  const forwarded = getRequestHeader("x-forwarded-for")
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim()
+    if (first) return first
+  }
+  return getRequestHeader("x-real-ip") ?? "unknown"
+}
+
+function limitWrites(action: string) {
+  assertRateLimit(`write:ip:${clientIp()}:${action}`, {
+    limit: 30,
+    windowMs: 60_000,
+    label: action,
   })
 }
 
@@ -115,6 +134,7 @@ export const createRoom = createServerFn({ method: "POST" })
     return { name, currency, memberNames }
   })
   .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("create-room")
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = generateRoomCode(7)
       try {
@@ -180,6 +200,7 @@ export const joinRoom = createServerFn({ method: "POST" })
     async ({
       data,
     }): Promise<{ room: RoomDto; memberId: string }> => {
+      limitWrites("join-room")
       const existing = await loadRoomByCode(data.code)
       if (!existing) {
         throw new Error("Room not found")
@@ -291,6 +312,7 @@ export const addExpense = createServerFn({ method: "POST" })
     }
   })
   .handler(async ({ data }): Promise<ExpenseDto> => {
+    limitWrites("add-expense")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
       include: { members: true },
