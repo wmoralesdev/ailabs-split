@@ -208,7 +208,7 @@ function RoomLayout() {
           <AppHeader
             right={<ShareTripButton code={room.code} name={room.name} />}
           />
-          <div className="flex-1 pb-28">
+          <div className="pb-room-tab-bar flex-1">
             <Outlet />
           </div>
           <RoomTabBar code={code} />

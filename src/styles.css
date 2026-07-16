@@ -84,6 +84,9 @@
     --space-gutter: 1.5rem;
     --max-width: 40rem;
     --max-width-narrow: 28rem;
+    --room-tab-bar-clearance: calc(
+        7rem + env(safe-area-inset-bottom, 0px)
+    );
 
     /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -250,11 +253,15 @@
 
     /* Bottom-chrome safe area for the mobile tab bar / sticky CTAs. */
     .pb-safe {
-        padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+    }
+
+    .pb-room-tab-bar {
+        padding-bottom: var(--room-tab-bar-clearance);
     }
 
     .h-safe-bottom {
-        height: env(safe-area-inset-bottom);
+        height: env(safe-area-inset-bottom, 0px);
     }
 
     .split-hero-wash {
