@@ -11,10 +11,10 @@
     --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
     --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
 
-    --color-split: var(--brand-split);
-    --color-split-soft: var(--brand-split-soft);
-    --color-mist: var(--brand-mist);
-    --color-ink: var(--brand-ink);
+    --color-purple: var(--brand-purple);
+    --color-purple-soft: var(--brand-purple-soft);
+    --color-lavender: var(--brand-lavender);
+    --color-graphite: var(--brand-graphite);
     --color-muted-text: var(--brand-muted);
     --color-white: var(--brand-white);
     --color-border-dark: var(--brand-border-dark);
@@ -69,67 +69,74 @@
 }
 
 :root {
-    /* Split brand — teal ink, not Ai Labs purple */
-    --brand-split: #0f766e;
-    --brand-split-soft: #2dd4bf;
-    --brand-mist: #e7f5f2;
-    --brand-ink: #14201e;
-    --brand-muted: #5a6b68;
+    /* Ai Labs brand — purple accent on graphite/white (parity with Vega). */
+    --brand-purple: #a78bfa;
+    --brand-purple-soft: #c4acf6;
+    --brand-lavender: #ede4ff;
+    --brand-graphite: #1a1a1a;
+    --brand-muted: #5c5c5c;
     --brand-white: #ffffff;
-    --brand-border: #d3e4e0;
-    --brand-border-dark: #3d524e;
+    --brand-border: #e8e4f0;
+    --brand-border-dark: #44414f;
 
+    /* Spacing / layout — tuned for a single mobile column. */
     --space-section-y: 4rem;
     --space-gutter: 1.5rem;
     --max-width: 40rem;
     --max-width-narrow: 28rem;
 
+    /* Motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
     --dur-fast: 160ms;
     --dur-base: 240ms;
     --dur-enter: 500ms;
 
+    /* shadcn semantic map → brand */
     --background: var(--brand-white);
-    --foreground: var(--brand-ink);
+    --foreground: var(--brand-graphite);
     --card: var(--brand-white);
-    --card-foreground: var(--brand-ink);
+    --card-foreground: var(--brand-graphite);
     --popover: var(--brand-white);
-    --popover-foreground: var(--brand-ink);
-    --primary: var(--brand-split);
-    --primary-foreground: var(--brand-white);
-    --secondary: var(--brand-mist);
-    --secondary-foreground: var(--brand-ink);
-    --muted: var(--brand-mist);
+    --popover-foreground: var(--brand-graphite);
+    --primary: var(--brand-purple);
+    --primary-foreground: var(--brand-graphite);
+    --secondary: var(--brand-white);
+    --secondary-foreground: var(--brand-graphite);
+    --muted: var(--brand-lavender);
     --muted-foreground: var(--brand-muted);
-    --accent: var(--brand-mist);
-    --accent-foreground: var(--brand-ink);
+    --accent: var(--brand-lavender);
+    --accent-foreground: var(--brand-graphite);
     --destructive: #c2410c;
     --border: var(--brand-border);
     --input: var(--brand-border);
-    --ring: var(--brand-split);
-    --chart-1: var(--brand-split);
-    --chart-2: var(--brand-split-soft);
+    --ring: var(--brand-purple);
+    --chart-1: var(--brand-purple);
+    --chart-2: var(--brand-purple-soft);
     --chart-3: var(--brand-muted);
-    --chart-4: var(--brand-ink);
+    --chart-4: var(--brand-graphite);
     --chart-5: var(--brand-border-dark);
     --radius: 0.75rem;
     --sidebar: var(--brand-white);
-    --sidebar-foreground: var(--brand-ink);
-    --sidebar-primary: var(--brand-split);
-    --sidebar-primary-foreground: var(--brand-white);
-    --sidebar-accent: var(--brand-mist);
-    --sidebar-accent-foreground: var(--brand-ink);
+    --sidebar-foreground: var(--brand-graphite);
+    --sidebar-primary: var(--brand-purple);
+    --sidebar-primary-foreground: var(--brand-graphite);
+    --sidebar-accent: var(--brand-lavender);
+    --sidebar-accent-foreground: var(--brand-graphite);
     --sidebar-border: var(--brand-border);
-    --sidebar-ring: var(--brand-split);
+    --sidebar-ring: var(--brand-purple);
 
-    --surface-soft: var(--brand-mist);
+    /* Soft tinted ground (lavender band) */
+    --surface-soft: var(--brand-lavender);
+
+    /* Fixed contrast for controls sitting on dark bands */
     --on-dark: var(--brand-white);
-    --on-dark-foreground: var(--brand-ink);
+    --on-dark-foreground: var(--brand-graphite);
 
-    --shadow-color: color-mix(in srgb, var(--brand-ink) 8%, transparent);
-    --shadow-color-strong: color-mix(in srgb, var(--brand-ink) 12%, transparent);
-    --shadow-glow: color-mix(in srgb, var(--brand-split) 28%, transparent);
+    /* Elevation — graphite/purple in light, black/purple in dark */
+    --shadow-color: color-mix(in srgb, var(--brand-graphite) 8%, transparent);
+    --shadow-color-strong: color-mix(in srgb, var(--brand-graphite) 12%, transparent);
+    --shadow-glow: color-mix(in srgb, var(--brand-purple) 32%, transparent);
 }
 
 @media (min-width: 768px) {
@@ -140,42 +147,42 @@
 }
 
 .dark {
-    --background: var(--brand-ink);
+    --background: var(--brand-graphite);
     --foreground: var(--brand-white);
-    --card: color-mix(in srgb, var(--brand-white) 8%, var(--brand-ink));
+    --card: color-mix(in srgb, var(--brand-white) 8%, var(--brand-graphite));
     --card-foreground: var(--brand-white);
-    --popover: color-mix(in srgb, var(--brand-white) 8%, var(--brand-ink));
+    --popover: color-mix(in srgb, var(--brand-white) 8%, var(--brand-graphite));
     --popover-foreground: var(--brand-white);
-    --primary: var(--brand-split-soft);
-    --primary-foreground: var(--brand-ink);
+    --primary: var(--brand-purple);
+    --primary-foreground: var(--brand-graphite);
     --secondary: transparent;
     --secondary-foreground: var(--brand-white);
-    --muted: color-mix(in srgb, var(--brand-split) 12%, var(--brand-ink));
+    --muted: color-mix(in srgb, var(--brand-purple) 10%, var(--brand-graphite));
     --muted-foreground: color-mix(in srgb, var(--brand-white) 68%, transparent);
-    --accent: color-mix(in srgb, var(--brand-split) 16%, var(--brand-ink));
+    --accent: color-mix(in srgb, var(--brand-purple) 14%, var(--brand-graphite));
     --accent-foreground: var(--brand-white);
     --destructive: color-mix(in srgb, #f87171 92%, white);
     --border: var(--brand-border-dark);
     --input: var(--brand-border-dark);
-    --ring: var(--brand-split-soft);
-    --chart-1: var(--brand-split-soft);
-    --chart-2: var(--brand-split);
+    --ring: var(--brand-purple-soft);
+    --chart-1: var(--brand-purple);
+    --chart-2: var(--brand-purple-soft);
     --chart-3: color-mix(in srgb, var(--brand-white) 68%, transparent);
     --chart-4: var(--brand-white);
     --chart-5: var(--brand-border);
-    --sidebar: color-mix(in srgb, var(--brand-white) 8%, var(--brand-ink));
+    --sidebar: color-mix(in srgb, var(--brand-white) 8%, var(--brand-graphite));
     --sidebar-foreground: var(--brand-white);
-    --sidebar-primary: var(--brand-split-soft);
-    --sidebar-primary-foreground: var(--brand-ink);
-    --sidebar-accent: color-mix(in srgb, var(--brand-split) 16%, var(--brand-ink));
+    --sidebar-primary: var(--brand-purple);
+    --sidebar-primary-foreground: var(--brand-graphite);
+    --sidebar-accent: color-mix(in srgb, var(--brand-purple) 14%, var(--brand-graphite));
     --sidebar-accent-foreground: var(--brand-white);
     --sidebar-border: var(--brand-border-dark);
-    --sidebar-ring: var(--brand-split-soft);
+    --sidebar-ring: var(--brand-purple-soft);
 
-    --surface-soft: color-mix(in srgb, var(--brand-split) 14%, var(--brand-ink));
+    --surface-soft: color-mix(in srgb, var(--brand-purple) 14%, var(--brand-graphite));
     --shadow-color: color-mix(in srgb, black 40%, transparent);
     --shadow-color-strong: color-mix(in srgb, black 55%, transparent);
-    --shadow-glow: color-mix(in srgb, var(--brand-split) 24%, transparent);
+    --shadow-glow: color-mix(in srgb, var(--brand-purple) 24%, transparent);
 }
 
 @layer base {
@@ -207,10 +214,22 @@
         box-shadow: 0 2px 6px var(--shadow-color-strong);
     }
 
+    .shadow-elevated {
+        box-shadow:
+            0 1px 2px var(--shadow-color),
+            0 12px 32px -20px var(--shadow-glow);
+    }
+
     .shadow-float {
         box-shadow:
             0 2px 6px var(--shadow-color-strong),
             0 16px 40px var(--shadow-glow);
+    }
+
+    .shadow-panel {
+        box-shadow:
+            0 2px 8px var(--shadow-color),
+            0 32px 80px -24px var(--shadow-glow);
     }
 
     .section-y {
@@ -229,23 +248,32 @@
         max-width: var(--max-width-narrow);
     }
 
+    /* Bottom-chrome safe area for the mobile tab bar / sticky CTAs. */
+    .pb-safe {
+        padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+    }
+
+    .h-safe-bottom {
+        height: env(safe-area-inset-bottom);
+    }
+
     .split-hero-wash {
         background:
             radial-gradient(
                 120% 80% at 10% 0%,
-                color-mix(in srgb, var(--brand-split-soft) 28%, transparent),
+                color-mix(in srgb, var(--brand-purple-soft) 30%, transparent),
                 transparent 55%
             ),
             radial-gradient(
                 90% 70% at 100% 20%,
-                color-mix(in srgb, var(--brand-split) 18%, transparent),
+                color-mix(in srgb, var(--brand-purple) 20%, transparent),
                 transparent 50%
             ),
             linear-gradient(
                 165deg,
-                var(--brand-mist) 0%,
+                var(--brand-lavender) 0%,
                 var(--brand-white) 45%,
-                color-mix(in srgb, var(--brand-mist) 55%, white) 100%
+                color-mix(in srgb, var(--brand-lavender) 55%, white) 100%
             );
     }
 
@@ -253,24 +281,24 @@
         background:
             radial-gradient(
                 120% 80% at 10% 0%,
-                color-mix(in srgb, var(--brand-split) 35%, transparent),
+                color-mix(in srgb, var(--brand-purple) 34%, transparent),
                 transparent 55%
             ),
             radial-gradient(
                 90% 70% at 100% 20%,
-                color-mix(in srgb, var(--brand-split-soft) 12%, transparent),
+                color-mix(in srgb, var(--brand-purple-soft) 12%, transparent),
                 transparent 50%
             ),
             linear-gradient(
                 165deg,
-                var(--brand-ink) 0%,
-                color-mix(in srgb, var(--brand-split) 12%, var(--brand-ink)) 100%
+                var(--brand-graphite) 0%,
+                color-mix(in srgb, var(--brand-purple) 12%, var(--brand-graphite)) 100%
             );
     }
 
     .split-stipple {
         background-image: radial-gradient(
-            color-mix(in srgb, var(--brand-split) 22%, transparent) 1px,
+            color-mix(in srgb, var(--brand-purple) 24%, transparent) 1px,
             transparent 1px
         );
         background-size: 18px 18px;
@@ -289,6 +317,53 @@
         animation: split-rise var(--dur-enter) var(--ease-out) both;
         animation-delay: 160ms;
     }
+
+    .animate-rise-delay-3 {
+        animation: split-rise var(--dur-enter) var(--ease-out) both;
+        animation-delay: 240ms;
+    }
+
+    /* Landing interaction surface — glass with edge refraction, not a dashboard card. */
+    .landing-panel {
+        border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+        background: color-mix(in srgb, var(--background) 72%, transparent);
+        box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 55%, transparent),
+            0 1px 2px var(--shadow-color),
+            0 24px 48px -28px var(--shadow-glow);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+    }
+
+    .dark .landing-panel {
+        border-color: color-mix(in srgb, white 10%, transparent);
+        background: color-mix(in srgb, var(--brand-graphite) 55%, transparent);
+        box-shadow:
+            inset 0 1px 0 color-mix(in srgb, white 10%, transparent),
+            0 1px 2px var(--shadow-color),
+            0 28px 56px -28px var(--shadow-glow);
+    }
+
+    .landing-chip {
+        @apply inline-flex items-center justify-center rounded-md border px-2.5 py-1.5 text-xs font-medium transition-[transform,background-color,border-color,color] duration-200;
+        transition-timing-function: var(--ease-out);
+    }
+
+    .landing-chip:active {
+        transform: scale(0.97);
+    }
+
+    .landing-chip-idle {
+        @apply border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground;
+    }
+
+    .landing-chip-on {
+        @apply border-primary/35 bg-primary/12 text-foreground;
+    }
+
+    .landing-member-chip {
+        @apply bg-muted/70 text-foreground inline-flex items-center gap-1.5 rounded-md py-1.5 pr-1.5 pl-2.5 text-sm font-medium;
+    }
 }
 
 @keyframes split-rise {
@@ -305,7 +380,8 @@
 @media (prefers-reduced-motion: reduce) {
     .animate-rise,
     .animate-rise-delay,
-    .animate-rise-delay-2 {
+    .animate-rise-delay-2,
+    .animate-rise-delay-3 {
         animation: none;
         opacity: 1;
         transform: none;

@@ -2,19 +2,25 @@ import {
   HeadContent,
   Link,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
 } from "@tanstack/react-router"
+import type { QueryClient } from "@tanstack/react-query"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
 
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 import appCss from "../styles.css?url"
+
+// Applies the persisted theme before paint to avoid a flash / hydration jump.
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('split-theme');var d=t==='dark'||((!t||t==='system')&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();`
 
 const SITE_TITLE = "Split — trip costs, no accounts"
 const SITE_DESCRIPTION =
-  "Split trip costs with a room code. No accounts, no fuss."
+  "Split trip costs with a trip code. No accounts, no fuss."
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -24,7 +30,7 @@ export const Route = createRootRoute({
       },
       { title: SITE_TITLE },
       { name: "description", content: SITE_DESCRIPTION },
-      { name: "theme-color", content: "#0f766e" },
+      { name: "theme-color", content: "#1a1a1a" },
       { name: "application-name", content: "Split" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Split" },
@@ -52,7 +58,7 @@ export const Route = createRootRoute({
         Page not found
       </h1>
       <p className="text-muted-foreground mt-3 text-lg">
-        That room or page doesn&rsquo;t exist.
+        That trip or page doesn&rsquo;t exist.
       </p>
       <Link
         to="/"
@@ -67,13 +73,17 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
-        {children}
-        <PwaInstallPrompt />
+        <ThemeProvider>
+          {children}
+          <Toaster />
+          <PwaInstallPrompt />
+        </ThemeProvider>
         {import.meta.env.DEV ? (
           <TanStackDevtools
             config={{ position: "bottom-right" }}
