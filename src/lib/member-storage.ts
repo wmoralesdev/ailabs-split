@@ -1,3 +1,5 @@
+import { inviteLink } from "@/lib/invite-link"
+
 const STORAGE_PREFIX = "split:member:"
 
 export function memberStorageKey(roomCode: string): string {
@@ -29,10 +31,7 @@ export function resolveRememberedMember(
 }
 
 export function memberLink(roomCode: string, memberName: string): string {
-  const url = new URL(
-    `/r/${roomCode.toUpperCase()}`,
-    typeof window !== "undefined" ? window.location.origin : "https://split.ailabs.sv"
-  )
+  const url = new URL(inviteLink(roomCode))
   url.searchParams.set("as", memberName)
   return url.toString()
 }

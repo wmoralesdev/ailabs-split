@@ -161,3 +161,63 @@ export function parseAmountToCents(raw: string): number | null {
   if (!Number.isFinite(value) || value < 0) return null
   return Math.round(value * 100)
 }
+
+/**
+ * Split total cents by integer weights using the largest-remainder method so
+ * the parts always sum exactly to the total. Members with weight 0 are excluded.
+ * Example: total split by [2,1,1,0] → [50%, 25%, 25%, 0].
+ */
+export function partsSplitCents(
+  totalCents: number,
+  weights: Array<{ memberId: string; weight: number }>
+): Array<{ memberId: string; amountCents: number; weight: number }> {
+  if (totalCents < 0) {
+    throw new Error("Amount cannot be negative")
+  }
+  const active = weights.filter((entry) => entry.weight > 0)
+  const totalWeight = active.reduce((sum, entry) => sum + entry.weight, 0)
+  if (totalWeight <= 0) {
+    throw new Error("At least one member needs a positive number of parts")
+  }
+
+  const raw = active.map((entry) => {
+    const exact = (totalCents * entry.weight) / totalWeight
+    const base = Math.floor(exact)
+    return { memberId: entry.memberId, weight: entry.weight, base, remainder: exact - base }
+  })
+
+  const distributed = raw.reduce((sum, entry) => sum + entry.base, 0)
+  let leftover = totalCents - distributed
+  const byRemainder = [...raw].sort((a, b) => b.remainder - a.remainder)
+  for (const entry of byRemainder) {
+    if (leftover <= 0) break
+    entry.base += 1
+    leftover -= 1
+  }
+
+  const amountByMember = new Map(raw.map((entry) => [entry.memberId, entry.base]))
+  return active.map((entry) => ({
+    memberId: entry.memberId,
+    weight: entry.weight,
+    amountCents: amountByMember.get(entry.memberId) ?? 0,
+  }))
+}
+
+export type FxRates = Record<string, number> | null | undefined
+
+/**
+ * Convert an amount in `currency` to the room base currency.
+ * fxRates are units of the currency per 1 unit of base (e.g. { CRC: 505 }).
+ * Unknown or missing rates fall back to 1:1 so balances still compute.
+ */
+export function convertToBase(
+  amountCents: number,
+  currency: string | null | undefined,
+  baseCurrency: string,
+  fxRates: FxRates
+): number {
+  if (!currency || currency === baseCurrency) return amountCents
+  const rate = fxRates?.[currency]
+  if (!rate || rate <= 0) return amountCents
+  return Math.round(amountCents / rate)
+}

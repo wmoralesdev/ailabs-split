@@ -10,7 +10,7 @@ const RoomIdentityContext = createContext<RoomIdentity | null>(null)
 function useRoomIdentity(): RoomIdentity {
   const value = useContext(RoomIdentityContext)
   if (!value) {
-    throw new Error("useRoomIdentity must be used inside a claimed room")
+    throw new Error("useRoomIdentity must be used inside a claimed trip")
   }
   return value
 }
