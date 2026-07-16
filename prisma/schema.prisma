@@ -13,7 +13,12 @@ model Room {
   id        String   @id @default(cuid())
   code      String   @unique
   name      String
+  // Base/settlement currency for the room (e.g. the members' home currency).
   currency  String
+  // Allowed currencies for expenses (includes the base currency).
+  currencies String[] @default([])
+  // Exchange rates as units of the currency per 1 base currency, e.g. { "CRC": 505 }.
+  fxRates   Json?
   createdAt DateTime @default(now())
   members   Member[]
   expenses  Expense[]
@@ -35,6 +40,10 @@ model Expense {
   roomId      String
   title       String
   amountCents Int
+  // Currency this expense was recorded in; null falls back to the room base currency.
+  currency    String?
+  // How shares were derived: EQUAL | PARTS | AMOUNT.
+  splitMode   String         @default("EQUAL")
   paidById    String
   createdAt   DateTime       @default(now())
   room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -50,6 +59,8 @@ model ExpenseShare {
   expenseId   String
   memberId    String
   amountCents Int
+  // Relative weight when the expense uses PARTS split mode (null otherwise).
+  weight      Int?
   expense     Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   member      Member  @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
