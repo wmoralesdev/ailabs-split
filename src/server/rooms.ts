@@ -167,31 +167,27 @@ export const joinRoom = createServerFn({ method: "POST" })
     }
     const body = data as Record<string, unknown>
     const code = normalizeRoomCode(asString(body.code, "code"))
-    const memberName =
-      typeof body.memberName === "string" && body.memberName.trim()
-        ? body.memberName.trim()
-        : undefined
+    const memberName = asString(body.memberName, "memberName")
     if (code.length < 6 || code.length > 8) {
       throw new Error("Room code must be 6–8 characters")
+    }
+    if (memberName.length > 40) {
+      throw new Error("Name is too long")
     }
     return { code, memberName }
   })
   .handler(
     async ({
       data,
-    }): Promise<{ room: RoomDto; memberId: string | null }> => {
+    }): Promise<{ room: RoomDto; memberId: string }> => {
       const existing = await loadRoomByCode(data.code)
       if (!existing) {
         throw new Error("Room not found")
       }
 
-      if (!data.memberName) {
-        return { room: existing, memberId: null }
-      }
-
       const match = existing.members.find(
         (member) =>
-          member.name.toLowerCase() === data.memberName!.toLowerCase()
+          member.name.toLowerCase() === data.memberName.toLowerCase()
       )
       if (match) {
         return { room: existing, memberId: match.id }
@@ -208,11 +204,38 @@ export const joinRoom = createServerFn({ method: "POST" })
       if (!room) throw new Error("Room not found")
       const created = room.members.find(
         (member) =>
-          member.name.toLowerCase() === data.memberName!.toLowerCase()
+          member.name.toLowerCase() === data.memberName.toLowerCase()
       )
-      return { room, memberId: created?.id ?? null }
+      if (!created) throw new Error("Could not claim member")
+      return { room, memberId: created.id }
     }
   )
+
+/** Pick an existing member id in a room (cross-device reclaim). */
+export const claimMemberById = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    if (typeof data !== "object" || data === null) {
+      throw new Error("Invalid payload")
+    }
+    const body = data as Record<string, unknown>
+    const code = normalizeRoomCode(asString(body.code, "code"))
+    const memberId = asString(body.memberId, "memberId")
+    if (code.length < 6 || code.length > 8) {
+      throw new Error("Room code must be 6–8 characters")
+    }
+    return { code, memberId }
+  })
+  .handler(async ({ data }): Promise<{ memberId: string; name: string }> => {
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      include: { members: true },
+    })
+    if (!room) throw new Error("Room not found")
+    const member = room.members.find((entry) => entry.id === data.memberId)
+    if (!member) throw new Error("Member not found in this room")
+    return { memberId: member.id, name: member.name }
+  })
+
 
 export const addExpense = createServerFn({ method: "POST" })
   .validator((data: unknown) => {

@@ -44,9 +44,6 @@ function LandingPage() {
       const room = await createRoom({
         data: { name: roomName, currency, memberNames },
       })
-      if (room.members[0]) {
-        rememberMember(room.code, room.members[0].id)
-      }
       await navigate({ to: "/r/$code", params: { code: room.code } })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create room")
@@ -64,12 +61,10 @@ function LandingPage() {
       const result = await joinRoom({
         data: {
           code,
-          ...(joinName.trim() ? { memberName: joinName.trim() } : {}),
+          memberName: joinName.trim(),
         },
       })
-      if (result.memberId) {
-        rememberMember(result.room.code, result.memberId)
-      }
+      rememberMember(result.room.code, result.memberId)
       await navigate({ to: "/r/$code", params: { code: result.room.code } })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join room")
@@ -193,14 +188,18 @@ function LandingPage() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="join-name">Your name (optional)</Label>
+              <Label htmlFor="join-name">Your name</Label>
               <Input
                 id="join-name"
                 value={joinName}
                 onChange={(e) => setJoinName(e.target.value)}
-                placeholder="Adds you if you're new"
+                placeholder="Matches or adds you in the room"
+                required
                 className="h-11"
               />
+              <p className="text-muted-foreground text-xs">
+                Same name as on another device? Enter it to reclaim yourself.
+              </p>
             </div>
             <Button
               type="submit"

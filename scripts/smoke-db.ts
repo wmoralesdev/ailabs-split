@@ -21,9 +21,8 @@ const room = await prisma.room.create({
   include: { members: true },
 })
 
-const [walter, daniela] = room.members
-if (!walter || !daniela) throw new Error("members missing")
-
+const walter = room.members[0]
+const daniela = room.members[1]
 const shares = equalSplitCents(5000, [walter.id, daniela.id])
 await prisma.expense.create({
   data: {

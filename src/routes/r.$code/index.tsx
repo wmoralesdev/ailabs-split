@@ -10,17 +10,12 @@ import {
   Add01Icon,
   ArrowRight01Icon,
   Copy01Icon,
+  Link01Icon,
 } from "@hugeicons/core-free-icons"
 
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { recallMember, rememberMember } from "@/lib/member-storage"
+import { memberLink } from "@/lib/member-storage"
+import { useRoomIdentity } from "@/lib/room-identity"
 import {
   computeNets,
   formatMoney,
@@ -36,9 +31,11 @@ export const Route = createFileRoute("/r/$code/")({
 
 function RoomHomePage() {
   const { room } = roomRoute.useLoaderData()
+  const { memberId, switchIdentity } = useRoomIdentity()
   const router = useRouter()
-  const [copied, setCopied] = useState(false)
-  const [me, setMe] = useState<string | null>(() => recallMember(room.code))
+  const [copied, setCopied] = useState<"code" | "link" | null>(null)
+
+  const me = room.members.find((member) => member.id === memberId)
 
   const nets = useMemo(
     () =>
@@ -59,14 +56,15 @@ function RoomHomePage() {
 
   async function copyCode() {
     await navigator.clipboard.writeText(room.code)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
+    setCopied("code")
+    window.setTimeout(() => setCopied(null), 1500)
   }
 
-  function onPickMe(memberId: string | null) {
-    if (!memberId) return
-    setMe(memberId)
-    rememberMember(room.code, memberId)
+  async function copyMyLink() {
+    if (!me) return
+    await navigator.clipboard.writeText(memberLink(room.code, me.name))
+    setCopied("link")
+    window.setTimeout(() => setCopied(null), 1500)
   }
 
   return (
@@ -89,7 +87,7 @@ function RoomHomePage() {
           >
             <span className="font-display tracking-widest">{room.code}</span>
             <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-            {copied ? "Copied" : "Copy code"}
+            {copied === "code" ? "Copied" : "Copy code"}
           </button>
         </div>
         <Button
@@ -102,19 +100,34 @@ function RoomHomePage() {
       </header>
 
       <section className="mt-8">
-        <Labelish>I am</Labelish>
-        <Select value={me ?? undefined} onValueChange={onPickMe}>
-          <SelectTrigger className="mt-2 h-11 w-full">
-            <SelectValue placeholder="Pick your name" />
-          </SelectTrigger>
-          <SelectContent>
-            {room.members.map((member) => (
-              <SelectItem key={member.id} value={member.id}>
-                {member.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+          You are
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p className="font-display text-xl font-semibold">
+            {me?.name ?? "Unknown"}
+          </p>
+          <button
+            type="button"
+            onClick={switchIdentity}
+            className="text-primary text-sm font-medium"
+          >
+            Not you? Switch
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => void copyMyLink()}
+          className="text-muted-foreground mt-3 inline-flex items-center gap-1.5 text-sm"
+        >
+          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+          {copied === "link"
+            ? "Personal link copied"
+            : "Copy my link for another device"}
+        </button>
+        <p className="text-muted-foreground mt-1 text-xs">
+          Opens this room as you via name — handy when localStorage is empty.
+        </p>
       </section>
 
       <section className="mt-10">
@@ -135,7 +148,12 @@ function RoomHomePage() {
               key={line.memberId}
               className="flex items-baseline justify-between gap-3 border-b border-border/70 py-2"
             >
-              <span className="font-medium">{line.name}</span>
+              <span className="font-medium">
+                {line.name}
+                {line.memberId === memberId ? (
+                  <span className="text-muted-foreground font-normal"> (you)</span>
+                ) : null}
+              </span>
               <span
                 className={
                   line.netCents > 0
@@ -216,13 +234,5 @@ function ExpenseRow({
         {formatMoney(expense.amountCents, currency)}
       </p>
     </li>
-  )
-}
-
-function Labelish({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-      {children}
-    </p>
   )
 }

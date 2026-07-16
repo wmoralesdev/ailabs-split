@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowLeft01Icon, Camera01Icon } from "@hugeicons/core-free-icons"
@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { recallMember, rememberMember } from "@/lib/member-storage"
+import { recallMember } from "@/lib/member-storage"
 import {
   equalSplitCents,
   formatMoney,
@@ -61,10 +61,6 @@ function AddExpensePage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [ocrPending, setOcrPending] = useState(false)
-
-  useEffect(() => {
-    if (paidById) rememberMember(room.code, paidById)
-  }, [paidById, room.code])
 
   const amountCents = useMemo(() => parseAmountToCents(amountRaw), [amountRaw])
 

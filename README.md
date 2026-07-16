@@ -36,12 +36,13 @@ pnpm dev
 
 ## Product
 
-1. **/** — create a room (name, currency, members) or join by code  
-2. **/r/$code** — balances + expense list  
-3. **/r/$code/new** — fast add expense; optional scan  
-4. **/r/$code/settle** — “X owes Y $Z” transfers  
+1. **/** — create a room (name, currency, members) or join by code **and your name**
+2. **/r/$code** — who-are-you gate (pick existing or add name) → balances + expenses
+3. **/r/$code?as=Name** — personal link that claims you on a new device
+4. **/r/$code/new** — fast add expense; optional scan
+5. **/r/$code/settle** — “X owes Y $Z” transfers
 
-Room code (6–8 chars) is the only access control. Member identity is a display name remembered in `localStorage`.
+Room code is the only access control. Your display name is how you reclaim yourself across devices; localStorage only remembers the last pick on that browser.
 
 ## Deploy
 
