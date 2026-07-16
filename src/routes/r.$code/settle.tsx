@@ -40,7 +40,7 @@ export const Route = createFileRoute("/r/$code/settle")({
     <main className="page-gutter mx-auto flex min-h-dvh max-w-content flex-col justify-center">
       <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
       <p className="text-muted-foreground mt-2">{error.message}</p>
-      <Link to="/" className="text-primary mt-6 underline">
+      <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
         Back to Split
       </Link>
     </main>
