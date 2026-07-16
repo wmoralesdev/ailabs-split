@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useRouterState } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Cancel01Icon,
@@ -23,6 +24,9 @@ import {
 import type { BeforeInstallPromptEvent } from "@/lib/pwa-install"
 
 function PwaInstallPrompt() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const onLanding = pathname === "/"
+
   const [visible, setVisible] = useState(false)
   const [iosHelpOpen, setIosHelpOpen] = useState(false)
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
@@ -72,7 +76,8 @@ function PwaInstallPrompt() {
     }
   }
 
-  if (!visible) return null
+  // Listen app-wide; only show the banner on landing so it doesn't cover room FAB.
+  if (!visible || !onLanding) return null
 
   return (
     <>
@@ -151,10 +156,12 @@ function PwaInstallPrompt() {
               at the bottom of Safari.
             </li>
             <li>
-              Scroll and tap <span className="font-medium">Add to Home Screen</span>.
+              Scroll and tap{" "}
+              <span className="font-medium">Add to Home Screen</span>.
             </li>
             <li>
-              Tap <span className="font-medium">Add</span>. Split opens like an app.
+              Tap <span className="font-medium">Add</span>. Split opens like an
+              app.
             </li>
           </ol>
           <Button type="button" className="mt-4 w-full" onClick={dismiss}>
