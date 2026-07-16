@@ -23,7 +23,7 @@ export function AppHeader({
       )}
     >
       <div className="page-gutter mx-auto flex h-14 max-w-content items-center justify-between gap-3">
-        <Link to="/" className="rounded-md" aria-label="Split home">
+        <Link to="/" search={{ stay: true }} className="rounded-md" aria-label="Split home">
           <SiteLogo showWordmark={showWordmark} />
         </Link>
         <div className="flex items-center gap-1">

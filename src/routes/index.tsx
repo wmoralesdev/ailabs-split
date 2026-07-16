@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
+import { RecentTripsList } from "@/components/recent-trips-list"
 import { SiteLogo } from "@/components/site-logo"
 import { SplitAtmosphere } from "@/components/split-atmosphere"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -34,6 +35,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
 import { rememberMember } from "@/lib/member-storage"
+import { isStandaloneDisplay } from "@/lib/pwa-install"
+import { resolveMostRecentTripCode, getMostRecentTripCode } from "@/lib/resume-trip"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
 import { fetchFxRates } from "@/server/fx"
@@ -45,7 +48,17 @@ import {
   type RoomDto,
 } from "@/server/rooms"
 
+type LandingSearch = {
+  stay?: boolean
+}
+
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>): LandingSearch => ({
+    stay:
+      search.stay === "1" ||
+      search.stay === true ||
+      search.stay === "true",
+  }),
   component: LandingPage,
 })
 
@@ -66,6 +79,50 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
+  const { stay } = Route.useSearch()
+  const [resuming, setResuming] = useState(() => {
+    if (typeof window === "undefined") return false
+    if (stay) return false
+    return isStandaloneDisplay() && Boolean(getMostRecentTripCode())
+  })
+
+  useEffect(() => {
+    if (stay || !isStandaloneDisplay()) return
+
+    let cancelled = false
+
+    void resolveMostRecentTripCode()
+      .then((code) => {
+        if (cancelled) return
+        if (!code) {
+          setResuming(false)
+          return
+        }
+        void navigate({
+          to: "/r/$code",
+          params: { code },
+          replace: true,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setResuming(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [navigate, stay])
+
+  if (resuming) {
+    return (
+      <SplitAtmosphere as="main" className="overflow-hidden">
+        <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col items-center justify-center pb-12 pt-5">
+          <SiteLogo showWordmark={false} markClassName="size-8" />
+          <p className="text-muted-foreground mt-6 text-sm">Opening your trip…</p>
+        </div>
+      </SplitAtmosphere>
+    )
+  }
 
   return (
     <SplitAtmosphere as="main" className="overflow-hidden">
@@ -109,6 +166,7 @@ function LandingPage() {
               </TabsContent>
             </Tabs>
           </div>
+          <RecentTripsList />
         </div>
       </div>
     </SplitAtmosphere>

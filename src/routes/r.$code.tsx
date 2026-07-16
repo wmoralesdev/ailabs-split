@@ -46,7 +46,7 @@ export const Route = createFileRoute("/r/$code")({
       <div className="page-gutter relative mx-auto flex min-h-dvh max-w-content flex-col justify-center">
         <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
         <p className="text-muted-foreground mt-2">{error.message}</p>
-        <Link to="/" className="text-primary mt-6 underline">
+        <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
           Back to Split
         </Link>
       </div>
@@ -71,9 +71,9 @@ function RoomLayout() {
     queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
 
   useEffect(() => {
-    if (!memberId || !room) return
+    if (!room) return
     rememberRecentTrip({ code: room.code, name: room.name })
-  }, [memberId, room?.code, room?.name])
+  }, [room?.code, room?.name])
 
   useEffect(() => {
     if (!members) return
