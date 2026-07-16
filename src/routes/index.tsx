@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -34,6 +34,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
 import { rememberMember } from "@/lib/member-storage"
+import { formatRecentTripOpened, listRecentTrips } from "@/lib/recent-trips"
+import type { RecentTrip } from "@/lib/recent-trips"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
 import { fetchFxRates } from "@/server/fx"
@@ -42,8 +44,8 @@ import {
   createRoom,
   getRoomByCode,
   joinRoom,
-  type RoomDto,
 } from "@/server/rooms"
+import type { RoomDto } from "@/server/rooms"
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -66,37 +68,42 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
+  const [recentTrips, setRecentTrips] = useState<RecentTrip[]>([])
+
+  useEffect(() => {
+    setRecentTrips(listRecentTrips())
+  }, [])
 
   return (
     <SplitAtmosphere as="main" className="overflow-hidden">
-      <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col pb-12 pt-5">
+      <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col pt-5 pb-12">
         <header className="animate-rise flex items-center justify-between">
           <SiteLogo showWordmark={false} markClassName="size-8" />
           <ThemeToggle />
         </header>
 
         <div className="animate-rise-delay mt-14 sm:mt-16">
-          <h1 className="font-display text-foreground text-5xl leading-none font-semibold tracking-tighter sm:text-6xl md:text-7xl">
+          <h1 className="font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl">
             Split
           </h1>
-          <p className="text-muted-foreground mt-4 max-w-[28ch] text-base leading-relaxed sm:max-w-sm sm:text-lg">
+          <p className="mt-4 max-w-[28ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
             Trip costs, shared by code. No accounts.
           </p>
         </div>
 
-        <div className="animate-rise-delay-2 mt-10 flex-1 pb-safe">
+        <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
           <div className="landing-panel rounded-2xl p-4 sm:p-5">
             <Tabs defaultValue="create">
               <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl p-1">
                 <TabsTrigger
                   value="create"
-                  className="rounded-lg text-sm data-active:shadow-soft"
+                  className="data-active:shadow-soft rounded-lg text-sm"
                 >
                   Create
                 </TabsTrigger>
                 <TabsTrigger
                   value="join"
-                  className="rounded-lg text-sm data-active:shadow-soft"
+                  className="data-active:shadow-soft rounded-lg text-sm"
                 >
                   Join
                 </TabsTrigger>
@@ -109,13 +116,55 @@ function LandingPage() {
               </TabsContent>
             </Tabs>
           </div>
+          <RecentTrips trips={recentTrips} />
         </div>
       </div>
     </SplitAtmosphere>
   )
 }
 
-function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+function RecentTrips({ trips }: { trips: RecentTrip[] }) {
+  if (trips.length === 0) return null
+
+  return (
+    <section className="mt-5">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="font-display text-sm font-semibold text-foreground">
+          Recent trips
+        </h2>
+        <span className="text-xs text-muted-foreground">This device</span>
+      </div>
+      <div className="grid gap-2">
+        {trips.slice(0, 4).map((trip) => (
+          <Link
+            key={trip.code}
+            to="/r/$code"
+            params={{ code: trip.code }}
+            className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 px-3 py-2.5 text-left transition-colors hover:bg-background/80"
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">
+                {trip.name}
+              </span>
+              <span className="mt-0.5 block text-xs tracking-wider text-muted-foreground">
+                {trip.code}
+              </span>
+            </span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {formatRecentTripOpened(trip.updatedAt)}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function CreateForm({
+  navigate,
+}: {
+  navigate: ReturnType<typeof useNavigate>
+}) {
   const form = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
     defaultValues: { name: "", baseCurrency: "USD" },
@@ -143,7 +192,9 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
       await navigate({ to: "/r/$code", params: { code: room.code } })
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Could not create trip")
+      toast.error(
+        error instanceof Error ? error.message : "Could not create trip"
+      )
     },
   })
 
@@ -245,7 +296,9 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
             .filter(Boolean),
         ]
       : members
-    const unique = Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)))
+    const unique = Array.from(
+      new Set(names.map((n) => n.trim()).filter(Boolean))
+    )
     if (unique.length < 2) {
       setMembersError("Add at least two members")
       return
@@ -280,7 +333,10 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-7">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex flex-col gap-7"
+      >
         <div className="flex flex-col gap-5">
           <FormField
             control={form.control}
@@ -306,7 +362,9 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
                   <Select
                     items={currencyItems}
                     value={field.value}
-                    onValueChange={(value) => value && onBaseCurrencyChange(value)}
+                    onValueChange={(value) =>
+                      value && onBaseCurrencyChange(value)
+                    }
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -320,7 +378,9 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
                     </SelectContent>
                   </Select>
                 </FormControl>
-                <FormDescription>Settlements use this currency.</FormDescription>
+                <FormDescription>
+                  Settlements use this currency.
+                </FormDescription>
               </FormItem>
             )}
           />
@@ -340,10 +400,14 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
                   <button
                     type="button"
                     onClick={() => removeMember(name)}
-                    className="hover:bg-background/70 inline-flex size-5 items-center justify-center rounded-sm transition-colors"
+                    className="inline-flex size-5 items-center justify-center rounded-sm transition-colors hover:bg-background/70"
                     aria-label={`Remove ${name}`}
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      size={12}
+                      strokeWidth={2}
+                    />
                   </button>
                 </span>
               ))}
@@ -361,22 +425,22 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
             onBlur={commitDraft}
             placeholder="Type a name, press Enter"
           />
-          <p className="text-muted-foreground text-xs leading-relaxed">
+          <p className="text-xs leading-relaxed text-muted-foreground">
             At least two people. Enter or comma adds a name.
           </p>
           {membersError ? (
-            <p className="text-destructive text-xs" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {membersError}
             </p>
           ) : null}
         </div>
 
-        <div className="border-border/60 flex flex-col gap-3 border-t pt-5">
+        <div className="flex flex-col gap-3 border-t border-border/60 pt-5">
           {!extrasOpen ? (
             <button
               type="button"
               onClick={() => setShowExtras(true)}
-              className="text-muted-foreground hover:text-foreground text-left text-sm font-medium transition-colors"
+              className="text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Add other currencies
             </button>
@@ -390,7 +454,7 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
                     if (extraCodes.length === 0) setShowExtras(false)
                   }}
                   className={cn(
-                    "text-muted-foreground text-xs font-medium transition-colors",
+                    "text-xs font-medium text-muted-foreground transition-colors",
                     extraCodes.length === 0
                       ? "hover:text-foreground"
                       : "pointer-events-none opacity-0"
@@ -400,35 +464,40 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
                 </button>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {CURRENCY_OPTIONS.filter((o) => o.code !== baseCurrency).map((o) => {
-                  const on = o.code in extras
-                  return (
-                    <button
-                      key={o.code}
-                      type="button"
-                      onClick={() => toggleExtra(o.code)}
-                      className={cn(
-                        "landing-chip",
-                        on ? "landing-chip-on" : "landing-chip-idle"
-                      )}
-                    >
-                      {o.code}
-                    </button>
-                  )
-                })}
+                {CURRENCY_OPTIONS.filter((o) => o.code !== baseCurrency).map(
+                  (o) => {
+                    const on = o.code in extras
+                    return (
+                      <button
+                        key={o.code}
+                        type="button"
+                        onClick={() => toggleExtra(o.code)}
+                        className={cn(
+                          "landing-chip",
+                          on ? "landing-chip-on" : "landing-chip-idle"
+                        )}
+                      >
+                        {o.code}
+                      </button>
+                    )
+                  }
+                )}
               </div>
               {extraCodes.length > 0 ? (
                 <div className="animate-rise-delay-3 mt-1 flex flex-col gap-2">
                   {extraCodes.map((code) => (
                     <div key={code} className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground w-24 shrink-0 tabular-nums">
+                      <span className="w-24 shrink-0 text-muted-foreground tabular-nums">
                         1 {baseCurrency} =
                       </span>
                       <Input
                         inputMode="decimal"
                         value={extras[code] ?? ""}
                         onChange={(e) =>
-                          setExtras((prev) => ({ ...prev, [code]: e.target.value }))
+                          setExtras((prev) => ({
+                            ...prev,
+                            [code]: e.target.value,
+                          }))
                         }
                         placeholder="rate"
                         className="flex-1"
@@ -437,7 +506,7 @@ function CreateForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) 
                       <span className="w-10 shrink-0 font-medium">{code}</span>
                     </div>
                   ))}
-                  <p className="text-muted-foreground text-xs leading-relaxed">
+                  <p className="text-xs leading-relaxed text-muted-foreground">
                     {fxLoading
                       ? "Fetching live rates…"
                       : fxDate
@@ -538,13 +607,13 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
     return (
       <div className="flex flex-col gap-6">
         <div>
-          <p className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">
+          <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
             Joining
           </p>
-          <p className="font-display text-foreground mt-1 text-2xl font-semibold tracking-tight">
+          <p className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground">
             {room.name}
           </p>
-          <p className="text-muted-foreground mt-1 font-display tracking-[0.22em]">
+          <p className="mt-1 font-display tracking-[0.22em] text-muted-foreground">
             {room.code}
           </p>
         </div>
@@ -559,7 +628,7 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
 
         <button
           type="button"
-          className="text-muted-foreground hover:text-foreground text-left text-sm font-medium transition-colors"
+          className="text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           onClick={goBackToCode}
           disabled={pending}
         >
@@ -586,11 +655,9 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
                   placeholder="7-character code"
                   maxLength={8}
                   size="lg"
-                  className="font-display text-center text-2xl tracking-[0.2em] uppercase"
+                  className="text-center font-display text-2xl tracking-[0.2em] uppercase"
                   {...field}
-                  onChange={(e) =>
-                    field.onChange(e.target.value.toUpperCase())
-                  }
+                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                 />
               </FormControl>
               <FormDescription>

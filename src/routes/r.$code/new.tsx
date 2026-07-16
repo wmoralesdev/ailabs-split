@@ -40,18 +40,11 @@ import {
   formatAtmAmount,
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
-import {
-  rememberLastCurrency,
-  resolveLastCurrency,
-} from "@/lib/last-currency"
+import { rememberLastCurrency, resolveLastCurrency } from "@/lib/last-currency"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
-import {
-  equalSplitCents,
-  formatMoney,
-  partsSplitCents,
-} from "@/lib/settle"
+import { equalSplitCents, formatMoney, partsSplitCents } from "@/lib/settle"
 import type { SplitMode } from "@/lib/schemas"
 import { scanReceipt } from "@/server/ocr"
 import { addExpense } from "@/server/rooms"
@@ -82,7 +75,12 @@ function initials(name: string): string {
 
 const formSchema = z
   .object({
-    title: z.string().trim().min(1, "Add a short title").max(80, "Title is too long"),
+    title: z
+      .string()
+      .trim()
+      .min(1, "Add a short title")
+      .max(80, "Title is too long"),
+    category: z.string().trim().max(32, "Category is too long").optional(),
     /** ATM digit buffer (minor units), not a decimal string. */
     amount: z.string(),
     currency: z.string().min(3),
@@ -107,6 +105,7 @@ type FormValues = z.infer<typeof formSchema>
 type AddExpensePayload = {
   code: string
   title: string
+  category?: string
   amountCents: number
   currency?: string
   paidById: string
@@ -160,6 +159,7 @@ function AddExpenseForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
+      category: "",
       amount: "",
       currency: defaultCurrency,
       paidById: defaultPaidBy,
@@ -276,7 +276,9 @@ function AddExpenseForm({
       await navigate({ to: "/r/$code", params: { code } })
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Could not save expense")
+      toast.error(
+        error instanceof Error ? error.message : "Could not save expense"
+      )
     },
   })
 
@@ -311,7 +313,8 @@ function AddExpenseForm({
           mimeType: compressed.mimeType,
         },
       })
-      if (draft.title) form.setValue("title", draft.title, { shouldValidate: true })
+      if (draft.title)
+        form.setValue("title", draft.title, { shouldValidate: true })
       if (draft.amountCents) {
         form.setValue(
           "amount",
@@ -339,7 +342,11 @@ function AddExpenseForm({
       return
     }
 
-    let splits: Array<{ memberId: string; weight?: number; amountCents?: number }>
+    let splits: Array<{
+      memberId: string
+      weight?: number
+      amountCents?: number
+    }>
     let paidById = values.paidById
     let mode: SplitMode = splitMode
 
@@ -387,6 +394,7 @@ function AddExpenseForm({
     mutation.mutate({
       code: room.code,
       title: values.title.trim(),
+      category: values.category?.trim() || undefined,
       amountCents: cents,
       currency: values.currency,
       paidById,
@@ -480,10 +488,21 @@ function AddExpenseForm({
               <FormItem>
                 <FormLabel>Title</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Dinner, taxi, Airbnb…"
-                    {...field}
-                  />
+                  <Input placeholder="Dinner, taxi, Airbnb…" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Category (optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="Food, lodging, taxi…" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -492,7 +511,7 @@ function AddExpenseForm({
 
           <div className="flex flex-col gap-2">
             <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
-            <label className="border-border hover:bg-muted/40 flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
+            <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border text-sm hover:bg-muted/40">
               <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
               {ocrPending ? "Reading receipt…" : "Scan receipt"}
               <input
@@ -506,7 +525,7 @@ function AddExpenseForm({
             </label>
           </div>
 
-          <label className="border-border bg-muted/30 flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3">
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-3">
             <Checkbox
               checked={isPersonal}
               onCheckedChange={(checked) => setPersonalMode(checked === true)}
@@ -514,7 +533,7 @@ function AddExpenseForm({
             />
             <span className="min-w-0">
               <span className="block text-sm font-medium">Personal</span>
-              <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">
+              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                 Only you can see this. It won’t change group balances.
               </span>
             </span>
@@ -552,10 +571,10 @@ function AddExpenseForm({
           )}
 
           {isPersonal ? (
-            <div className="border-border/60 flex items-center justify-between gap-3 border-y py-3">
+            <div className="flex items-center justify-between gap-3 border-y border-border/60 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar className="size-9">
-                  <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+                  <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                     {initials(
                       room.members.find((m) => m.id === selfMemberId)?.name ??
                         "You"
@@ -567,7 +586,7 @@ function AddExpenseForm({
                     {room.members.find((m) => m.id === selfMemberId)?.name ??
                       "You"}
                   </p>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-xs text-muted-foreground">
                     Assigned to you
                   </p>
                 </div>
@@ -603,7 +622,7 @@ function AddExpenseForm({
                 </Tabs>
               </div>
 
-              <ul className="divide-border/60 divide-y">
+              <ul className="divide-y divide-border/60">
                 {room.members.map((member) => {
                   const isParts = splitMode === "PARTS"
                   const weight = weights[member.id] ?? 0
@@ -625,12 +644,10 @@ function AddExpenseForm({
                       >
                         <Avatar
                           className={
-                            active
-                              ? "size-9"
-                              : "size-9 opacity-40 grayscale"
+                            active ? "size-9" : "size-9 opacity-40 grayscale"
                           }
                         >
-                          <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+                          <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                             {initials(member.name)}
                           </AvatarFallback>
                         </Avatar>
@@ -638,7 +655,7 @@ function AddExpenseForm({
                           className={
                             active
                               ? "truncate font-medium"
-                              : "text-muted-foreground truncate"
+                              : "truncate text-muted-foreground"
                           }
                         >
                           {member.name}
@@ -656,7 +673,11 @@ function AddExpenseForm({
                             disabled={weight <= 0}
                             aria-label={`Fewer parts for ${member.name}`}
                           >
-                            <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
+                            <HugeiconsIcon
+                              icon={MinusSignIcon}
+                              size={14}
+                              strokeWidth={2}
+                            />
                           </Button>
                           <span className="w-5 text-center text-sm font-semibold tabular-nums">
                             {weight}
@@ -669,9 +690,13 @@ function AddExpenseForm({
                             onClick={() => setWeight(member.id, weight + 1)}
                             aria-label={`More parts for ${member.name}`}
                           >
-                            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+                            <HugeiconsIcon
+                              icon={Add01Icon}
+                              size={14}
+                              strokeWidth={2}
+                            />
                           </Button>
-                          <span className="text-muted-foreground w-16 text-right text-xs tabular-nums">
+                          <span className="w-16 text-right text-xs text-muted-foreground tabular-nums">
                             {formatMoney(active ? shareCents : 0, currency)}
                           </span>
                         </div>
@@ -696,7 +721,7 @@ function AddExpenseForm({
                             className="w-28 text-right tabular-nums"
                           />
                         ) : (
-                          <span className="text-muted-foreground text-sm">
+                          <span className="text-sm text-muted-foreground">
                             Not included
                           </span>
                         )
@@ -705,7 +730,7 @@ function AddExpenseForm({
                           {formatMoney(shareCents, currency)}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground text-sm">
+                        <span className="text-sm text-muted-foreground">
                           Not included
                         </span>
                       )}
@@ -714,7 +739,7 @@ function AddExpenseForm({
                 })}
               </ul>
 
-              <div className="text-muted-foreground flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
                   {activeMemberIds.length} of {room.members.length} people
                 </span>
@@ -722,8 +747,8 @@ function AddExpenseForm({
                   <span
                     className={
                       remainingCents === 0
-                        ? "text-primary font-medium"
-                        : "text-destructive font-medium"
+                        ? "font-medium text-primary"
+                        : "font-medium text-destructive"
                     }
                   >
                     {remainingCents === 0
@@ -738,18 +763,14 @@ function AddExpenseForm({
               </div>
 
               {splitError ? (
-                <p className="text-destructive text-xs" role="alert">
+                <p className="text-xs text-destructive" role="alert">
                   {splitError}
                 </p>
               ) : null}
             </div>
           )}
 
-          <Button
-            type="submit"
-            size="lg"
-            disabled={mutation.isPending}
-          >
+          <Button type="submit" size="lg" disabled={mutation.isPending}>
             {mutation.isPending ? "Saving…" : "Save expense"}
           </Button>
         </form>
@@ -760,7 +781,7 @@ function AddExpenseForm({
 
 function FormLabelStatic({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-foreground flex items-center gap-2 text-sm leading-none font-medium">
+    <span className="flex items-center gap-2 text-sm leading-none font-medium text-foreground">
       {children}
     </span>
   )

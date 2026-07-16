@@ -17,6 +17,12 @@ export type LedgerEntry = {
   shares: Array<{ memberId: string; amountCents: number }>
 }
 
+export type SettlementLedgerEntry = {
+  fromMemberId: string
+  toMemberId: string
+  amountCents: number
+}
+
 /**
  * Net balance per member in integer cents.
  * Positive = others owe them; negative = they owe others.
@@ -56,6 +62,25 @@ export function computeNets(
     name: names.get(member.id) ?? member.name,
     netCents: nets.get(member.id) ?? 0,
   }))
+}
+
+export function computeNetsWithSettlements(
+  members: Array<{ id: string; name: string }>,
+  expenses: LedgerEntry[],
+  settlements: SettlementLedgerEntry[]
+): BalanceLine[] {
+  return computeNets(members, [
+    ...expenses,
+    ...settlements.map((settlement) => ({
+      paidById: settlement.fromMemberId,
+      shares: [
+        {
+          memberId: settlement.toMemberId,
+          amountCents: settlement.amountCents,
+        },
+      ],
+    })),
+  ])
 }
 
 /**
@@ -118,6 +143,74 @@ export function formatTransferSentence(
   return `${transfer.fromName} owes ${transfer.toName} ${amount}`
 }
 
+export function buildTripSummary(input: {
+  name: string
+  code: string
+  currency: string
+  expenses: Array<{
+    title: string
+    amountCents: number
+    currency: string
+    paidByName: string
+    category?: string | null
+    isPersonal?: boolean
+  }>
+  settlements: Array<{
+    fromMemberName: string
+    toMemberName: string
+    amountCents: number
+    currency: string
+  }>
+  transfers: Transfer[]
+}): string {
+  const lines = [
+    `${input.name} (${input.code})`,
+    `Base currency: ${input.currency}`,
+    "",
+    "Expenses:",
+  ]
+
+  if (input.expenses.length === 0) {
+    lines.push("- None")
+  } else {
+    for (const expense of input.expenses) {
+      const category = expense.category ? ` [${expense.category}]` : ""
+      const personal = expense.isPersonal ? " (personal)" : ""
+      lines.push(
+        `- ${expense.title}${category}${personal}: ${formatMoney(
+          expense.amountCents,
+          expense.currency
+        )} paid by ${expense.paidByName}`
+      )
+    }
+  }
+
+  lines.push("", "Recorded payments:")
+  if (input.settlements.length === 0) {
+    lines.push("- None")
+  } else {
+    for (const settlement of input.settlements) {
+      lines.push(
+        `- ${settlement.fromMemberName} paid ${settlement.toMemberName} ${formatMoney(
+          settlement.amountCents,
+          settlement.currency
+        )}`
+      )
+    }
+  }
+
+  lines.push("", "Remaining transfers:")
+  if (input.transfers.length === 0) {
+    lines.push("- All settled")
+  } else {
+    for (const transfer of input.transfers) {
+      lines.push(`- ${formatTransferSentence(transfer, input.currency)}`)
+    }
+  }
+
+  return lines.join("\n")
+}
+
 export function formatMoney(cents: number, currency: string): string {
   const value = cents / 100
   try {
@@ -155,7 +248,10 @@ export function equalSplitCents(
 }
 
 export function parseAmountToCents(raw: string): number | null {
-  const cleaned = raw.trim().replace(/[^0-9.,]/g, "").replace(",", ".")
+  const cleaned = raw
+    .trim()
+    .replace(/[^0-9.,]/g, "")
+    .replace(",", ".")
   if (!cleaned) return null
   const value = Number.parseFloat(cleaned)
   if (!Number.isFinite(value) || value < 0) return null
@@ -183,7 +279,12 @@ export function partsSplitCents(
   const raw = active.map((entry) => {
     const exact = (totalCents * entry.weight) / totalWeight
     const base = Math.floor(exact)
-    return { memberId: entry.memberId, weight: entry.weight, base, remainder: exact - base }
+    return {
+      memberId: entry.memberId,
+      weight: entry.weight,
+      base,
+      remainder: exact - base,
+    }
   })
 
   const distributed = raw.reduce((sum, entry) => sum + entry.base, 0)
@@ -195,7 +296,9 @@ export function partsSplitCents(
     leftover -= 1
   }
 
-  const amountByMember = new Map(raw.map((entry) => [entry.memberId, entry.base]))
+  const amountByMember = new Map(
+    raw.map((entry) => [entry.memberId, entry.base])
+  )
   return active.map((entry) => ({
     memberId: entry.memberId,
     weight: entry.weight,

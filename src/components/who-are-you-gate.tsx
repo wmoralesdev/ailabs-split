@@ -1,9 +1,7 @@
 import { SiteLogo } from "@/components/site-logo"
 import { SplitAtmosphere } from "@/components/split-atmosphere"
-import {
-  MemberIdentityPicker,
-  type MemberIdentityPickerProps,
-} from "@/components/member-identity-picker"
+import { MemberIdentityPicker } from "@/components/member-identity-picker"
+import type { MemberIdentityPickerProps } from "@/components/member-identity-picker"
 
 type WhoAreYouGateProps = MemberIdentityPickerProps & {
   roomName: string
@@ -23,14 +21,14 @@ function WhoAreYouGate({
     >
       <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col justify-center py-10">
         <SiteLogo />
-        <h1 className="font-display mt-6 text-4xl font-semibold tracking-tight">
+        <h1 className="mt-6 font-display text-4xl font-semibold tracking-tight">
           Who are you?
         </h1>
-        <p className="text-muted-foreground mt-3 text-base">
+        <p className="mt-3 text-base text-muted-foreground">
           You&rsquo;re in{" "}
-          <span className="text-foreground font-medium">{roomName}</span>{" "}
-          (<span className="font-display tracking-widest">{roomCode}</span>). Pick
-          your name to continue on this device — no account needed.
+          <span className="font-medium text-foreground">{roomName}</span> (
+          <span className="font-display tracking-widest">{roomCode}</span>).
+          Pick your name to continue on this device — no account needed.
         </p>
 
         <div className="mt-8">
