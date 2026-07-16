@@ -1,23 +1,27 @@
 import { useMemo, useState } from "react"
-import {
-  Link,
-  createFileRoute,
-  getRouteApi,
-  useRouter,
-} from "@tanstack/react-router"
+import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
+import { useQuery } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowRight01Icon,
   Copy01Icon,
   Link01Icon,
+  ReceiptDollarIcon,
+  Share01Icon,
 } from "@hugeicons/core-free-icons"
+import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { copyText, shareOrCopyInvite } from "@/lib/invite-link"
 import { memberLink } from "@/lib/member-storage"
+import { roomQueryOptions } from "@/lib/room-query"
 import { useRoomIdentity } from "@/lib/room-identity"
 import {
   computeNets,
+  convertToBase,
   formatMoney,
   simplifyTransfers,
 } from "@/lib/settle"
@@ -29,210 +33,299 @@ export const Route = createFileRoute("/r/$code/")({
   component: RoomHomePage,
 })
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("")
+}
+
+function splitModeLabel(mode: string): string {
+  if (mode === "PARTS") return "Parts"
+  if (mode === "AMOUNT") return "Amounts"
+  return "Equal"
+}
+
 function RoomHomePage() {
-  const { room } = roomRoute.useLoaderData()
+  const { code } = roomRoute.useParams()
+  const { data: room } = useQuery(roomQueryOptions(code))
   const { memberId, switchIdentity } = useRoomIdentity()
-  const router = useRouter()
-  const [copied, setCopied] = useState<"code" | "link" | null>(null)
+  const [copied, setCopied] = useState<"code" | "link" | "invite" | null>(null)
 
-  const me = room.members.find((member) => member.id === memberId)
+  const me = room?.members.find((member) => member.id === memberId)
 
-  const nets = useMemo(
-    () =>
-      computeNets(
-        room.members,
-        room.expenses.map((expense) => ({
-          paidById: expense.paidById,
-          shares: expense.shares.map((share) => ({
-            memberId: share.memberId,
-            amountCents: share.amountCents,
-          })),
-        }))
-      ),
-    [room]
-  )
+  const nets = useMemo(() => {
+    if (!room) return []
+    return computeNets(
+      room.members,
+      room.expenses.map((expense) => ({
+        paidById: expense.paidById,
+        shares: expense.shares.map((share) => ({
+          memberId: share.memberId,
+          amountCents: convertToBase(
+            share.amountCents,
+            expense.currency,
+            room.currency,
+            room.fxRates
+          ),
+        })),
+      }))
+    )
+  }, [room])
 
   const transfers = useMemo(() => simplifyTransfers(nets), [nets])
 
+  if (!room) return null
+
+  const maxAbs = Math.max(1, ...nets.map((line) => Math.abs(line.netCents)))
+
   async function copyCode() {
-    await navigator.clipboard.writeText(room.code)
+    await copyText(room!.code)
     setCopied("code")
     window.setTimeout(() => setCopied(null), 1500)
   }
 
+  async function shareInvite() {
+    try {
+      const result = await shareOrCopyInvite({
+        code: room!.code,
+        name: room!.name,
+      })
+      if (result === "cancelled") return
+      if (result === "copied") {
+        setCopied("invite")
+        toast.success("Invite link copied")
+        window.setTimeout(() => setCopied(null), 1500)
+      }
+    } catch {
+      toast.error("Could not share trip")
+    }
+  }
+
   async function copyMyLink() {
     if (!me) return
-    await navigator.clipboard.writeText(memberLink(room.code, me.name))
+    await copyText(memberLink(room!.code, me.name))
     setCopied("link")
     window.setTimeout(() => setCopied(null), 1500)
   }
 
   return (
-    <main className="page-gutter mx-auto min-h-dvh max-w-content pb-28 pt-8">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <Link
-            to="/"
-            className="font-display text-split text-sm font-semibold tracking-wide"
-          >
-            Split
-          </Link>
-          <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight">
-            {room.name}
-          </h1>
+    <main className="page-gutter mx-auto max-w-content pt-6">
+      <header>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
+          {room.name}
+        </h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void copyCode()}
-            className="text-muted-foreground mt-2 inline-flex items-center gap-1.5 text-sm"
+            className="border-border bg-background/60 text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm"
           >
-            <span className="font-display tracking-widest">{room.code}</span>
+            <span className="font-display text-foreground tracking-widest">
+              {room.code}
+            </span>
             <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-            {copied === "code" ? "Copied" : "Copy code"}
+            {copied === "code" ? "Copied" : "Copy"}
           </button>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void router.invalidate()}
-        >
-          Refresh
-        </Button>
-      </header>
-
-      <section className="mt-8">
-        <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-          You are
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <p className="font-display text-xl font-semibold">
-            {me?.name ?? "Unknown"}
-          </p>
           <button
             type="button"
-            onClick={switchIdentity}
-            className="text-primary text-sm font-medium"
+            onClick={() => void shareInvite()}
+            className="border-border bg-background/60 text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm"
           >
-            Not you? Switch
+            <HugeiconsIcon icon={Share01Icon} size={14} strokeWidth={2} />
+            {copied === "invite" ? "Link copied" : "Share link"}
           </button>
+          <Badge variant="secondary">Base {room.currency}</Badge>
         </div>
-        <button
-          type="button"
-          onClick={() => void copyMyLink()}
-          className="text-muted-foreground mt-3 inline-flex items-center gap-1.5 text-sm"
-        >
-          <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-          {copied === "link"
-            ? "Personal link copied"
-            : "Copy my link for another device"}
-        </button>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Opens this room as you via name — handy when localStorage is empty.
-        </p>
+      </header>
+
+      <section className="mt-6">
+        <Card size="sm" className="gap-3">
+          <div className="flex items-center justify-between gap-3 px-(--card-spacing)">
+            <div className="flex items-center gap-3">
+              <Avatar className="size-10">
+                <AvatarFallback className="bg-accent text-accent-foreground text-sm font-semibold">
+                  {me ? initials(me.name) : "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-muted-foreground text-xs">You are</p>
+                <p className="font-display text-lg font-semibold leading-tight">
+                  {me?.name ?? "Unknown"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={switchIdentity}
+              className="text-primary text-sm font-medium"
+            >
+              Switch
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => void copyMyLink()}
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-(--card-spacing) text-sm"
+          >
+            <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+            {copied === "link" ? "Personal link copied" : "Copy my device link"}
+          </button>
+        </Card>
       </section>
 
-      <section className="mt-10">
+      <section className="mt-8">
         <div className="flex items-end justify-between gap-3">
           <h2 className="font-display text-xl font-semibold">Balances</h2>
-          <Link
-            to="/r/$code/settle"
-            params={{ code: room.code }}
-            className="text-primary inline-flex items-center gap-1 text-sm font-medium"
-          >
-            Settle
-            <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
-          </Link>
-        </div>
-        <ul className="mt-4 space-y-3">
-          {nets.map((line) => (
-            <li
-              key={line.memberId}
-              className="flex items-baseline justify-between gap-3 border-b border-border/70 py-2"
+          {transfers.length > 0 ? (
+            <Link
+              to="/r/$code/settle"
+              params={{ code: room.code }}
+              className="text-primary inline-flex items-center gap-1 text-sm font-medium"
             >
-              <span className="font-medium">
-                {line.name}
-                {line.memberId === memberId ? (
-                  <span className="text-muted-foreground font-normal"> (you)</span>
-                ) : null}
-              </span>
-              <span
-                className={
-                  line.netCents > 0
-                    ? "text-split font-medium"
-                    : line.netCents < 0
-                      ? "text-destructive font-medium"
-                      : "text-muted-foreground"
-                }
+              Settle
+              <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+            </Link>
+          ) : null}
+        </div>
+        <ul className="mt-3 space-y-2">
+          {nets.map((line) => {
+            const owed = line.netCents > 0
+            const owes = line.netCents < 0
+            const width = `${Math.round((Math.abs(line.netCents) / maxAbs) * 100)}%`
+            return (
+              <li
+                key={line.memberId}
+                className="border-border/70 flex items-center gap-3 border-b py-2"
               >
-                {line.netCents === 0
-                  ? "settled"
-                  : `${line.netCents > 0 ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
-              </span>
-            </li>
-          ))}
+                <Avatar className="size-8">
+                  <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
+                    {initials(line.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {line.name}
+                      {line.memberId === memberId ? (
+                        <span className="text-muted-foreground font-normal">
+                          {" "}
+                          (you)
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className={
+                        owed
+                          ? "text-primary text-sm font-semibold tabular-nums"
+                          : owes
+                            ? "text-destructive text-sm font-semibold tabular-nums"
+                            : "text-muted-foreground text-sm tabular-nums"
+                      }
+                    >
+                      {line.netCents === 0
+                        ? "settled"
+                        : `${owed ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
+                    </span>
+                  </div>
+                  <div className="bg-muted mt-1.5 h-1 overflow-hidden rounded-full">
+                    <div
+                      className={
+                        owed
+                          ? "bg-primary h-full rounded-full"
+                          : owes
+                            ? "bg-destructive h-full rounded-full"
+                            : "h-full rounded-full"
+                      }
+                      style={{ width }}
+                    />
+                  </div>
+                </div>
+              </li>
+            )
+          })}
         </ul>
-        {transfers.length > 0 ? (
-          <p className="text-muted-foreground mt-4 text-sm">
-            {transfers.length} transfer{transfers.length === 1 ? "" : "s"} to
-            settle — see Settle for the sentences.
-          </p>
-        ) : room.expenses.length > 0 ? (
-          <p className="text-muted-foreground mt-4 text-sm">All settled.</p>
-        ) : null}
       </section>
 
-      <section className="mt-10">
+      <section className="mt-8">
         <h2 className="font-display text-xl font-semibold">Expenses</h2>
         {room.expenses.length === 0 ? (
-          <p className="text-muted-foreground mt-4 text-sm">
-            No expenses yet. Add the first one.
-          </p>
+          <Card className="mt-3 items-center gap-3 py-10 text-center">
+            <span className="bg-accent text-accent-foreground flex size-12 items-center justify-center rounded-full">
+              <HugeiconsIcon icon={ReceiptDollarIcon} size={24} strokeWidth={2} />
+            </span>
+            <div>
+              <p className="text-foreground text-sm font-medium">
+                No expenses yet
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Add the first one to start splitting.
+              </p>
+            </div>
+            <Link
+              to="/r/$code/new"
+              params={{ code: room.code }}
+              className="bg-primary text-primary-foreground hover:bg-primary/80 inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-medium"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
+              Add expense
+            </Link>
+          </Card>
         ) : (
-          <ul className="mt-4 space-y-1">
+          <ul className="mt-3 space-y-2">
             {room.expenses.map((expense) => (
-              <ExpenseRow
-                key={expense.id}
-                expense={expense}
-                currency={room.currency}
-              />
+              <ExpenseRow key={expense.id} expense={expense} room={room} />
             ))}
           </ul>
         )}
       </section>
-
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-background/90 p-4 backdrop-blur-md">
-        <div className="mx-auto max-w-content">
-          <Link
-            to="/r/$code/new"
-            params={{ code: room.code }}
-            className="bg-primary text-primary-foreground hover:bg-primary/80 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md text-base font-medium"
-          >
-            <HugeiconsIcon icon={Add01Icon} strokeWidth={2} />
-            Add expense
-          </Link>
-        </div>
-      </div>
     </main>
   )
 }
 
 function ExpenseRow({
   expense,
-  currency,
+  room,
 }: {
   expense: RoomDto["expenses"][number]
-  currency: string
+  room: RoomDto
 }) {
+  const isForeign = expense.currency !== room.currency
+  const baseCents = convertToBase(
+    expense.amountCents,
+    expense.currency,
+    room.currency,
+    room.fxRates
+  )
   return (
-    <li className="flex items-baseline justify-between gap-3 border-b border-border/50 py-3">
-      <div className="min-w-0">
-        <p className="truncate font-medium">{expense.title}</p>
-        <p className="text-muted-foreground text-xs">
-          Paid by {expense.paidByName}
-        </p>
-      </div>
-      <p className="shrink-0 font-medium">
-        {formatMoney(expense.amountCents, currency)}
-      </p>
+    <li>
+      <Card size="sm" className="flex-row items-center justify-between gap-3 px-(--card-spacing)">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar className="size-9">
+            <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+              {initials(expense.paidByName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{expense.title}</p>
+            <p className="text-muted-foreground truncate text-xs">
+              {expense.paidByName} paid · {splitModeLabel(expense.splitMode)}
+            </p>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-semibold tabular-nums">
+            {formatMoney(expense.amountCents, expense.currency)}
+          </p>
+          {isForeign ? (
+            <p className="text-muted-foreground text-xs tabular-nums">
+              ≈ {formatMoney(baseCents, room.currency)}
+            </p>
+          ) : null}
+        </div>
+      </Card>
     </li>
   )
 }
