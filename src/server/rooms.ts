@@ -1,10 +1,17 @@
 import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
+import type { ZodType } from "zod"
 
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
-import { generateRoomCode, normalizeRoomCode } from "@/lib/room-code"
-import { equalSplitCents } from "@/lib/settle"
+import { generateRoomCode } from "@/lib/room-code"
+import {
+  addExpenseSchema,
+  claimMemberSchema,
+  createRoomSchema,
+  joinRoomSchema,
+} from "@/lib/schemas"
+import { equalSplitCents, partsSplitCents } from "@/lib/settle"
 
 export type RoomMemberDto = {
   id: string
@@ -15,12 +22,15 @@ export type ExpenseShareDto = {
   memberId: string
   memberName: string
   amountCents: number
+  weight: number | null
 }
 
 export type ExpenseDto = {
   id: string
   title: string
   amountCents: number
+  currency: string
+  splitMode: string
   paidById: string
   paidByName: string
   createdAt: string
@@ -31,29 +41,35 @@ export type RoomDto = {
   id: string
   code: string
   name: string
+  /** Base / settlement currency. */
   currency: string
+  /** Allowed currencies for expenses (always includes the base currency). */
+  currencies: string[]
+  /** Units of each currency per 1 unit of the base currency. */
+  fxRates: Record<string, number>
   createdAt: string
   members: RoomMemberDto[]
   expenses: ExpenseDto[]
 }
 
-function asString(value: unknown, field: string): string {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`Invalid ${field}`)
+/** Parse with Zod but surface the first friendly message instead of a ZodError blob. */
+function parseOrThrow<T>(schema: ZodType<T>, data: unknown): T {
+  const result = schema.safeParse(data)
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? "Invalid input")
   }
-  return value.trim()
+  return result.data
 }
 
-function asStringArray(value: unknown, field: string): string[] {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`Invalid ${field}`)
-  }
-  return value.map((entry, index) => {
-    if (typeof entry !== "string" || !entry.trim()) {
-      throw new Error(`Invalid ${field}[${index}]`)
+function toFxRates(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object") return {}
+  const out: Record<string, number> = {}
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+      out[key] = raw
     }
-    return entry.trim()
-  })
+  }
+  return out
 }
 
 function clientIp(): string {
@@ -90,11 +106,18 @@ async function loadRoomByCode(code: string): Promise<RoomDto | null> {
 
   if (!room) return null
 
+  const currencies =
+    room.currencies.length > 0
+      ? Array.from(new Set([room.currency, ...room.currencies]))
+      : [room.currency]
+
   return {
     id: room.id,
     code: room.code,
     name: room.name,
     currency: room.currency,
+    currencies,
+    fxRates: toFxRates(room.fxRates),
     createdAt: room.createdAt.toISOString(),
     members: room.members.map((member) => ({
       id: member.id,
@@ -104,6 +127,8 @@ async function loadRoomByCode(code: string): Promise<RoomDto | null> {
       id: expense.id,
       title: expense.title,
       amountCents: expense.amountCents,
+      currency: expense.currency ?? room.currency,
+      splitMode: expense.splitMode,
       paidById: expense.paidById,
       paidByName: expense.paidBy.name,
       createdAt: expense.createdAt.toISOString(),
@@ -111,30 +136,19 @@ async function loadRoomByCode(code: string): Promise<RoomDto | null> {
         memberId: share.memberId,
         memberName: share.member.name,
         amountCents: share.amountCents,
+        weight: share.weight ?? null,
       })),
     })),
   }
 }
 
 export const createRoom = createServerFn({ method: "POST" })
-  .validator((data: unknown) => {
-    if (typeof data !== "object" || data === null) {
-      throw new Error("Invalid payload")
-    }
-    const body = data as Record<string, unknown>
-    const name = asString(body.name, "name")
-    const currency = asString(body.currency, "currency").toUpperCase()
-    const memberNames = asStringArray(body.memberNames, "memberNames")
-    if (currency.length !== 3) {
-      throw new Error("Currency must be a 3-letter ISO code")
-    }
-    if (memberNames.length < 2) {
-      throw new Error("Add at least two members")
-    }
-    return { name, currency, memberNames }
-  })
+  .validator((data: unknown) => parseOrThrow(createRoomSchema, data))
   .handler(async ({ data }): Promise<RoomDto> => {
     limitWrites("create-room")
+    const currencies = Array.from(new Set([data.currency, ...data.currencies]))
+    const fxRates = data.fxRates ?? {}
+
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = generateRoomCode(7)
       try {
@@ -143,6 +157,8 @@ export const createRoom = createServerFn({ method: "POST" })
             code,
             name: data.name,
             currency: data.currency,
+            currencies,
+            fxRates,
             members: {
               create: data.memberNames.map((memberName) => ({
                 name: memberName,
@@ -151,7 +167,7 @@ export const createRoom = createServerFn({ method: "POST" })
           },
         })
         const loaded = await loadRoomByCode(room.code)
-        if (!loaded) throw new Error("Failed to load room")
+        if (!loaded) throw new Error("Failed to load trip")
         return loaded
       } catch (error) {
         const isUnique =
@@ -162,48 +178,25 @@ export const createRoom = createServerFn({ method: "POST" })
         if (!isUnique) throw error
       }
     }
-    throw new Error("Could not allocate a room code")
+    throw new Error("Could not allocate a trip code")
   })
 
 export const getRoomByCode = createServerFn({ method: "GET" })
-  .validator((data: unknown) => {
-    if (typeof data !== "object" || data === null) {
-      throw new Error("Invalid payload")
-    }
-    const code = normalizeRoomCode(asString((data as { code?: unknown }).code, "code"))
-    if (code.length < 6 || code.length > 8) {
-      throw new Error("Room code must be 6–8 characters")
-    }
-    return { code }
-  })
+  .validator((data: unknown) =>
+    parseOrThrow(joinRoomSchema.pick({ code: true }), data)
+  )
   .handler(async ({ data }): Promise<RoomDto | null> => {
     return await loadRoomByCode(data.code)
   })
 
 export const joinRoom = createServerFn({ method: "POST" })
-  .validator((data: unknown) => {
-    if (typeof data !== "object" || data === null) {
-      throw new Error("Invalid payload")
-    }
-    const body = data as Record<string, unknown>
-    const code = normalizeRoomCode(asString(body.code, "code"))
-    const memberName = asString(body.memberName, "memberName")
-    if (code.length < 6 || code.length > 8) {
-      throw new Error("Room code must be 6–8 characters")
-    }
-    if (memberName.length > 40) {
-      throw new Error("Name is too long")
-    }
-    return { code, memberName }
-  })
+  .validator((data: unknown) => parseOrThrow(joinRoomSchema, data))
   .handler(
-    async ({
-      data,
-    }): Promise<{ room: RoomDto; memberId: string }> => {
+    async ({ data }): Promise<{ room: RoomDto; memberId: string }> => {
       limitWrites("join-room")
       const existing = await loadRoomByCode(data.code)
       if (!existing) {
-        throw new Error("Room not found")
+        throw new Error("Trip not found")
       }
 
       const match = existing.members.find(
@@ -222,7 +215,7 @@ export const joinRoom = createServerFn({ method: "POST" })
       })
 
       const room = await loadRoomByCode(data.code)
-      if (!room) throw new Error("Room not found")
+      if (!room) throw new Error("Trip not found")
       const created = room.members.find(
         (member) =>
           member.name.toLowerCase() === data.memberName.toLowerCase()
@@ -234,114 +227,91 @@ export const joinRoom = createServerFn({ method: "POST" })
 
 /** Pick an existing member id in a room (cross-device reclaim). */
 export const claimMemberById = createServerFn({ method: "POST" })
-  .validator((data: unknown) => {
-    if (typeof data !== "object" || data === null) {
-      throw new Error("Invalid payload")
-    }
-    const body = data as Record<string, unknown>
-    const code = normalizeRoomCode(asString(body.code, "code"))
-    const memberId = asString(body.memberId, "memberId")
-    if (code.length < 6 || code.length > 8) {
-      throw new Error("Room code must be 6–8 characters")
-    }
-    return { code, memberId }
-  })
+  .validator((data: unknown) => parseOrThrow(claimMemberSchema, data))
   .handler(async ({ data }): Promise<{ memberId: string; name: string }> => {
     const room = await prisma.room.findUnique({
       where: { code: data.code },
       include: { members: true },
     })
-    if (!room) throw new Error("Room not found")
+    if (!room) throw new Error("Trip not found")
     const member = room.members.find((entry) => entry.id === data.memberId)
-    if (!member) throw new Error("Member not found in this room")
+    if (!member) throw new Error("Member not found in this trip")
     return { memberId: member.id, name: member.name }
   })
 
-
 export const addExpense = createServerFn({ method: "POST" })
-  .validator((data: unknown) => {
-    if (typeof data !== "object" || data === null) {
-      throw new Error("Invalid payload")
-    }
-    const body = data as Record<string, unknown>
-    const code = normalizeRoomCode(asString(body.code, "code"))
-    const title = asString(body.title, "title")
-    const paidById = asString(body.paidById, "paidById")
-    const amountCents = body.amountCents
-    if (typeof amountCents !== "number" || !Number.isInteger(amountCents) || amountCents <= 0) {
-      throw new Error("Amount must be a positive integer (cents)")
-    }
-
-    const shareMemberIds = asStringArray(body.shareMemberIds, "shareMemberIds")
-    const customShares = body.customShares
-    let shares: Array<{ memberId: string; amountCents: number }> | null = null
-
-    if (customShares !== undefined && customShares !== null) {
-      if (!Array.isArray(customShares) || customShares.length === 0) {
-        throw new Error("Invalid customShares")
-      }
-      shares = customShares.map((entry, index) => {
-        if (typeof entry !== "object" || entry === null) {
-          throw new Error(`Invalid customShares[${index}]`)
-        }
-        const row = entry as Record<string, unknown>
-        const memberId = asString(row.memberId, `customShares[${index}].memberId`)
-        const shareAmount = row.amountCents
-        if (
-          typeof shareAmount !== "number" ||
-          !Number.isInteger(shareAmount) ||
-          shareAmount < 0
-        ) {
-          throw new Error(`Invalid customShares[${index}].amountCents`)
-        }
-        return { memberId, amountCents: shareAmount }
-      })
-      const sum = shares.reduce((total, share) => total + share.amountCents, 0)
-      if (sum !== amountCents) {
-        throw new Error("Custom shares must sum to the expense total")
-      }
-    }
-
-    return {
-      code,
-      title,
-      amountCents,
-      paidById,
-      shareMemberIds,
-      shares,
-    }
-  })
+  .validator((data: unknown) => parseOrThrow(addExpenseSchema, data))
   .handler(async ({ data }): Promise<ExpenseDto> => {
     limitWrites("add-expense")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
       include: { members: true },
     })
-    if (!room) throw new Error("Room not found")
+    if (!room) throw new Error("Trip not found")
 
     const memberIds = new Set(room.members.map((member) => member.id))
     if (!memberIds.has(data.paidById)) {
-      throw new Error("Payer is not in this room")
+      throw new Error("Payer is not in this trip")
     }
-    for (const memberId of data.shareMemberIds) {
-      if (!memberIds.has(memberId)) {
-        throw new Error("Share member is not in this room")
+    for (const split of data.splits) {
+      if (!memberIds.has(split.memberId)) {
+        throw new Error("Share member is not in this trip")
       }
     }
 
-    const shares =
-      data.shares ?? equalSplitCents(data.amountCents, data.shareMemberIds)
+    const currency =
+      data.currency && room.currencies.includes(data.currency)
+        ? data.currency
+        : (data.currency ?? room.currency)
+
+    let shares: Array<{ memberId: string; amountCents: number; weight: number | null }>
+
+    if (data.splitMode === "PARTS") {
+      const parts = partsSplitCents(
+        data.amountCents,
+        data.splits.map((split) => ({
+          memberId: split.memberId,
+          weight: split.weight ?? 0,
+        }))
+      )
+      shares = parts.map((part) => ({
+        memberId: part.memberId,
+        amountCents: part.amountCents,
+        weight: part.weight,
+      }))
+    } else if (data.splitMode === "AMOUNT") {
+      const sum = data.splits.reduce(
+        (total, split) => total + (split.amountCents ?? 0),
+        0
+      )
+      if (sum !== data.amountCents) {
+        throw new Error("Custom amounts must sum to the expense total")
+      }
+      shares = data.splits.map((split) => ({
+        memberId: split.memberId,
+        amountCents: split.amountCents ?? 0,
+        weight: null,
+      }))
+    } else {
+      shares = equalSplitCents(
+        data.amountCents,
+        data.splits.map((split) => split.memberId)
+      ).map((share) => ({ ...share, weight: null }))
+    }
 
     const expense = await prisma.expense.create({
       data: {
         roomId: room.id,
         title: data.title,
         amountCents: data.amountCents,
+        currency,
+        splitMode: data.splitMode,
         paidById: data.paidById,
         shares: {
           create: shares.map((share) => ({
             memberId: share.memberId,
             amountCents: share.amountCents,
+            weight: share.weight,
           })),
         },
       },
@@ -355,6 +325,8 @@ export const addExpense = createServerFn({ method: "POST" })
       id: expense.id,
       title: expense.title,
       amountCents: expense.amountCents,
+      currency: expense.currency ?? room.currency,
+      splitMode: expense.splitMode,
       paidById: expense.paidById,
       paidByName: expense.paidBy.name,
       createdAt: expense.createdAt.toISOString(),
@@ -362,6 +334,7 @@ export const addExpense = createServerFn({ method: "POST" })
         memberId: share.memberId,
         memberName: share.member.name,
         amountCents: share.amountCents,
+        weight: share.weight ?? null,
       })),
     }
   })

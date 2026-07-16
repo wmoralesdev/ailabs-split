@@ -110,7 +110,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
       typeof body.code === "string" ? body.code : ""
     )
     if (code.length < 6 || code.length > 8) {
-      throw new Error("Room code is required for OCR")
+      throw new Error("Trip code is required for OCR")
     }
 
     const imageBase64 = body.imageBase64
@@ -151,7 +151,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     assertRateLimit(`ocr:room:${data.code}`, {
       limit: 20,
       windowMs: 60_000,
-      label: "receipt scans for this room",
+      label: "receipt scans for this trip",
     })
 
     // Prove the room exists before spending Mistral credits.
@@ -160,7 +160,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
       select: { id: true },
     })
     if (!room) {
-      throw new Error("Room not found")
+      throw new Error("Trip not found")
     }
 
     const client = new Mistral({ apiKey })
