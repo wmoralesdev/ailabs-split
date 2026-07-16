@@ -1,21 +1,48 @@
-# TanStack Start + shadcn/ui
+# Split
 
-This is a template for a new TanStack Start project with React, TypeScript, and shadcn/ui.
+Trip cost PWA — rooms, expenses, balances, optional receipt OCR. No accounts.
 
-## Adding components
+Host: `split.ailabs.sv`
 
-To add components to your app, run the following command:
+## Stack
+
+- TanStack Start (React + file router)
+- Tailwind v4 + shadcn base-mira + Hugeicons
+- Neon Postgres + Prisma
+- vite-plugin-pwa (installable shell; data needs network)
+- Mistral OCR for receipt draft-fill
+
+## Setup
 
 ```bash
-npx shadcn@latest add button
+pnpm install
+cp .env.example .env
+# set DATABASE_URL (Neon) and optional MISTRAL_API_KEY
+pnpm db:migrate
+pnpm dev
 ```
 
-This will place the ui components in the `components` directory.
+## Scripts
 
-## Using components
+| Script | Purpose |
+|--------|---------|
+| `pnpm dev` | Local app on :3000 |
+| `pnpm build` | `prisma generate && vite build` |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm lint` | ESLint |
+| `pnpm test` | Vitest (settle math) |
+| `pnpm db:migrate` | `prisma migrate dev` |
+| `pnpm db:generate` | `prisma generate` |
 
-To use the components in your app, import them as follows:
+## Product
 
-```tsx
-import { Button } from "@/components/ui/button";
-```
+1. **/** — create a room (name, currency, members) or join by code  
+2. **/r/$code** — balances + expense list  
+3. **/r/$code/new** — fast add expense; optional scan  
+4. **/r/$code/settle** — “X owes Y $Z” transfers  
+
+Room code (6–8 chars) is the only access control. Member identity is a display name remembered in `localStorage`.
+
+## Deploy
+
+Vercel (or same host as ailabs). Env: `DATABASE_URL`, optional `DIRECT_URL`, optional `MISTRAL_API_KEY`. Point DNS `split.ailabs.sv` at the deployment.
