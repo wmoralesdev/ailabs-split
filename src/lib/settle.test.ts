@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  buildTripSummary,
   computeNets,
+  computeNetsWithSettlements,
   equalSplitCents,
   formatTransferSentence,
   parseAmountToCents,
@@ -89,6 +91,62 @@ describe("computeNets + simplifyTransfers", () => {
         "USD"
       )
     ).toBe("Daniela owes Walter $100.00")
+  })
+
+  it("applies recorded settlement payments to nets", () => {
+    const nets = computeNetsWithSettlements(
+      members,
+      [
+        {
+          paidById: "w",
+          shares: equalSplitCents(9000, ["w", "d", "m"]),
+        },
+      ],
+      [{ fromMemberId: "m", toMemberId: "w", amountCents: 3000 }]
+    )
+
+    expect(nets.find((n) => n.memberId === "w")?.netCents).toBe(3000)
+    expect(nets.find((n) => n.memberId === "m")?.netCents).toBe(0)
+  })
+})
+
+describe("buildTripSummary", () => {
+  it("includes expenses, payments, and remaining transfers", () => {
+    const summary = buildTripSummary({
+      name: "Beach",
+      code: "ABC123",
+      currency: "USD",
+      expenses: [
+        {
+          title: "Dinner",
+          category: "Food",
+          amountCents: 4200,
+          currency: "USD",
+          paidByName: "Walter",
+        },
+      ],
+      settlements: [
+        {
+          fromMemberName: "Daniela",
+          toMemberName: "Walter",
+          amountCents: 2100,
+          currency: "USD",
+        },
+      ],
+      transfers: [
+        {
+          fromId: "m",
+          fromName: "Mario",
+          toId: "w",
+          toName: "Walter",
+          amountCents: 2100,
+        },
+      ],
+    })
+
+    expect(summary).toContain("Dinner [Food]: $42.00 paid by Walter")
+    expect(summary).toContain("Daniela paid Walter $21.00")
+    expect(summary).toContain("Mario owes Walter $21.00")
   })
 })
 

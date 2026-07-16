@@ -10,27 +10,30 @@ datasource db {
 }
 
 model Room {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
   // Base/settlement currency for the room (e.g. the members' home currency).
-  currency  String
+  currency    String
   // Allowed currencies for expenses (includes the base currency).
-  currencies String[] @default([])
+  currencies  String[]     @default([])
   // Exchange rates as units of the currency per 1 base currency, e.g. { "CRC": 505 }.
-  fxRates   Json?
-  createdAt DateTime @default(now())
-  members   Member[]
-  expenses  Expense[]
+  fxRates     Json?
+  createdAt   DateTime     @default(now())
+  members     Member[]
+  expenses    Expense[]
+  settlements Settlement[]
 }
 
 model Member {
-  id            String         @id @default(cuid())
-  roomId        String
-  name          String
-  room          Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  paidExpenses  Expense[]      @relation("ExpensePaidBy")
-  shares        ExpenseShare[]
+  id                         String         @id @default(cuid())
+  roomId                     String
+  name                       String
+  room                       Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  paidExpenses               Expense[]      @relation("ExpensePaidBy")
+  shares                     ExpenseShare[]
+  settlementPaymentsSent     Settlement[]   @relation("SettlementFrom")
+  settlementPaymentsReceived Settlement[]   @relation("SettlementTo")
 
   @@index([roomId])
 }
@@ -40,6 +43,7 @@ model Expense {
   roomId      String
   title       String
   amountCents Int
+  category    String?
   // Currency this expense was recorded in; null falls back to the room base currency.
   currency    String?
   // How shares were derived: EQUAL | PARTS | AMOUNT.
@@ -68,4 +72,21 @@ model ExpenseShare {
 
   @@index([expenseId])
   @@index([memberId])
+}
+
+model Settlement {
+  id           String   @id @default(cuid())
+  roomId       String
+  fromMemberId String
+  toMemberId   String
+  amountCents  Int
+  currency     String
+  createdAt    DateTime @default(now())
+  room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  fromMember   Member   @relation("SettlementFrom", fields: [fromMemberId], references: [id], onDelete: Restrict)
+  toMember     Member   @relation("SettlementTo", fields: [toMemberId], references: [id], onDelete: Restrict)
+
+  @@index([roomId])
+  @@index([fromMemberId])
+  @@index([toMemberId])
 }

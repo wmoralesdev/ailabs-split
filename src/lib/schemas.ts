@@ -27,6 +27,13 @@ export const memberNameSchema = z
 export const splitModeSchema = z.enum(["EQUAL", "PARTS", "AMOUNT"])
 export type SplitMode = z.infer<typeof splitModeSchema>
 
+export const expenseCategorySchema = z
+  .string()
+  .trim()
+  .max(32, "Category is too long")
+  .optional()
+  .transform((value) => (value ? value : undefined))
+
 export const createRoomSchema = z.object({
   name: z.string().trim().min(1, "Name your trip").max(60, "Name is too long"),
   currency: currencyCodeSchema,
@@ -56,67 +63,109 @@ export const expenseSplitSchema = z.object({
   amountCents: z.number().int().min(0).optional(),
 })
 
-export const addExpenseSchema = z
-  .object({
-    code: roomCodeSchema,
-    title: z.string().trim().min(1, "Add a short title").max(80, "Title is too long"),
-    amountCents: z.number().int().positive("Enter a valid amount"),
-    currency: currencyCodeSchema.optional(),
-    paidById: z.string().min(1, "Pick who paid"),
-    splitMode: splitModeSchema.default("EQUAL"),
-    isPersonal: z.boolean().default(false),
-    splits: z.array(expenseSplitSchema).min(1, "Pick at least one person"),
-  })
-  .superRefine((value, ctx) => {
-    if (value.isPersonal) {
-      if (value.splits.length !== 1 || value.splits[0]?.memberId !== value.paidById) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Personal expenses must be assigned only to you",
-          path: ["splits"],
-        })
-      }
-      return
-    }
+const expenseWriteBaseSchema = z.object({
+  code: roomCodeSchema,
+  title: z
+    .string()
+    .trim()
+    .min(1, "Add a short title")
+    .max(80, "Title is too long"),
+  amountCents: z.number().int().positive("Enter a valid amount"),
+  category: expenseCategorySchema,
+  currency: currencyCodeSchema.optional(),
+  paidById: z.string().min(1, "Pick who paid"),
+  splitMode: splitModeSchema.default("EQUAL"),
+  isPersonal: z.boolean().default(false),
+  splits: z.array(expenseSplitSchema).min(1, "Pick at least one person"),
+})
 
-    if (value.splitMode === "AMOUNT") {
-      let sum = 0
-      for (const split of value.splits) {
-        if (typeof split.amountCents !== "number") {
-          ctx.addIssue({
-            code: "custom",
-            message: "Every person needs an amount",
-            path: ["splits"],
-          })
-          return
-        }
-        sum += split.amountCents
-      }
-      if (sum !== value.amountCents) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Custom amounts must sum to the total",
-          path: ["splits"],
-        })
-      }
+function validateExpenseWrite(
+  value: z.infer<typeof expenseWriteBaseSchema>,
+  ctx: z.RefinementCtx
+) {
+  if (value.isPersonal) {
+    if (
+      value.splits.length !== 1 ||
+      value.splits[0]?.memberId !== value.paidById
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Personal expenses must be assigned only to you",
+        path: ["splits"],
+      })
     }
+    return
+  }
 
-    if (value.splitMode === "PARTS") {
-      const totalWeight = value.splits.reduce(
-        (total, split) => total + (split.weight ?? 0),
-        0
-      )
-      if (totalWeight <= 0) {
+  if (value.splitMode === "AMOUNT") {
+    let sum = 0
+    for (const split of value.splits) {
+      if (typeof split.amountCents !== "number") {
         ctx.addIssue({
           code: "custom",
-          message: "Give at least one person some parts",
+          message: "Every person needs an amount",
           path: ["splits"],
         })
+        return
       }
+      sum += split.amountCents
     }
+    if (sum !== value.amountCents) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Custom amounts must sum to the total",
+        path: ["splits"],
+      })
+    }
+  }
+
+  if (value.splitMode === "PARTS") {
+    const totalWeight = value.splits.reduce(
+      (total, split) => total + (split.weight ?? 0),
+      0
+    )
+    if (totalWeight <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Give at least one person some parts",
+        path: ["splits"],
+      })
+    }
+  }
+}
+
+export const addExpenseSchema =
+  expenseWriteBaseSchema.superRefine(validateExpenseWrite)
+
+export const updateExpenseSchema = expenseWriteBaseSchema
+  .extend({
+    expenseId: z.string().min(1, "Missing expense"),
   })
+  .superRefine(validateExpenseWrite)
+
+export const deleteExpenseSchema = z.object({
+  code: roomCodeSchema,
+  expenseId: z.string().min(1, "Missing expense"),
+})
+
+export const recordSettlementSchema = z.object({
+  code: roomCodeSchema,
+  fromMemberId: z.string().min(1, "Pick who paid"),
+  toMemberId: z.string().min(1, "Pick who received"),
+  amountCents: z.number().int().positive("Enter a valid amount"),
+  currency: currencyCodeSchema.optional(),
+})
+
+export const deleteSettlementSchema = z.object({
+  code: roomCodeSchema,
+  settlementId: z.string().min(1, "Missing settlement"),
+})
 
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type JoinRoomInput = z.input<typeof joinRoomSchema>
 export type AddExpenseInput = z.input<typeof addExpenseSchema>
+export type UpdateExpenseInput = z.input<typeof updateExpenseSchema>
+export type DeleteExpenseInput = z.input<typeof deleteExpenseSchema>
+export type RecordSettlementInput = z.input<typeof recordSettlementSchema>
+export type DeleteSettlementInput = z.input<typeof deleteSettlementSchema>
 export type ExpenseSplitInput = z.input<typeof expenseSplitSchema>
