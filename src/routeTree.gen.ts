@@ -8,59 +8,144 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root"
-import { Route as IndexRouteImport } from "./routes/index"
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as RCodeRouteImport } from './routes/r.$code'
+import { Route as RCodeIndexRouteImport } from './routes/r.$code/index'
+import { Route as RCodeSettleRouteImport } from './routes/r.$code/settle'
+import { Route as RCodeNewRouteImport } from './routes/r.$code/new'
 
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const RCodeRoute = RCodeRouteImport.update({
+  id: '/r/$code',
+  path: '/r/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RCodeIndexRoute = RCodeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RCodeRoute,
+} as any)
+const RCodeSettleRoute = RCodeSettleRouteImport.update({
+  id: '/settle',
+  path: '/settle',
+  getParentRoute: () => RCodeRoute,
+} as any)
+const RCodeNewRoute = RCodeNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => RCodeRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/r/$code': typeof RCodeRouteWithChildren
+  '/r/$code/new': typeof RCodeNewRoute
+  '/r/$code/settle': typeof RCodeSettleRoute
+  '/r/$code/': typeof RCodeIndexRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/r/$code/new': typeof RCodeNewRoute
+  '/r/$code/settle': typeof RCodeSettleRoute
+  '/r/$code': typeof RCodeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/r/$code': typeof RCodeRouteWithChildren
+  '/r/$code/new': typeof RCodeNewRoute
+  '/r/$code/settle': typeof RCodeSettleRoute
+  '/r/$code/': typeof RCodeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/"
+  fullPaths: '/' | '/r/$code' | '/r/$code/new' | '/r/$code/settle' | '/r/$code/'
   fileRoutesByTo: FileRoutesByTo
-  to: "/"
-  id: "__root__" | "/"
+  to: '/' | '/r/$code/new' | '/r/$code/settle' | '/r/$code'
+  id:
+    | '__root__'
+    | '/'
+    | '/r/$code'
+    | '/r/$code/new'
+    | '/r/$code/settle'
+    | '/r/$code/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  RCodeRoute: typeof RCodeRouteWithChildren
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/": {
-      id: "/"
-      path: "/"
-      fullPath: "/"
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/r/$code': {
+      id: '/r/$code'
+      path: '/r/$code'
+      fullPath: '/r/$code'
+      preLoaderRoute: typeof RCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/r/$code/': {
+      id: '/r/$code/'
+      path: '/'
+      fullPath: '/r/$code/'
+      preLoaderRoute: typeof RCodeIndexRouteImport
+      parentRoute: typeof RCodeRoute
+    }
+    '/r/$code/settle': {
+      id: '/r/$code/settle'
+      path: '/settle'
+      fullPath: '/r/$code/settle'
+      preLoaderRoute: typeof RCodeSettleRouteImport
+      parentRoute: typeof RCodeRoute
+    }
+    '/r/$code/new': {
+      id: '/r/$code/new'
+      path: '/new'
+      fullPath: '/r/$code/new'
+      preLoaderRoute: typeof RCodeNewRouteImport
+      parentRoute: typeof RCodeRoute
     }
   }
 }
 
+interface RCodeRouteChildren {
+  RCodeNewRoute: typeof RCodeNewRoute
+  RCodeSettleRoute: typeof RCodeSettleRoute
+  RCodeIndexRoute: typeof RCodeIndexRoute
+}
+
+const RCodeRouteChildren: RCodeRouteChildren = {
+  RCodeNewRoute: RCodeNewRoute,
+  RCodeSettleRoute: RCodeSettleRoute,
+  RCodeIndexRoute: RCodeIndexRoute,
+}
+
+const RCodeRouteWithChildren = RCodeRoute._addFileChildren(RCodeRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  RCodeRoute: RCodeRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx"
-import type { createStart } from "@tanstack/react-start"
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>

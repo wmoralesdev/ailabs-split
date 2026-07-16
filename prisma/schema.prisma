@@ -1,0 +1,58 @@
+// Split — trip cost rooms, members, expenses (integer cents only)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  currency  String
+  createdAt DateTime @default(now())
+  members   Member[]
+  expenses  Expense[]
+}
+
+model Member {
+  id            String         @id @default(cuid())
+  roomId        String
+  name          String
+  room          Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  paidExpenses  Expense[]      @relation("ExpensePaidBy")
+  shares        ExpenseShare[]
+
+  @@index([roomId])
+}
+
+model Expense {
+  id          String         @id @default(cuid())
+  roomId      String
+  title       String
+  amountCents Int
+  paidById    String
+  createdAt   DateTime       @default(now())
+  room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  paidBy      Member         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
+  shares      ExpenseShare[]
+
+  @@index([roomId])
+  @@index([paidById])
+}
+
+model ExpenseShare {
+  id          String  @id @default(cuid())
+  expenseId   String
+  memberId    String
+  amountCents Int
+  expense     Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  member      Member  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+  @@index([memberId])
+}
