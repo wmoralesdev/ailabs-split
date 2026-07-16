@@ -198,7 +198,7 @@ function LandingPage() {
                 id="join-name"
                 value={joinName}
                 onChange={(e) => setJoinName(e.target.value)}
-                placeholder="Adds you if you&apos;re new"
+                placeholder="Adds you if you're new"
                 className="h-11"
               />
             </div>
