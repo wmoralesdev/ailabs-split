@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
 
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 import appCss from "../styles.css?url"
 
 const SITE_TITLE = "Split — trip costs, no accounts"
@@ -72,6 +73,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <PwaInstallPrompt />
         {import.meta.env.DEV ? (
           <TanStackDevtools
             config={{ position: "bottom-right" }}

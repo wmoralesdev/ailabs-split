@@ -14,6 +14,7 @@ const config = defineConfig({
     viteReact(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: "auto",
       includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
       manifest: {
         name: "Split",
