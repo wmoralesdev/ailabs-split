@@ -83,7 +83,7 @@ function PwaInstallPrompt() {
     <>
       <div className="animate-rise pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="border-border bg-background/95 shadow-float pointer-events-auto flex w-full max-w-content items-start gap-3 rounded-xl border p-4 backdrop-blur-md">
-          <div className="bg-muted text-split flex size-10 shrink-0 items-center justify-center rounded-lg">
+          <div className="bg-muted text-primary flex size-10 shrink-0 items-center justify-center rounded-lg">
             <HugeiconsIcon icon={Download01Icon} size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
