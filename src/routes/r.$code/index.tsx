@@ -37,6 +37,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { BankFxCalibrationSheet } from "@/components/bank-fx-calibration-sheet"
 import { CategoryChips } from "@/components/category-chips"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -197,6 +198,10 @@ function RoomHomePage() {
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
   )
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const [calibrationExpenseId, setCalibrationExpenseId] = useState<
+    string | null
+  >(null)
   const [reordering, setReordering] = useState(false)
   const [order, setOrder] = useState<string[]>([])
   const [savingOrder, setSavingOrder] = useState(false)
@@ -257,18 +262,23 @@ function RoomHomePage() {
     }
   }
 
+  // Home list hides others' personal expenses (still available redacted for FX calibrate).
+  const listExpenses = useMemo(() => {
+    if (!room) return []
+    return room.expenses.filter((expense) => !expense.redacted)
+  }, [room])
+
   useEffect(() => {
     if (!room || reordering) return
-    setOrder(room.expenses.map((expense) => expense.id))
-  }, [room?.expenses, reordering])
+    setOrder(listExpenses.map((expense) => expense.id))
+  }, [listExpenses, reordering, room])
 
   const orderedExpenses = useMemo(() => {
-    if (!room) return []
-    const byId = new Map(room.expenses.map((expense) => [expense.id, expense]))
+    const byId = new Map(listExpenses.map((expense) => [expense.id, expense]))
     return order
       .map((id) => byId.get(id))
       .filter((expense): expense is RoomDto["expenses"][number] => !!expense)
-  }, [order, room])
+  }, [order, listExpenses])
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -304,7 +314,8 @@ function RoomHomePage() {
           myShare.amountCents,
           expense.currency,
           room.currency,
-          room.fxRates
+          room.fxRates,
+          room.fxAdjustmentBps
         )
       )
     }, 0)
@@ -324,7 +335,8 @@ function RoomHomePage() {
               share.amountCents,
               expense.currency,
               room.currency,
-              room.fxRates
+              room.fxRates,
+              room.fxAdjustmentBps
             ),
           })),
         })),
@@ -335,7 +347,8 @@ function RoomHomePage() {
           settlement.amountCents,
           settlement.currency,
           room.currency,
-          room.fxRates
+          room.fxRates,
+          room.fxAdjustmentBps
         ),
       }))
     )
@@ -350,7 +363,7 @@ function RoomHomePage() {
   const selectedExpense =
     selectedExpenseId == null
       ? null
-      : (room.expenses.find((expense) => expense.id === selectedExpenseId) ??
+      : (listExpenses.find((expense) => expense.id === selectedExpenseId) ??
         null)
 
   async function copyCode() {
@@ -393,29 +406,32 @@ function RoomHomePage() {
         </header>
 
         <section className="mt-4 border-y border-border/70 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Avatar className="size-8">
-                <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                  {me ? initials(me.name) : "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  You · {me?.name ?? "Unknown"}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void copyMyLink()}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={2} />
-                  {copied === "link"
-                    ? "Personal link copied"
-                    : "Copy my device link"}
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Avatar className="size-8 shrink-0">
+              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                {me ? initials(me.name) : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <p className="min-w-0 flex-1 truncate text-sm font-medium">
+              You · {me?.name ?? "Unknown"}
+            </p>
+            <button
+              type="button"
+              onClick={() => void copyMyLink()}
+              className="text-muted-foreground hover:text-foreground inline-flex size-9 shrink-0 items-center justify-center rounded-md"
+              aria-label={
+                copied === "link"
+                  ? "Personal link copied"
+                  : "Copy my device link"
+              }
+              title={
+                copied === "link"
+                  ? "Personal link copied"
+                  : "Copy my device link"
+              }
+            >
+              <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={2} />
+            </button>
             <button
               type="button"
               onClick={switchIdentity}
@@ -489,7 +505,7 @@ function RoomHomePage() {
         <section className="mt-6">
           <div className="flex items-end justify-between gap-3">
             <h2 className="font-display text-xl font-semibold">Expenses</h2>
-            {room.expenses.length > 1 ? (
+            {listExpenses.length > 1 ? (
               <button
                 type="button"
                 disabled={reordering && savingOrder}
@@ -522,7 +538,7 @@ function RoomHomePage() {
               </button>
             ) : null}
           </div>
-          {room.expenses.length === 0 ? (
+          {listExpenses.length === 0 ? (
             <div className="mt-3 flex flex-col items-center gap-3 border-y border-border/70 py-10 text-center">
               <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
                 <HugeiconsIcon
@@ -572,7 +588,7 @@ function RoomHomePage() {
             </DndContext>
           ) : (
             <ul className="mt-1">
-              {room.expenses.map((expense) => (
+              {listExpenses.map((expense) => (
                 <ExpenseRow
                   key={expense.id}
                   expense={expense}
@@ -597,6 +613,20 @@ function RoomHomePage() {
           onOpenChange={(open) => {
             if (!open) setSelectedExpenseId(null)
           }}
+          onCalibrateBank={(expenseId) => {
+            setSelectedExpenseId(null)
+            setCalibrationExpenseId(expenseId)
+            setCalibrationOpen(true)
+          }}
+        />
+        <BankFxCalibrationSheet
+          room={room}
+          open={calibrationOpen}
+          onOpenChange={(open) => {
+            setCalibrationOpen(open)
+            if (!open) setCalibrationExpenseId(null)
+          }}
+          initialExpenseId={calibrationExpenseId}
         />
       </main>
     </PullToRefresh>
@@ -620,7 +650,8 @@ function ExpenseRowContent({
     expense.amountCents,
     expense.currency,
     room.currency,
-    room.fxRates
+    room.fxRates,
+    room.fxAdjustmentBps
   )
 
   return (
@@ -631,8 +662,8 @@ function ExpenseRowContent({
         </AvatarFallback>
       </Avatar>
       <div className={cn("min-w-0 flex-1", pending && "opacity-80")}>
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate text-sm font-medium">{expense.title}</p>
+        <div className="flex min-w-0 items-baseline gap-2">
+          <p className="truncate text-sm font-semibold">{expense.title}</p>
           {pending ? (
             <Badge variant="secondary" className="shrink-0">
               Syncing
@@ -644,21 +675,20 @@ function ExpenseRowContent({
             </Badge>
           ) : null}
           {expense.category ? (
-            <Badge variant="outline" className="shrink-0">
+            <Badge
+              variant="outline"
+              className="shrink-0 border-transparent bg-muted text-muted-foreground"
+            >
               {expense.category}
             </Badge>
           ) : null}
         </div>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="mt-1 truncate text-xs text-muted-foreground">
           {pending
             ? "Waiting to sync"
             : compact
               ? formatRelativeTime(expense.createdAt)
-              : `${
-                  expense.isPersonal
-                    ? `${expense.paidByName} paid`
-                    : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`
-                } · ${formatRelativeTime(expense.createdAt)}`}
+              : `${expense.paidByName} paid · ${formatRelativeTime(expense.createdAt)}`}
         </p>
       </div>
       <div className={cn("shrink-0 text-right", pending && "opacity-80")}>
@@ -690,7 +720,7 @@ function ExpenseRow({
     <li className="border-b border-border/70">
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-muted/30"
+        className="flex w-full items-center justify-between gap-3.5 py-3.5 text-left transition-colors hover:bg-muted/30"
         onClick={onOpen}
       >
         <ExpenseRowContent expense={expense} room={room} pending={pending} />
@@ -727,7 +757,7 @@ function SortableExpenseRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-3 border-b border-border/70 bg-background py-3",
+        "flex items-center gap-3.5 border-b border-border/70 bg-background py-3.5",
         isDragging && "relative z-10 opacity-90 shadow-lg",
         pending && "opacity-80"
       )}
@@ -756,11 +786,13 @@ function ExpenseDetailSheet({
   expense,
   open,
   onOpenChange,
+  onCalibrateBank,
 }: {
   room: RoomDto
   expense: RoomDto["expenses"][number] | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCalibrateBank: (expenseId: string) => void
 }) {
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
@@ -823,7 +855,8 @@ function ExpenseDetailSheet({
     expense.amountCents,
     expense.currency,
     room.currency,
-    room.fxRates
+    room.fxRates,
+    room.fxAdjustmentBps
   )
   const isForeign = expense.currency !== room.currency
 
@@ -932,6 +965,15 @@ function ExpenseDetailSheet({
                     <p className="mt-1 text-sm text-muted-foreground">
                       ≈ {formatMoney(baseCents, room.currency)}
                     </p>
+                  ) : null}
+                  {isForeign ? (
+                    <button
+                      type="button"
+                      onClick={() => onCalibrateBank(expense.id)}
+                      className="mt-2 text-sm font-medium text-primary"
+                    >
+                      Bank charged different?
+                    </button>
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
