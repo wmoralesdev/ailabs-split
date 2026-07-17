@@ -32,7 +32,7 @@ const config = defineConfig({
         name: "Split",
         short_name: "Split",
         description: "Split trip costs. No accounts.",
-        theme_color: "#1a1a1a",
+        theme_color: "#ede4ff",
         background_color: "#ede4ff",
         display: "standalone",
         start_url: "/",
