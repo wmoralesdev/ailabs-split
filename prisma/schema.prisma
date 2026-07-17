@@ -52,12 +52,16 @@ model Expense {
   isPersonal  Boolean        @default(false)
   paidById    String
   createdAt   DateTime       @default(now())
+  // Manual display order (lower first). New expenses get min(sortIndex)-1 so
+  // they appear at the top. Ties fall back to createdAt desc.
+  sortIndex   Int            @default(0)
   room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
   paidBy      Member         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
   shares      ExpenseShare[]
 
   @@index([roomId])
   @@index([paidById])
+  @@index([roomId, sortIndex])
 }
 
 model ExpenseShare {
