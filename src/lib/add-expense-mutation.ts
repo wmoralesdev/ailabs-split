@@ -95,6 +95,7 @@ export function buildOptimisticExpense(
     currency: vars.currency ?? room.currency,
     splitMode,
     isPersonal: vars.isPersonal,
+    redacted: false,
     paidById: vars.paidById,
     paidByName: memberName(room, vars.paidById),
     createdAt: new Date().toISOString(),

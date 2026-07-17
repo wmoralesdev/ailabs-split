@@ -20,6 +20,22 @@ function isRoomDto(value: unknown): value is RoomDto {
   )
 }
 
+function normalizeRoomDto(room: RoomDto): RoomDto {
+  return {
+    ...room,
+    fxAdjustmentBps: Number.isFinite(room.fxAdjustmentBps)
+      ? room.fxAdjustmentBps
+      : 0,
+    fxCalibrationSamples: Array.isArray(room.fxCalibrationSamples)
+      ? room.fxCalibrationSamples
+      : [],
+    expenses: room.expenses.map((expense) => ({
+      ...expense,
+      redacted: expense.redacted === true,
+    })),
+  }
+}
+
 /** Last successful room payload for this trip + viewer, if any. */
 export function readRoomCache(
   code: string,
@@ -30,7 +46,7 @@ export function readRoomCache(
     const raw = window.localStorage.getItem(cacheKey(code, viewerMemberId))
     if (!raw) return undefined
     const parsed: unknown = JSON.parse(raw)
-    return isRoomDto(parsed) ? parsed : undefined
+    return isRoomDto(parsed) ? normalizeRoomDto(parsed) : undefined
   } catch {
     return undefined
   }

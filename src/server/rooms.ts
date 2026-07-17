@@ -7,6 +7,7 @@ import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
 import {
   addExpenseSchema,
+  calibrateRoomFxSchema,
   claimMemberSchema,
   createRoomSchema,
   deleteExpenseSchema,
@@ -17,7 +18,12 @@ import {
   reorderExpensesSchema,
   updateExpenseSchema,
 } from "@/lib/schemas"
-import { equalSplitCents, partsSplitCents } from "@/lib/settle"
+import {
+  computeFxAdjustmentBps,
+  equalSplitCents,
+  partsSplitCents,
+} from "@/lib/settle"
+import type { FxCalibrationSample } from "@/lib/settle"
 
 export type RoomMemberDto = {
   id: string
@@ -39,6 +45,8 @@ export type ExpenseDto = {
   currency: string
   splitMode: string
   isPersonal: boolean
+  /** True when this is someone else's personal expense (title/details hidden). */
+  redacted: boolean
   paidById: string
   paidByName: string
   createdAt: string
@@ -66,6 +74,10 @@ export type RoomDto = {
   currencies: string[]
   /** Units of each currency per 1 unit of the base currency. */
   fxRates: Record<string, number>
+  /** Bank FX markup in basis points from calibration (87 = +0.87%). */
+  fxAdjustmentBps: number
+  /** Calibration samples used to derive fxAdjustmentBps. */
+  fxCalibrationSamples: FxCalibrationSample[]
   createdAt: string
   members: RoomMemberDto[]
   expenses: ExpenseDto[]
@@ -90,6 +102,33 @@ function toFxRates(value: unknown): Record<string, number> {
     }
   }
   return out
+}
+
+function toFxCalibrationSamples(value: unknown): FxCalibrationSample[] {
+  if (!Array.isArray(value)) return []
+  const samples: FxCalibrationSample[] = []
+  for (const row of value) {
+    if (!row || typeof row !== "object") continue
+    const record = row as Record<string, unknown>
+    const appCents = record.appCents
+    const bankCents = record.bankCents
+    if (
+      typeof appCents !== "number" ||
+      typeof bankCents !== "number" ||
+      !Number.isInteger(appCents) ||
+      !Number.isInteger(bankCents) ||
+      appCents <= 0 ||
+      bankCents <= 0
+    ) {
+      continue
+    }
+    const sample: FxCalibrationSample = { appCents, bankCents }
+    if (typeof record.expenseId === "string" && record.expenseId.length > 0) {
+      sample.expenseId = record.expenseId
+    }
+    samples.push(sample)
+  }
+  return samples
 }
 
 function clientIp(): string {
@@ -128,25 +167,40 @@ function expenseToDto(
       member: { name: string }
     }>
   },
-  roomCurrency: string
+  roomCurrency: string,
+  viewerMemberId?: string | null
 ): ExpenseDto {
+  const redacted =
+    expense.isPersonal &&
+    (viewerMemberId == null || expense.paidById !== viewerMemberId)
+
   return {
     id: expense.id,
-    title: expense.title,
+    title: redacted ? "Personal" : expense.title,
     amountCents: expense.amountCents,
-    category: expense.category,
+    category: redacted ? null : expense.category,
     currency: expense.currency ?? roomCurrency,
     splitMode: expense.splitMode,
     isPersonal: expense.isPersonal,
+    redacted,
     paidById: expense.paidById,
     paidByName: expense.paidBy.name,
     createdAt: expense.createdAt.toISOString(),
-    shares: expense.shares.map((share) => ({
-      memberId: share.memberId,
-      memberName: share.member.name,
-      amountCents: share.amountCents,
-      weight: share.weight ?? null,
-    })),
+    shares: redacted
+      ? [
+          {
+            memberId: expense.paidById,
+            memberName: expense.paidBy.name,
+            amountCents: expense.amountCents,
+            weight: null,
+          },
+        ]
+      : expense.shares.map((share) => ({
+          memberId: share.memberId,
+          memberName: share.member.name,
+          amountCents: share.amountCents,
+          weight: share.weight ?? null,
+        })),
   }
 }
 
@@ -279,12 +333,6 @@ async function loadRoomByCode(
       ? Array.from(new Set([room.currency, ...room.currencies]))
       : [room.currency]
 
-  const visibleExpenses = room.expenses.filter(
-    (expense) =>
-      !expense.isPersonal ||
-      (viewerMemberId != null && expense.paidById === viewerMemberId)
-  )
-
   return {
     id: room.id,
     code: room.code,
@@ -292,13 +340,17 @@ async function loadRoomByCode(
     currency: room.currency,
     currencies,
     fxRates: toFxRates(room.fxRates),
+    fxAdjustmentBps: room.fxAdjustmentBps,
+    fxCalibrationSamples: toFxCalibrationSamples(room.fxCalibrationSamples),
     createdAt: room.createdAt.toISOString(),
     members: room.members.map((member) => ({
       id: member.id,
       name: member.name,
     })),
-    expenses: visibleExpenses.map((expense) =>
-      expenseToDto(expense, room.currency)
+    // Include others' personal expenses (redacted) so bank FX calibration can
+    // use them; home/settle UIs hide redacted rows from the main lists.
+    expenses: room.expenses.map((expense) =>
+      expenseToDto(expense, room.currency, viewerMemberId)
     ),
     settlements: room.settlements.map(settlementToDto),
   }
@@ -463,7 +515,7 @@ export const addExpense = createServerFn({ method: "POST" })
       },
     })
 
-    return expenseToDto(expense, room.currency)
+    return expenseToDto(expense, room.currency, data.paidById)
   })
 
 export const updateExpense = createServerFn({ method: "POST" })
@@ -531,7 +583,7 @@ export const updateExpense = createServerFn({ method: "POST" })
       })
     })
 
-    return expenseToDto(expense, room.currency)
+    return expenseToDto(expense, room.currency, data.paidById)
   })
 
 export const deleteExpense = createServerFn({ method: "POST" })
@@ -664,4 +716,37 @@ export const deleteSettlement = createServerFn({ method: "POST" })
 
     await prisma.settlement.delete({ where: { id: data.settlementId } })
     return { settlementId: data.settlementId }
+  })
+
+export const calibrateRoomFx = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(calibrateRoomFxSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("calibrate-room-fx")
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      select: { id: true },
+    })
+    if (!room) throw new Error("Trip not found")
+
+    const samples: FxCalibrationSample[] = data.samples.map((sample) => {
+      const next: FxCalibrationSample = {
+        appCents: sample.appCents,
+        bankCents: sample.bankCents,
+      }
+      if (sample.expenseId) next.expenseId = sample.expenseId
+      return next
+    })
+    const fxAdjustmentBps = computeFxAdjustmentBps(samples)
+
+    await prisma.room.update({
+      where: { id: room.id },
+      data: {
+        fxAdjustmentBps,
+        fxCalibrationSamples: samples,
+      },
+    })
+
+    const updated = await loadRoomByCode(data.code)
+    if (!updated) throw new Error("Trip not found")
+    return updated
   })

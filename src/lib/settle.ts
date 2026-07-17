@@ -326,19 +326,58 @@ export function partsSplitCents(
 
 export type FxRates = Record<string, number> | null | undefined
 
+export type FxCalibrationSample = {
+  /** App-converted base cents (unadjusted mid-market). */
+  appCents: number
+  /** What the bank charged, in room base currency cents. */
+  bankCents: number
+  /** Optional expense id if the row was prefilled from an expense. */
+  expenseId?: string
+}
+
+/**
+ * Weighted-average bank markup in basis points from calibration samples.
+ * Each sample: ((bank - app) / app) * 10000; trip average weighted by appCents.
+ */
+export function computeFxAdjustmentBps(
+  samples: ReadonlyArray<Pick<FxCalibrationSample, "appCents" | "bankCents">>
+): number {
+  let weightedBps = 0
+  let totalApp = 0
+  for (const sample of samples) {
+    if (
+      !Number.isFinite(sample.appCents) ||
+      !Number.isFinite(sample.bankCents) ||
+      sample.appCents <= 0 ||
+      sample.bankCents <= 0
+    ) {
+      continue
+    }
+    const bps = ((sample.bankCents - sample.appCents) / sample.appCents) * 10000
+    weightedBps += sample.appCents * bps
+    totalApp += sample.appCents
+  }
+  if (totalApp <= 0) return 0
+  return Math.round(weightedBps / totalApp)
+}
+
 /**
  * Convert an amount in `currency` to the room base currency.
  * fxRates are units of the currency per 1 unit of base (e.g. { CRC: 505 }).
  * Unknown or missing rates fall back to 1:1 so balances still compute.
+ * fxAdjustmentBps (from bank calibration) marks up foreign→base only.
  */
 export function convertToBase(
   amountCents: number,
   currency: string | null | undefined,
   baseCurrency: string,
-  fxRates: FxRates
+  fxRates: FxRates,
+  fxAdjustmentBps = 0
 ): number {
   if (!currency || currency === baseCurrency) return amountCents
   const rate = fxRates?.[currency]
   if (!rate || rate <= 0) return amountCents
-  return Math.round(amountCents / rate)
+  const midMarketCents = Math.round(amountCents / rate)
+  if (!fxAdjustmentBps) return midMarketCents
+  return Math.round(midMarketCents * (1 + fxAdjustmentBps / 10000))
 }

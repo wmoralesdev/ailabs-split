@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildTripSummary,
+  computeFxAdjustmentBps,
   computeNets,
   computeNetsWithSettlements,
+  convertToBase,
   equalSplitCents,
   formatTransferSentence,
   parseAmountToCents,
@@ -167,5 +169,65 @@ describe("parseAmountToCents", () => {
   it("rejects invalid input", () => {
     expect(parseAmountToCents("")).toBeNull()
     expect(parseAmountToCents("abc")).toBeNull()
+  })
+})
+
+describe("computeFxAdjustmentBps", () => {
+  it("returns 0 for empty or invalid samples", () => {
+    expect(computeFxAdjustmentBps([])).toBe(0)
+    expect(computeFxAdjustmentBps([{ appCents: 0, bankCents: 100 }])).toBe(0)
+    expect(
+      computeFxAdjustmentBps([{ appCents: Number.NaN, bankCents: 100 }])
+    ).toBe(0)
+  })
+
+  it("computes bps from a single sample", () => {
+    // 1032 → 1041 ≈ +0.872% → 87 bps
+    expect(
+      computeFxAdjustmentBps([{ appCents: 1032, bankCents: 1041 }])
+    ).toBe(87)
+  })
+
+  it("weights by app amount across samples", () => {
+    // Small: 1000→1010 = 100 bps; large: 9000→9090 = 100 bps → 100
+    expect(
+      computeFxAdjustmentBps([
+        { appCents: 1000, bankCents: 1010 },
+        { appCents: 9000, bankCents: 9090 },
+      ])
+    ).toBe(100)
+
+    // Unequal: 1000→1100 = 1000 bps; 3000→3030 = 100 bps
+    // weighted = (1000*1000 + 3000*100) / 4000 = 325
+    expect(
+      computeFxAdjustmentBps([
+        { appCents: 1000, bankCents: 1100 },
+        { appCents: 3000, bankCents: 3030 },
+      ])
+    ).toBe(325)
+  })
+})
+
+describe("convertToBase", () => {
+  const rates = { CRC: 500 }
+
+  it("returns base amounts unchanged", () => {
+    expect(convertToBase(2500, "USD", "USD", rates)).toBe(2500)
+    expect(convertToBase(2500, null, "USD", rates)).toBe(2500)
+  })
+
+  it("converts with mid-market rate", () => {
+    // 500000 CRC / 500 = 1000 USD cents
+    expect(convertToBase(500_000, "CRC", "USD", rates)).toBe(1000)
+  })
+
+  it("applies bank markup only to foreign amounts", () => {
+    // 1000 mid-market * 1.0087 ≈ 1009
+    expect(convertToBase(500_000, "CRC", "USD", rates, 87)).toBe(1009)
+    expect(convertToBase(2500, "USD", "USD", rates, 87)).toBe(2500)
+  })
+
+  it("falls back to 1:1 when rate is missing", () => {
+    expect(convertToBase(5000, "EUR", "USD", rates)).toBe(5000)
   })
 })
