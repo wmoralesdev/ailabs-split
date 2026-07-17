@@ -38,6 +38,7 @@ import {
   centsToAtmDigits,
   currencyFractionDigits,
   formatAtmAmount,
+  formatAtmAmountInput,
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
 import { rememberLastCurrency, resolveLastCurrency } from "@/lib/last-currency"
@@ -438,7 +439,7 @@ function AddExpenseForm({
                       name={field.name}
                       ref={field.ref}
                       onBlur={field.onBlur}
-                      value={formatAtmAmount(field.value, fractionDigits)}
+                      value={formatAtmAmountInput(field.value, fractionDigits)}
                       onChange={(e) => {
                         field.onChange(atmDigitsFromInput(e.target.value))
                       }}
@@ -511,7 +512,7 @@ function AddExpenseForm({
 
           <div className="flex flex-col gap-2">
             <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
-            <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border text-sm hover:bg-muted/40">
+            <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
               <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
               {ocrPending ? "Reading receipt…" : "Scan receipt"}
               <input
@@ -599,7 +600,7 @@ function AddExpenseForm({
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3">
                 <FormLabelStatic>Split between</FormLabelStatic>
                 <Tabs
                   value={splitMode}
@@ -608,16 +609,10 @@ function AddExpenseForm({
                     setSplitError(null)
                   }}
                 >
-                  <TabsList className="h-9">
-                    <TabsTrigger value="EQUAL" className="text-xs">
-                      Equal
-                    </TabsTrigger>
-                    <TabsTrigger value="PARTS" className="text-xs">
-                      Parts
-                    </TabsTrigger>
-                    <TabsTrigger value="AMOUNT" className="text-xs">
-                      Amounts
-                    </TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="EQUAL">Equal</TabsTrigger>
+                    <TabsTrigger value="PARTS">Parts</TabsTrigger>
+                    <TabsTrigger value="AMOUNT">Amounts</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -705,7 +700,7 @@ function AddExpenseForm({
                           <Input
                             inputMode="numeric"
                             autoComplete="off"
-                            value={formatAtmAmount(
+                            value={formatAtmAmountInput(
                               amounts[member.id] ?? "",
                               fractionDigits
                             )}
@@ -770,7 +765,7 @@ function AddExpenseForm({
             </div>
           )}
 
-          <Button type="submit" size="lg" disabled={mutation.isPending}>
+          <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? "Saving…" : "Save expense"}
           </Button>
         </form>

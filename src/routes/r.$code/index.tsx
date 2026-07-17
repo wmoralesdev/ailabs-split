@@ -17,7 +17,6 @@ import { toast } from "sonner"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -34,6 +33,7 @@ import {
   centsToAtmDigits,
   currencyFractionDigits,
   formatAtmAmount,
+  formatAtmAmountInput,
 } from "@/lib/atm-amount"
 import { copyText, shareOrCopyInvite } from "@/lib/invite-link"
 import { memberLink } from "@/lib/member-storage"
@@ -163,8 +163,6 @@ function RoomHomePage() {
       : (room.expenses.find((expense) => expense.id === selectedExpenseId) ??
         null)
 
-  const maxAbs = Math.max(1, ...nets.map((line) => Math.abs(line.netCents)))
-
   async function copyCode() {
     await copyText(room!.code)
     setCopied("code")
@@ -225,39 +223,38 @@ function RoomHomePage() {
         </div>
       </header>
 
-      <section className="mt-6">
-        <Card size="sm" className="gap-3">
-          <div className="flex items-center justify-between gap-3 px-(--card-spacing)">
-            <div className="flex items-center gap-3">
-              <Avatar className="size-10">
-                <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
-                  {me ? initials(me.name) : "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-xs text-muted-foreground">You are</p>
-                <p className="font-display text-lg leading-tight font-semibold">
-                  {me?.name ?? "Unknown"}
-                </p>
-              </div>
+      <section className="border-border/70 mt-6 border-y py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar className="size-9">
+              <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
+                {me ? initials(me.name) : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                You are {me?.name ?? "Unknown"}
+              </p>
+              <button
+                type="button"
+                onClick={() => void copyMyLink()}
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+              >
+                <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+                {copied === "link"
+                  ? "Personal link copied"
+                  : "Copy my device link"}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={switchIdentity}
-              className="text-sm font-medium text-primary"
-            >
-              Switch
-            </button>
           </div>
           <button
             type="button"
-            onClick={() => void copyMyLink()}
-            className="inline-flex items-center gap-1.5 px-(--card-spacing) text-sm text-muted-foreground hover:text-foreground"
+            onClick={switchIdentity}
+            className="shrink-0 text-sm font-medium text-primary"
           >
-            <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
-            {copied === "link" ? "Personal link copied" : "Copy my device link"}
+            Switch
           </button>
-        </Card>
+        </div>
       </section>
 
       <section className="mt-8">
@@ -278,59 +275,42 @@ function RoomHomePage() {
             </Link>
           ) : null}
         </div>
-        <ul className="mt-3 space-y-2">
+        <ul className="mt-1">
           {nets.map((line) => {
             const owed = line.netCents > 0
             const owes = line.netCents < 0
-            const width = `${Math.round((Math.abs(line.netCents) / maxAbs) * 100)}%`
             return (
               <li
                 key={line.memberId}
-                className="flex items-center gap-3 border-b border-border/70 py-2"
+                className="border-border/70 flex items-center gap-3 border-b py-3"
               >
                 <Avatar className="size-8">
                   <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
                     {initials(line.name)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {line.name}
-                      {line.memberId === memberId ? (
-                        <span className="font-normal text-muted-foreground">
-                          {" "}
-                          (you)
-                        </span>
-                      ) : null}
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {line.name}
+                  {line.memberId === memberId ? (
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      (you)
                     </span>
-                    <span
-                      className={
-                        owed
-                          ? "text-sm font-semibold text-primary tabular-nums"
-                          : owes
-                            ? "text-sm font-semibold text-destructive tabular-nums"
-                            : "text-sm text-muted-foreground tabular-nums"
-                      }
-                    >
-                      {line.netCents === 0
-                        ? "settled"
-                        : `${owed ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={
-                        owed
-                          ? "h-full rounded-full bg-primary"
-                          : owes
-                            ? "h-full rounded-full bg-destructive"
-                            : "h-full rounded-full"
-                      }
-                      style={{ width }}
-                    />
-                  </div>
-                </div>
+                  ) : null}
+                </span>
+                <span
+                  className={
+                    owed
+                      ? "text-sm font-semibold text-primary tabular-nums"
+                      : owes
+                        ? "text-sm font-semibold text-destructive tabular-nums"
+                        : "text-sm text-muted-foreground tabular-nums"
+                  }
+                >
+                  {line.netCents === 0
+                    ? "settled"
+                    : `${owed ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
+                </span>
               </li>
             )
           })}
@@ -340,7 +320,7 @@ function RoomHomePage() {
       <section className="mt-8">
         <h2 className="font-display text-xl font-semibold">Expenses</h2>
         {room.expenses.length === 0 ? (
-          <Card className="mt-3 items-center gap-3 py-10 text-center">
+          <div className="border-border/70 mt-3 flex flex-col items-center gap-3 border-y py-10 text-center">
             <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
               <HugeiconsIcon
                 icon={ReceiptDollarIcon}
@@ -359,14 +339,14 @@ function RoomHomePage() {
             <Link
               to="/r/$code/new"
               params={{ code: room.code }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+              className="bg-primary text-primary-foreground hover:bg-primary/80 inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md px-5 text-base font-medium"
             >
               <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
               Add expense
             </Link>
-          </Card>
+          </div>
         ) : (
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-1">
             {room.expenses.map((expense) => (
               <ExpenseRow
                 key={expense.id}
@@ -407,49 +387,48 @@ function ExpenseRow({
     room.fxRates
   )
   return (
-    <li>
-      <button type="button" className="block w-full text-left" onClick={onOpen}>
-        <Card
-          size="sm"
-          className="flex-row items-center justify-between gap-3 px-(--card-spacing) transition-colors hover:bg-muted/30"
-        >
-          <div className="flex min-w-0 items-center gap-3">
-            <Avatar className="size-9">
-              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                {initials(expense.paidByName)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2">
-                <p className="truncate text-sm font-medium">{expense.title}</p>
-                {expense.isPersonal ? (
-                  <Badge variant="secondary" className="shrink-0">
-                    Personal
-                  </Badge>
-                ) : null}
-                {expense.category ? (
-                  <Badge variant="outline" className="shrink-0">
-                    {expense.category}
-                  </Badge>
-                ) : null}
-              </div>
-              <p className="truncate text-xs text-muted-foreground">
-                {expense.paidByName} paid ·{" "}
-                {splitModeLabel(expense.splitMode, expense.isPersonal)}
-              </p>
+    <li className="border-border/70 border-b">
+      <button
+        type="button"
+        className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 py-3 text-left transition-colors"
+        onClick={onOpen}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar className="size-9">
+            <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+              {initials(expense.paidByName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate text-sm font-medium">{expense.title}</p>
+              {expense.isPersonal ? (
+                <Badge variant="secondary" className="shrink-0">
+                  Personal
+                </Badge>
+              ) : null}
+              {expense.category ? (
+                <Badge variant="outline" className="shrink-0">
+                  {expense.category}
+                </Badge>
+              ) : null}
             </div>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-semibold tabular-nums">
-              {formatMoney(expense.amountCents, expense.currency)}
+            <p className="truncate text-xs text-muted-foreground">
+              {expense.paidByName} paid ·{" "}
+              {splitModeLabel(expense.splitMode, expense.isPersonal)}
             </p>
-            {isForeign ? (
-              <p className="text-xs text-muted-foreground tabular-nums">
-                ≈ {formatMoney(baseCents, room.currency)}
-              </p>
-            ) : null}
           </div>
-        </Card>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-sm font-semibold tabular-nums">
+            {formatMoney(expense.amountCents, expense.currency)}
+          </p>
+          {isForeign ? (
+            <p className="text-xs text-muted-foreground tabular-nums">
+              ≈ {formatMoney(baseCents, room.currency)}
+            </p>
+          ) : null}
+        </div>
       </button>
     </li>
   )
@@ -588,16 +567,17 @@ function ExpenseDetailSheet({
                     <Input
                       id="edit-expense-amount"
                       inputMode="numeric"
-                      value={formatAtmAmount(amountDigits, fractionDigits)}
+                      value={formatAtmAmountInput(amountDigits, fractionDigits)}
                       onChange={(event) =>
                         setAmountDigits(atmDigitsFromInput(event.target.value))
                       }
+                      placeholder={formatAtmAmount("", fractionDigits)}
                       className="text-right tabular-nums"
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label>Currency</Label>
-                    <div className="flex h-9 min-w-16 items-center justify-center rounded-md border border-border bg-muted/40 px-3 text-sm font-medium">
+                    <div className="border-border bg-muted/40 flex h-(--control-height) min-w-16 items-center justify-center rounded-md px-3 text-base font-medium">
                       {expense.currency}
                     </div>
                   </div>
