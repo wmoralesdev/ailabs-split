@@ -55,8 +55,16 @@ const config = defineConfig({
         ],
       },
       workbox: {
+        // SPA shell for deep links (/r/$code, /r/$code/new) while offline.
         navigateFallback: "/",
+        // Never serve the HTML shell for API / server-fn style paths.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/_server/,
+          /^\/__\//,
+        ],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Writes stay NetworkOnly — TanStack Query owns the offline outbox.
       },
       devOptions: {
         enabled: false,
