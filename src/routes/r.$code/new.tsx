@@ -514,7 +514,7 @@ function AddExpenseForm({
   }
 
   const currencyItems = room.currencies.map((c) => ({
-    label: currencyLabel(c),
+    label: c,
     value: c,
   }))
 
@@ -585,7 +585,7 @@ function AddExpenseForm({
                       }}
                     >
                       <SelectTrigger className="min-w-24">
-                        <SelectValue />
+                        <SelectValue>{field.value}</SelectValue>
                       </SelectTrigger>
                       <SelectContent className="min-w-56">
                         {room.currencies.map((c) => (
