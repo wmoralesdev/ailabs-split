@@ -8,6 +8,7 @@ import { z } from "zod"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
+  ArrowLeft01Icon,
   Camera01Icon,
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
@@ -432,9 +433,21 @@ function AddExpenseForm({
 
   return (
     <main className="page-gutter mx-auto max-w-content pt-6">
-      <h1 className="font-display text-3xl font-semibold tracking-tight">
-        Add expense
-      </h1>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-lg"
+          className="-ml-2"
+          onClick={() => navigate({ to: "/r/$code", params: { code } })}
+          aria-label="Back to trip"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
+        </Button>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
+          Add expense
+        </h1>
+      </div>
 
       <Form {...form}>
         <form
