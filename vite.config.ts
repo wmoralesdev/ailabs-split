@@ -22,8 +22,9 @@ const config = defineConfig({
     nitro(),
     viteReact(),
     VitePWA({
-      registerType: "autoUpdate",
-      injectRegister: "auto",
+      // Prompt UI via virtual:pwa-register/react (PwaUpdatePrompt).
+      registerType: "prompt",
+      injectRegister: false,
       // Default `dist` would 404 the SW once Nitro remaps the public root.
       outDir: nitroPublicDir,
       includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
@@ -58,11 +59,7 @@ const config = defineConfig({
         // SPA shell for deep links (/r/$code, /r/$code/new) while offline.
         navigateFallback: "/",
         // Never serve the HTML shell for API / server-fn style paths.
-        navigateFallbackDenylist: [
-          /^\/api\//,
-          /^\/_server/,
-          /^\/__\//,
-        ],
+        navigateFallbackDenylist: [/^\/api\//, /^\/_server/, /^\/__\//],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Writes stay NetworkOnly — TanStack Query owns the offline outbox.
       },
