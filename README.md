@@ -9,7 +9,7 @@ Host: `split.ailabs.sv`
 - TanStack Start (React + file router)
 - Tailwind v4 + shadcn base-mira + Hugeicons
 - Neon Postgres + Prisma
-- vite-plugin-pwa (installable shell; data needs network)
+- vite-plugin-pwa (installable shell; offline add-expense via TanStack Query persist + sync on reconnect)
 - Mistral OCR for receipt draft-fill
 
 ## Setup
@@ -40,10 +40,12 @@ pnpm dev
 1. **/** — create a room (name, currency, members) or join by code **and your name**
 2. **/r/$code** — who-are-you gate (pick existing or add name) → balances + expenses
 3. **/r/$code?as=Name** — personal link that claims you on a new device
-4. **/r/$code/new** — fast add expense; optional scan
+4. **/r/$code/new** — fast add expense; optional scan (scan needs network)
 5. **/r/$code/settle** — “X owes Y $Z” transfers
 
 Room code is the only access control. Your display name is how you reclaim yourself across devices; localStorage only remembers the last pick on that browser.
+
+Offline: after opening a trip online once, you can add expenses without a connection. They sync when you’re back online (header sync icon shows status).
 
 ## Cost / connection hygiene
 
