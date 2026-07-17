@@ -157,6 +157,13 @@ describe("parseAmountToCents", () => {
     expect(parseAmountToCents("$10.5")).toBe(1050)
   })
 
+  it("parses thousands separators from receipt OCR", () => {
+    expect(parseAmountToCents("5,900")).toBe(590000)
+    expect(parseAmountToCents("4.000")).toBe(400000)
+    expect(parseAmountToCents("1,234.56")).toBe(123456)
+    expect(parseAmountToCents("1.234,56")).toBe(123456)
+  })
+
   it("rejects invalid input", () => {
     expect(parseAmountToCents("")).toBeNull()
     expect(parseAmountToCents("abc")).toBeNull()
