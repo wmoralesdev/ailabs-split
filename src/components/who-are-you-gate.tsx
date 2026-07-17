@@ -15,10 +15,8 @@ function WhoAreYouGate({
 }: WhoAreYouGateProps) {
   return (
     <PageShell
-      width="narrow"
       className="overflow-hidden"
       innerClassName="flex min-h-dvh flex-col justify-center py-10"
-      stippleClassName="opacity-30"
     >
       <SiteLogo />
       <h1 className="mt-6 font-display text-4xl font-semibold tracking-tight">

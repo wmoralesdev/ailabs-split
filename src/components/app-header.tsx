@@ -1,9 +1,28 @@
 import type { ReactNode } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "@tanstack/react-router"
 
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
+
+const SCROLL_THRESHOLD = 12
+
+/** Whether the window has been scrolled past the header's frosted-glass threshold. */
+function useScrolled(threshold: number): boolean {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > threshold)
+    }
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [threshold])
+
+  return scrolled
+}
 
 /** Sticky top chrome: brand mark on the left, theme toggle + optional slot on the right. */
 export function AppHeader({
@@ -15,10 +34,14 @@ export function AppHeader({
   className?: string
   showWordmark?: boolean
 }) {
+  const scrolled = useScrolled(SCROLL_THRESHOLD)
+
   return (
     <header
       className={cn(
-        "border-border/60 bg-background sticky top-0 z-30 border-b",
+        "sticky top-0 z-30 border-b border-transparent transition-colors duration-200",
+        scrolled &&
+          "border-foreground/5 bg-background/70 backdrop-blur-xl supports-backdrop-filter:bg-background/40",
         className
       )}
     >

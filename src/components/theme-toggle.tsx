@@ -1,12 +1,27 @@
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Moon02Icon, Sun01Icon } from "@hugeicons/core-free-icons"
+import {
+  ComputerIcon,
+  Moon02Icon,
+  Sun01Icon,
+} from "@hugeicons/core-free-icons"
 
-import { useTheme } from "@/components/theme-provider"
+import { useTheme, type Theme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 
+const THEME_ICON = {
+  light: Sun01Icon,
+  dark: Moon02Icon,
+  system: ComputerIcon,
+} as const
+
+const THEME_LABEL: Record<Theme, string> = {
+  light: "Theme: light. Switch to dark",
+  dark: "Theme: dark. Switch to system",
+  system: "Theme: system. Switch to light",
+}
+
 export function ThemeToggle({ className }: { className?: string }) {
-  const { resolvedTheme, toggleTheme } = useTheme()
-  const isDark = resolvedTheme === "dark"
+  const { theme, toggleTheme } = useTheme()
 
   return (
     <Button
@@ -14,14 +29,11 @@ export function ThemeToggle({ className }: { className?: string }) {
       variant="ghost"
       size="icon-lg"
       onClick={toggleTheme}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={THEME_LABEL[theme]}
+      title={THEME_LABEL[theme]}
       className={className}
     >
-      <HugeiconsIcon
-        icon={isDark ? Sun01Icon : Moon02Icon}
-        size={18}
-        strokeWidth={2}
-      />
+      <HugeiconsIcon icon={THEME_ICON[theme]} size={18} strokeWidth={2} />
     </Button>
   )
 }

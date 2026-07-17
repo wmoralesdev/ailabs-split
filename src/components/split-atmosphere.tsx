@@ -7,29 +7,19 @@ type SplitAtmosphereProps = {
   as?: "div" | "main"
   children: ReactNode
   className?: string
-  /** Stipple opacity — keep very low for flat minimal shells. */
-  stippleClassName?: string
 }
 
 /**
- * Flat background shell with optional low-contrast stipple.
- * Put interactive content in a `relative` child so it sits above the stipple.
+ * Soft gradient background shell (top-down brand wash).
+ * Put interactive content in a `relative` child when stacking layers.
  */
 export function SplitAtmosphere({
   as: Comp = "div",
   children,
   className,
-  stippleClassName = "opacity-30",
 }: SplitAtmosphereProps) {
   return (
     <Comp className={cn("split-hero-wash relative min-h-dvh", className)}>
-      <div
-        aria-hidden
-        className={cn(
-          "split-stipple pointer-events-none absolute inset-0",
-          stippleClassName
-        )}
-      />
       {children}
     </Comp>
   )

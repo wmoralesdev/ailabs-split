@@ -73,14 +73,14 @@
 
 :root {
     /* Ai Labs brand — purple accent on graphite/white (parity with Vega). */
-    --brand-purple: #a78bfa;
-    --brand-purple-soft: #c4acf6;
+    --brand-purple: #8b6cf0;
+    --brand-purple-soft: #a78bfa;
     --brand-lavender: #ede4ff;
     --brand-graphite: #1a1a1a;
-    --brand-muted: #5c5c5c;
+    --brand-muted: #4a4a4a;
     --brand-white: #ffffff;
-    --brand-border: #e8e4f0;
-    --brand-border-dark: #44414f;
+    --brand-border: #d4cce3;
+    --brand-border-dark: #555260;
 
     /* Spacing / layout — 8px rhythm, single mobile column. */
     --base-unit: 8px;
@@ -162,17 +162,18 @@
     --card-foreground: var(--brand-white);
     --popover: color-mix(in srgb, var(--brand-white) 8%, var(--brand-graphite));
     --popover-foreground: var(--brand-white);
-    --primary: var(--brand-purple);
+    /* Slightly brighter CTA on OLED; graphite label stays high-contrast. */
+    --primary: var(--brand-purple-soft);
     --primary-foreground: var(--brand-graphite);
     --secondary: transparent;
     --secondary-foreground: var(--brand-white);
     --muted: color-mix(in srgb, var(--brand-purple) 10%, var(--brand-graphite));
-    --muted-foreground: color-mix(in srgb, var(--brand-white) 68%, transparent);
+    --muted-foreground: color-mix(in srgb, var(--brand-white) 78%, transparent);
     --accent: color-mix(in srgb, var(--brand-purple) 14%, var(--brand-graphite));
     --accent-foreground: var(--brand-white);
     --destructive: color-mix(in srgb, #f87171 92%, white);
-    --border: var(--brand-border-dark);
-    --input: var(--brand-border-dark);
+    --border: color-mix(in srgb, var(--brand-white) 22%, var(--brand-graphite));
+    --input: color-mix(in srgb, var(--brand-white) 26%, var(--brand-graphite));
     --ring: var(--brand-purple-soft);
     --chart-1: var(--brand-purple);
     --chart-2: var(--brand-purple-soft);
@@ -290,17 +291,22 @@
         height: env(safe-area-inset-bottom, 0px);
     }
 
-    /* Flat shell — token background, no multi-radial wash. */
+    /* Soft top-down brand wash (lavender → white / purple-tint → graphite). */
     .split-hero-wash {
-        background: var(--background);
+        background-color: var(--background);
+        background-image: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--brand-lavender) 72%, var(--background)) 0%,
+            var(--background) 42%
+        );
     }
 
-    .split-stipple {
-        background-image: radial-gradient(
-            color-mix(in srgb, var(--foreground) 6%, transparent) 1px,
-            transparent 1px
+    .dark .split-hero-wash {
+        background-image: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--brand-purple) 18%, var(--brand-graphite)) 0%,
+            var(--background) 48%
         );
-        background-size: 16px 16px;
     }
 
     .animate-rise {

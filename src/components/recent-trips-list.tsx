@@ -25,14 +25,18 @@ export function RecentTripsList() {
         Recent trips
       </h2>
       <ul className="mt-3 flex flex-col">
-        {trips.map((trip) => (
+        {trips.map((trip, index) => (
           <li
             key={trip.code}
             className="border-border/70 flex items-center gap-2 border-t py-1"
           >
             <button
               type="button"
-              className="hover:bg-muted/40 flex min-w-0 flex-1 flex-col rounded-md py-3 pr-2 text-left transition-colors"
+              className={
+                index === 0
+                  ? "hover:bg-muted/50 flex min-w-0 flex-1 flex-col rounded-md bg-muted/35 py-3.5 pr-2 pl-2.5 text-left transition-colors"
+                  : "hover:bg-muted/40 flex min-w-0 flex-1 flex-col rounded-md py-3 pr-2 text-left transition-colors"
+              }
               onClick={() =>
                 void navigate({
                   to: "/r/$code",
@@ -41,7 +45,7 @@ export function RecentTripsList() {
               }
             >
               <span className="text-foreground truncate font-medium">
-                {trip.name}
+                {index === 0 ? `Continue ${trip.name}` : trip.name}
               </span>
               <span className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
                 <span className="font-display tracking-[0.18em] uppercase">

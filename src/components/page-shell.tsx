@@ -12,8 +12,6 @@ type PageShellProps = {
   className?: string
   /** Extra classes on the inner padded column. */
   innerClassName?: string
-  /** Atmosphere stipple opacity class. */
-  stippleClassName?: string
   /** Skip atmosphere shell (plain gutter column). */
   plain?: boolean
 }
@@ -27,7 +25,6 @@ export function PageShell({
   width = "content",
   className,
   innerClassName,
-  stippleClassName,
   plain = false,
 }: PageShellProps) {
   const column = (
@@ -48,11 +45,7 @@ export function PageShell({
   }
 
   return (
-    <SplitAtmosphere
-      as={as}
-      className={className}
-      stippleClassName={stippleClassName}
-    >
+    <SplitAtmosphere as={as} className={className}>
       {column}
     </SplitAtmosphere>
   )

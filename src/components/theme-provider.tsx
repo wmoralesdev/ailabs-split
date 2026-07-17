@@ -13,6 +13,11 @@ type ThemeContextValue = {
 const ThemeContext = React.createContext<ThemeContextValue | null>(null)
 
 const STORAGE_KEY = "split-theme"
+const THEME_ORDER = ["light", "dark", "system"] as const satisfies readonly Theme[]
+
+function isTheme(value: string | null): value is Theme {
+  return value === "light" || value === "dark" || value === "system"
+}
 
 function systemTheme(): ResolvedTheme {
   if (typeof window === "undefined") return "light"
@@ -41,9 +46,8 @@ export function ThemeProvider({
 
   // Read persisted preference after mount to avoid SSR hydration mismatch.
   React.useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey) as Theme | null
-    const next = stored ?? "system"
-    setThemeState(next)
+    const stored = window.localStorage.getItem(storageKey)
+    setThemeState(isTheme(stored) ? stored : "system")
   }, [storageKey])
 
   React.useEffect(() => {
@@ -71,8 +75,10 @@ export function ThemeProvider({
   )
 
   const toggleTheme = React.useCallback(() => {
-    setTheme(resolvedTheme === "dark" ? "light" : "dark")
-  }, [resolvedTheme, setTheme])
+    const index = THEME_ORDER.indexOf(theme)
+    const next = THEME_ORDER[(index + 1) % THEME_ORDER.length] ?? "system"
+    setTheme(next)
+  }, [theme, setTheme])
 
   const value = React.useMemo(
     () => ({ theme, resolvedTheme, setTheme, toggleTheme }),
