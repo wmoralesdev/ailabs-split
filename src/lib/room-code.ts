@@ -25,3 +25,27 @@ export const CURRENCY_OPTIONS = [
   { code: "PAB", label: "PAB — Panamanian Balboa" },
   { code: "GBP", label: "GBP — British Pound" },
 ] as const
+
+/** Quick picks on create — regional + global defaults. */
+export const COMMON_BASE_CURRENCY_CODES = [
+  "USD",
+  "CRC",
+  "EUR",
+  "MXN",
+] as const
+
+export type CommonBaseCurrencyCode =
+  (typeof COMMON_BASE_CURRENCY_CODES)[number]
+
+export function isCommonBaseCurrency(
+  code: string
+): code is CommonBaseCurrencyCode {
+  return (COMMON_BASE_CURRENCY_CODES as readonly string[]).includes(code)
+}
+
+/** Closed/list label: "USD · US Dollar" */
+export function currencyShortLabel(code: string): string {
+  const option = CURRENCY_OPTIONS.find((entry) => entry.code === code)
+  if (!option) return code
+  return option.label.replace(" — ", " · ")
+}

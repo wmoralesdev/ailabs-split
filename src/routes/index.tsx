@@ -25,17 +25,11 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { BaseCurrencyPicker } from "@/components/base-currency-picker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
 import { rememberMember } from "@/lib/member-storage"
-import { isStandaloneDisplay } from "@/lib/pwa-install"
+import { isStandaloneDisplay, markInstallEligible } from "@/lib/pwa-install"
 import { resolveMostRecentTripCode, getMostRecentTripCode } from "@/lib/resume-trip"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
@@ -50,15 +44,24 @@ import type { RoomDto } from "@/server/rooms"
 
 type LandingSearch = {
   stay?: boolean
+  tab?: "create" | "join"
+  code?: string
 }
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>): LandingSearch => ({
-    stay:
-      search.stay === "1" ||
-      search.stay === true ||
-      search.stay === "true",
-  }),
+  validateSearch: (search: Record<string, unknown>): LandingSearch => {
+    const tabRaw = typeof search.tab === "string" ? search.tab.toLowerCase() : ""
+    const codeRaw =
+      typeof search.code === "string" ? search.code.trim().toUpperCase() : ""
+    return {
+      stay:
+        search.stay === "1" ||
+        search.stay === true ||
+        search.stay === "true",
+      tab: tabRaw === "join" || codeRaw ? "join" : tabRaw === "create" ? "create" : undefined,
+      code: codeRaw || undefined,
+    }
+  },
   component: LandingPage,
 })
 
@@ -79,15 +82,16 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
-  const { stay } = Route.useSearch()
+  const { stay, tab, code: joinCode } = Route.useSearch()
+  const defaultTab = tab === "join" ? "join" : "create"
   const [resuming, setResuming] = useState(() => {
     if (typeof window === "undefined") return false
-    if (stay) return false
+    if (stay || tab === "join" || joinCode) return false
     return isStandaloneDisplay() && Boolean(getMostRecentTripCode())
   })
 
   useEffect(() => {
-    if (stay || !isStandaloneDisplay()) return
+    if (stay || tab === "join" || joinCode || !isStandaloneDisplay()) return
 
     let cancelled = false
 
@@ -111,12 +115,11 @@ function LandingPage() {
     return () => {
       cancelled = true
     }
-  }, [navigate, stay])
+  }, [navigate, stay, tab, joinCode])
 
   if (resuming) {
     return (
       <PageShell
-        width="narrow"
         className="overflow-hidden"
         innerClassName="flex min-h-dvh flex-col items-center justify-center pb-12 pt-5"
       >
@@ -128,7 +131,6 @@ function LandingPage() {
 
   return (
     <PageShell
-      width="narrow"
       className="overflow-hidden"
       innerClassName="flex min-h-dvh flex-col pt-5 pb-12"
     >
@@ -141,13 +143,13 @@ function LandingPage() {
         <h1 className="font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl">
           Split
         </h1>
-        <p className="mt-4 max-w-[28ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
-          Trip costs, shared by code. No accounts.
+        <p className="mt-4 max-w-[32ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
+          Share a trip code. Split costs. No accounts.
         </p>
       </div>
 
       <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
-        <Tabs defaultValue="create">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="create">Create</TabsTrigger>
             <TabsTrigger value="join">Join</TabsTrigger>
@@ -156,7 +158,7 @@ function LandingPage() {
             <CreateForm navigate={navigate} />
           </TabsContent>
           <TabsContent value="join" className="mt-6 text-base">
-            <JoinForm navigate={navigate} />
+            <JoinForm navigate={navigate} initialCode={joinCode} />
           </TabsContent>
         </Tabs>
         <RecentTripsList />
@@ -193,8 +195,13 @@ function CreateForm({
       memberNames: string[]
     }) => createRoom({ data }),
     onSuccess: async (room) => {
+      markInstallEligible()
       toast.success("Trip created")
-      await navigate({ to: "/r/$code", params: { code: room.code } })
+      await navigate({
+        to: "/r/$code",
+        params: { code: room.code },
+        search: { created: true },
+      })
     },
     onError: (error) => {
       toast.error(
@@ -329,10 +336,6 @@ function CreateForm({
     })
   }
 
-  const currencyItems = CURRENCY_OPTIONS.map((o) => ({
-    label: o.code,
-    value: o.code,
-  }))
   const extraCodes = Object.keys(extras)
   const extrasOpen = showExtras || extraCodes.length > 0
 
@@ -364,27 +367,13 @@ function CreateForm({
               <FormItem>
                 <FormLabel>Base currency</FormLabel>
                 <FormControl>
-                  <Select
-                    items={currencyItems}
+                  <BaseCurrencyPicker
                     value={field.value}
-                    onValueChange={(value) =>
-                      value && onBaseCurrencyChange(value)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CURRENCY_OPTIONS.map((option) => (
-                        <SelectItem key={option.code} value={option.code}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={onBaseCurrencyChange}
+                  />
                 </FormControl>
                 <FormDescription>
-                  Settlements use this currency.
+                  Balances and settle-up use this currency.
                 </FormDescription>
               </FormItem>
             )}
@@ -418,20 +407,32 @@ function CreateForm({
               ))}
             </div>
           ) : null}
-          <Input
-            value={memberDraft}
-            onChange={(e) => setMemberDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === ",") {
-                e.preventDefault()
-                commitDraft()
-              }
-            }}
-            onBlur={commitDraft}
-            placeholder="Type a name, press Enter"
-          />
+          <div className="flex gap-2">
+            <Input
+              value={memberDraft}
+              onChange={(e) => setMemberDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault()
+                  commitDraft()
+                }
+              }}
+              onBlur={commitDraft}
+              placeholder="Type a name"
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 px-4"
+              onClick={commitDraft}
+              disabled={!memberDraft.trim()}
+            >
+              Add
+            </Button>
+          </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            At least two people. Enter or comma adds a name.
+            At least two people. Add, Enter, or comma.
           </p>
           {membersError ? (
             <p className="text-xs text-destructive" role="alert">
@@ -536,14 +537,21 @@ function CreateForm({
   )
 }
 
-function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+function JoinForm({
+  navigate,
+  initialCode,
+}: {
+  navigate: ReturnType<typeof useNavigate>
+  initialCode?: string
+}) {
   const [room, setRoom] = useState<RoomDto | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [autoLookupDone, setAutoLookupDone] = useState(false)
 
   const form = useForm<JoinCodeValues>({
     resolver: zodResolver(joinCodeSchema),
-    defaultValues: { code: "" },
+    defaultValues: { code: initialCode ?? "" },
   })
 
   const lookupMutation = useMutation({
@@ -560,6 +568,15 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
       toast.error(err instanceof Error ? err.message : "Could not find trip")
     },
   })
+
+  useEffect(() => {
+    if (autoLookupDone || !initialCode) return
+    if (initialCode.length < 6) return
+    setAutoLookupDone(true)
+    lookupMutation.mutate(initialCode)
+    // One-shot prefill lookup from ?code=
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once per initialCode
+  }, [autoLookupDone, initialCode])
 
   function onCodeSubmit(values: JoinCodeValues) {
     lookupMutation.mutate(values.code.toUpperCase())
@@ -580,6 +597,7 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
         data: { code: room.code, memberId },
       })
       rememberMember(room.code, claimed.memberId)
+      markInstallEligible()
       toast.success(`Joined ${room.name}`)
       await navigate({ to: "/r/$code", params: { code: room.code } })
     } catch (err) {
@@ -598,6 +616,7 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
         data: { code: room.code, memberName: name },
       })
       rememberMember(result.room.code, result.memberId)
+      markInstallEligible()
       toast.success(`Joined ${result.room.name}`)
       await navigate({ to: "/r/$code", params: { code: result.room.code } })
     } catch (err) {
@@ -654,15 +673,25 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Trip code</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="7-character code"
-                  maxLength={8}
-                  className="text-center font-display text-2xl tracking-[0.2em] uppercase"
-                  {...field}
-                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                />
-              </FormControl>
+              <div className="flex items-center gap-2">
+                <FormControl>
+                  <Input
+                    placeholder="7-character code"
+                    maxLength={8}
+                    className="text-center font-display text-2xl tracking-[0.2em] uppercase"
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                  />
+                </FormControl>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={lookupMutation.isPending}
+                  className="shrink-0 transition-transform duration-200 active:scale-[0.98]"
+                >
+                  {lookupMutation.isPending ? "Looking up…" : "Continue"}
+                </Button>
+              </div>
               <FormDescription>
                 Enter the shared code, then pick who you are.
               </FormDescription>
@@ -670,13 +699,6 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
             </FormItem>
           )}
         />
-        <Button
-          type="submit"
-          disabled={lookupMutation.isPending}
-          className="w-full transition-transform duration-200 active:scale-[0.98]"
-        >
-          {lookupMutation.isPending ? "Looking up…" : "Continue"}
-        </Button>
       </form>
     </Form>
   )
