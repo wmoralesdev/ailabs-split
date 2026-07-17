@@ -48,6 +48,18 @@ export function formatAtmAmount(digits: string, fractionDigits: number): string 
 }
 
 /**
+ * Controlled-input display: empty buffer → "" so a "0.00" placeholder can show.
+ * Use formatAtmAmount for placeholders / non-input display of zero.
+ */
+export function formatAtmAmountInput(
+  digits: string,
+  fractionDigits: number
+): string {
+  if (!normalizeAtmDigits(digits)) return ""
+  return formatAtmAmount(digits, fractionDigits)
+}
+
+/**
  * Convert ATM digit buffer to app cents (hundredths of the major unit).
  * Matches the rest of Split’s integer-cent storage.
  */

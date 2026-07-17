@@ -8,6 +8,7 @@ import {
   centsToAtmDigits,
   currencyFractionDigits,
   formatAtmAmount,
+  formatAtmAmountInput,
   normalizeAtmDigits,
 } from "./atm-amount"
 
@@ -46,6 +47,20 @@ describe("formatAtmAmount", () => {
   it("formats 3-decimal ATM entry", () => {
     expect(formatAtmAmount("1289", 3)).toBe("1.289")
     expect(formatAtmAmount("5", 3)).toBe("0.005")
+  })
+})
+
+describe("formatAtmAmountInput", () => {
+  it("returns empty string when no digits (placeholder can show)", () => {
+    expect(formatAtmAmountInput("", 2)).toBe("")
+    expect(formatAtmAmountInput("000", 2)).toBe("")
+    expect(formatAtmAmountInput("", 0)).toBe("")
+  })
+
+  it("formats non-empty digit buffers like formatAtmAmount", () => {
+    expect(formatAtmAmountInput("1", 2)).toBe("0.01")
+    expect(formatAtmAmountInput("1289", 2)).toBe("12.89")
+    expect(formatAtmAmountInput("5", 0)).toBe("5")
   })
 })
 
