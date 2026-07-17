@@ -11,6 +11,11 @@ import {
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import {
+  BankFxCalibrationSheet,
+  formatAdjustmentPercent,
+  formatFxAdjustmentLabel,
+} from "@/components/bank-fx-calibration-sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useRoomIdentity } from "@/lib/room-identity"
@@ -72,6 +77,7 @@ function SettlePage() {
   const [copiedAll, setCopiedAll] = useState(false)
   const [summaryCopied, setSummaryCopied] = useState(false)
   const [copiedOne, setCopiedOne] = useState<number | null>(null)
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
 
   const recordMutation = useMutation({
     mutationFn: (input: RecordSettlementInput) =>
@@ -115,7 +121,8 @@ function SettlePage() {
               share.amountCents,
               expense.currency,
               room.currency,
-              room.fxRates
+              room.fxRates,
+              room.fxAdjustmentBps
             ),
           })),
         })),
@@ -126,14 +133,31 @@ function SettlePage() {
           settlement.amountCents,
           settlement.currency,
           room.currency,
-          room.fxRates
+          room.fxRates,
+          room.fxAdjustmentBps
         ),
       }))
     )
     return simplifyTransfers(nets)
   }, [room])
 
+  const totalCents = useMemo(
+    () => transfers.reduce((sum, transfer) => sum + transfer.amountCents, 0),
+    [transfers]
+  )
+
+  const hasForeignExpenses = useMemo(() => {
+    if (!room) return false
+    return room.expenses.some(
+      (expense) => expense.currency !== room.currency
+    )
+  }, [room])
+
   if (!room) return null
+
+  const adjustmentBps = room.fxAdjustmentBps
+  const sampleCount = room.fxCalibrationSamples.length
+  const hasBankMatch = Number.isFinite(adjustmentBps) && adjustmentBps !== 0
 
   async function copyAll() {
     if (transfers.length === 0) return
@@ -218,8 +242,33 @@ function SettlePage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Amounts in {room.currency}
           </p>
+          {hasForeignExpenses ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {hasBankMatch ? (
+                <>
+                  {formatFxAdjustmentLabel(adjustmentBps, sampleCount)}
+                  {" · "}
+                  <button
+                    type="button"
+                    onClick={() => setCalibrationOpen(true)}
+                    className="font-medium text-primary"
+                  >
+                    Edit
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCalibrationOpen(true)}
+                  className="font-medium text-primary"
+                >
+                  Settle looks off? Match bank charges
+                </button>
+              )}
+            </p>
+          ) : null}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
             variant="outline"
@@ -238,19 +287,35 @@ function SettlePage() {
             <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
             {summaryCopied ? "Copied" : "Summary"}
           </Button>
-          {transfers.length > 0 ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void copyAll()}
-            >
-              <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-              {copiedAll ? "Copied" : "Copy all"}
-            </Button>
-          ) : null}
         </div>
       </div>
+      {transfers.length > 0 ? (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void copyAll()}
+            className="text-muted-foreground hover:text-foreground text-xs font-medium"
+          >
+            {copiedAll ? "Copied all sentences" : "Copy all sentences"}
+          </button>
+        </div>
+      ) : null}
+
+      {transfers.length > 0 ? (
+        <div className="border-border/70 mt-3 flex items-center justify-between gap-3 border-b pb-3">
+          <div>
+            <p className="text-sm font-medium">Total to settle</p>
+            {hasBankMatch ? (
+              <p className="text-muted-foreground text-xs">
+                Includes {formatAdjustmentPercent(adjustmentBps)} bank match
+              </p>
+            ) : null}
+          </div>
+          <p className="font-display shrink-0 text-xl font-semibold tabular-nums">
+            {formatMoney(totalCents, room.currency)}
+          </p>
+        </div>
+      ) : null}
 
       {transfers.length === 0 ? (
         <div className="border-border/70 mt-6 flex flex-col items-center gap-3 border-y py-12 text-center">
@@ -273,67 +338,77 @@ function SettlePage() {
           </div>
         </div>
       ) : (
-        <ul className="mt-6">
+        <ul className="mt-4">
           {transfers.map((transfer, index) => (
             <li
               key={`${transfer.fromId}-${transfer.toId}`}
-              className="border-border/70 border-b py-4"
+              className="border-border/70 border-b py-3.5"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Avatar className="size-9">
+                  <Avatar className="size-8">
                     <AvatarFallback className="bg-destructive/10 text-xs font-semibold text-destructive">
                       {initials(transfer.fromName)}
                     </AvatarFallback>
                   </Avatar>
                   <HugeiconsIcon
                     icon={ArrowRight01Icon}
-                    size={16}
+                    size={14}
                     strokeWidth={2}
                     className="text-muted-foreground shrink-0"
                   />
-                  <Avatar className="size-9">
+                  <Avatar className="size-8">
                     <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
                       {initials(transfer.toName)}
                     </AvatarFallback>
                   </Avatar>
-                  <p className="min-w-0 truncate text-sm">
-                    <span className="font-medium">{transfer.fromName}</span>
-                    <span className="text-muted-foreground"> → </span>
-                    <span className="font-medium">{transfer.toName}</span>
+                  <p className="min-w-0 truncate text-sm font-medium">
+                    {transfer.fromName}
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      →{" "}
+                    </span>
+                    {transfer.toName}
                   </p>
                 </div>
                 <p className="font-display shrink-0 text-lg font-semibold tabular-nums">
                   {formatMoney(transfer.amountCents, room.currency)}
                 </p>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => void copyOne(index)}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium"
-                >
-                  <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={2} />
-                  {copiedOne === index ? "Copied" : "Copy sentence"}
-                </button>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() => markPaid(index)}
                   disabled={recordMutation.isPending}
                 >
                   <HugeiconsIcon
                     icon={CheckmarkCircle02Icon}
-                    size={16}
+                    size={12}
                     strokeWidth={2}
                   />
                   Record
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => void copyOne(index)}
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium"
+                >
+                  <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
+                  {copiedOne === index ? "Copied" : "Copy sentence"}
+                </button>
               </div>
             </li>
           ))}
         </ul>
       )}
+
+      <BankFxCalibrationSheet
+        room={room}
+        open={calibrationOpen}
+        onOpenChange={setCalibrationOpen}
+      />
 
       {room.settlements.length > 0 ? (
         <section className="mt-8">
