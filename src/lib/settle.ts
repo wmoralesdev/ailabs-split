@@ -255,14 +255,14 @@ export function parseAmountToCents(raw: string): number | null {
   let normalized = cleaned
 
   if (separators.length === 1) {
-    const separator = separators[0]!
+    const separator = separators[0]
     const digitsAfter = cleaned.length - separator.index - 1
     normalized =
       digitsAfter === 1 || digitsAfter === 2
         ? cleaned.replace(separator[0], ".")
         : cleaned.replace(/[.,]/g, "")
   } else if (separators.length > 1) {
-    const last = separators[separators.length - 1]!
+    const last = separators[separators.length - 1]
     const digitsAfter = cleaned.length - last.index - 1
     if (digitsAfter === 1 || digitsAfter === 2) {
       normalized = `${cleaned.slice(0, last.index).replace(/[.,]/g, "")}.${cleaned.slice(last.index + 1)}`
