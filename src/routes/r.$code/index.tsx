@@ -14,11 +14,13 @@ import {
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { CategoryChips } from "@/components/category-chips"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Sheet,
   SheetContent,
@@ -69,8 +71,7 @@ function initials(name: string): string {
     .join("")
 }
 
-function splitModeLabel(mode: string, isPersonal: boolean): string {
-  if (isPersonal) return "Personal"
+function splitModeLabel(mode: string): string {
   if (mode === "PARTS") return "Parts"
   if (mode === "AMOUNT") return "Amounts"
   return "Equal"
@@ -112,16 +113,55 @@ function splitsForEditedExpense(
   return expense.shares.map((share) => ({ memberId: share.memberId }))
 }
 
+function RoomHomeSkeleton() {
+  return (
+    <main className="page-gutter mx-auto max-w-content pt-4">
+      <Skeleton className="h-8 w-40" />
+      <Skeleton className="mt-2 h-4 w-28" />
+      <Skeleton className="mt-3 h-6 w-36 rounded-full" />
+      <Skeleton className="mt-4 h-14 w-full" />
+      <Skeleton className="mt-6 h-5 w-24" />
+      <div className="mt-2 space-y-2">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      <Skeleton className="mt-6 h-5 w-24" />
+      <div className="mt-2 space-y-2">
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-14 w-full" />
+      </div>
+    </main>
+  )
+}
+
 function RoomHomePage() {
   const { code } = roomRoute.useParams()
   const { memberId, switchIdentity } = useRoomIdentity()
-  const { data: room } = useQuery(roomQueryOptions(code, memberId))
+  const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
   const [copied, setCopied] = useState<"code" | "link" | "invite" | null>(null)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
   )
 
   const me = room?.members.find((member) => member.id === memberId)
+
+  const spentCents = useMemo(() => {
+    if (!room || !memberId) return 0
+    return room.expenses
+      .filter((expense) => expense.paidById === memberId)
+      .reduce(
+        (sum, expense) =>
+          sum +
+          convertToBase(
+            expense.amountCents,
+            expense.currency,
+            room.currency,
+            room.fxRates
+          ),
+        0
+      )
+  }, [room, memberId])
 
   const nets = useMemo(() => {
     if (!room) return []
@@ -156,7 +196,10 @@ function RoomHomePage() {
 
   const transfers = useMemo(() => simplifyTransfers(nets), [nets])
 
-  if (!room) return null
+  if (!room) {
+    return isPending ? <RoomHomeSkeleton /> : null
+  }
+
   const selectedExpense =
     selectedExpenseId == null
       ? null
@@ -194,53 +237,56 @@ function RoomHomePage() {
   }
 
   return (
-    <main className="page-gutter mx-auto max-w-content pt-6">
+    <main className="page-gutter mx-auto max-w-content pt-4">
       <header>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
+        <h1 className="font-display text-2xl font-semibold tracking-tight">
           {room.name}
         </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="mt-0.5 text-sm text-muted-foreground tabular-nums">
+          You spent {formatMoney(spentCents, room.currency)}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => void copyCode()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1 text-sm text-muted-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
           >
             <span className="font-display tracking-widest text-foreground">
               {room.code}
             </span>
-            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+            <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
             {copied === "code" ? "Copied" : "Copy"}
           </button>
           <button
             type="button"
             onClick={() => void shareInvite()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1 text-sm text-muted-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
           >
-            <HugeiconsIcon icon={Share01Icon} size={14} strokeWidth={2} />
+            <HugeiconsIcon icon={Share01Icon} size={12} strokeWidth={2} />
             {copied === "invite" ? "Link copied" : "Share link"}
           </button>
           <Badge variant="secondary">Base {room.currency}</Badge>
         </div>
       </header>
 
-      <section className="border-border/70 mt-6 border-y py-4">
+      <section className="border-border/70 mt-4 border-y py-2.5">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <Avatar className="size-9">
-              <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Avatar className="size-8">
+              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                 {me ? initials(me.name) : "?"}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
-                You are {me?.name ?? "Unknown"}
+                You · {me?.name ?? "Unknown"}
               </p>
               <button
                 type="button"
                 onClick={() => void copyMyLink()}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
               >
-                <HugeiconsIcon icon={Link01Icon} size={14} strokeWidth={2} />
+                <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={2} />
                 {copied === "link"
                   ? "Personal link copied"
                   : "Copy my device link"}
@@ -257,7 +303,7 @@ function RoomHomePage() {
         </div>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-6">
         <div className="flex items-end justify-between gap-3">
           <h2 className="font-display text-xl font-semibold">Balances</h2>
           {transfers.length > 0 ? (
@@ -317,7 +363,7 @@ function RoomHomePage() {
         </ul>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-6">
         <h2 className="font-display text-xl font-semibold">Expenses</h2>
         {room.expenses.length === 0 ? (
           <div className="border-border/70 mt-3 flex flex-col items-center gap-3 border-y py-10 text-center">
@@ -414,8 +460,9 @@ function ExpenseRow({
               ) : null}
             </div>
             <p className="truncate text-xs text-muted-foreground">
-              {expense.paidByName} paid ·{" "}
-              {splitModeLabel(expense.splitMode, expense.isPersonal)}
+              {expense.isPersonal
+                ? `${expense.paidByName} paid`
+                : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`}
             </p>
           </div>
         </div>
@@ -553,8 +600,9 @@ function ExpenseDetailSheet({
           <SheetHeader>
             <SheetTitle>{editing ? "Edit expense" : expense.title}</SheetTitle>
             <SheetDescription>
-              {expense.paidByName} paid ·{" "}
-              {splitModeLabel(expense.splitMode, expense.isPersonal)}
+              {expense.isPersonal
+                ? `${expense.paidByName} paid`
+                : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`}
             </SheetDescription>
           </SheetHeader>
 
@@ -571,6 +619,7 @@ function ExpenseDetailSheet({
                       onChange={(event) =>
                         setAmountDigits(atmDigitsFromInput(event.target.value))
                       }
+                      onFocus={(event) => event.target.select()}
                       placeholder={formatAtmAmount("", fractionDigits)}
                       className="text-right tabular-nums"
                     />
@@ -592,11 +641,12 @@ function ExpenseDetailSheet({
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-expense-category">Category</Label>
+                  <CategoryChips value={category} onChange={setCategory} />
                   <Input
                     id="edit-expense-category"
                     value={category}
                     onChange={(event) => setCategory(event.target.value)}
-                    placeholder="Food, lodging, taxi…"
+                    placeholder="Custom category…"
                   />
                 </div>
               </>
@@ -613,9 +663,13 @@ function ExpenseDetailSheet({
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">
-                    {splitModeLabel(expense.splitMode, expense.isPersonal)}
-                  </Badge>
+                  {expense.isPersonal ? (
+                    <Badge variant="secondary">Personal</Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      {splitModeLabel(expense.splitMode)}
+                    </Badge>
+                  )}
                   {expense.category ? (
                     <Badge variant="outline">{expense.category}</Badge>
                   ) : null}
