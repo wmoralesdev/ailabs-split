@@ -12,6 +12,7 @@ import {
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
+import { CategoryChips } from "@/components/category-chips"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -24,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
   SelectContent,
@@ -115,14 +117,31 @@ type AddExpensePayload = {
   splits: Array<{ memberId: string; weight?: number; amountCents?: number }>
 }
 
+function AddExpenseSkeleton() {
+  return (
+    <main className="page-gutter mx-auto max-w-content pt-6">
+      <Skeleton className="h-8 w-40" />
+      <div className="mt-6 space-y-4">
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    </main>
+  )
+}
+
 function AddExpensePage() {
   const { code } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { memberId } = useRoomIdentity()
-  const { data: room } = useQuery(roomQueryOptions(code, memberId))
+  const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
 
-  if (!room) return null
+  if (!room) {
+    return isPending ? <AddExpenseSkeleton /> : null
+  }
   return (
     <AddExpenseForm
       room={room}
@@ -443,6 +462,7 @@ function AddExpenseForm({
                       onChange={(e) => {
                         field.onChange(atmDigitsFromInput(e.target.value))
                       }}
+                      onFocus={(e) => e.target.select()}
                     />
                   </FormControl>
                   <FormMessage />
@@ -502,8 +522,9 @@ function AddExpenseForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category (optional)</FormLabel>
+                <CategoryChips value={field.value ?? ""} onChange={field.onChange} />
                 <FormControl>
-                  <Input placeholder="Food, lodging, taxi…" {...field} />
+                  <Input placeholder="Custom category…" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -525,16 +546,15 @@ function AddExpenseForm({
             </label>
           </div>
 
-          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 px-3 py-3">
+          <label className="flex cursor-pointer items-center gap-3 py-1">
             <Checkbox
               checked={isPersonal}
               onCheckedChange={(checked) => setPersonalMode(checked === true)}
-              className="mt-0.5"
             />
             <span className="min-w-0">
               <span className="block text-sm font-medium">Personal</span>
-              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                Only you can see this. It won’t change group balances.
+              <span className="block text-xs text-muted-foreground">
+                Only you see this · won’t change balances
               </span>
             </span>
           </label>
@@ -570,34 +590,7 @@ function AddExpenseForm({
             />
           )}
 
-          {isPersonal ? (
-            <div className="flex items-center justify-between gap-3 border-y border-border/60 py-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar className="size-9">
-                  <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                    {initials(
-                      room.members.find((m) => m.id === selfMemberId)?.name ??
-                        "You"
-                    )}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {room.members.find((m) => m.id === selfMemberId)?.name ??
-                      "You"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Assigned to you
-                  </p>
-                </div>
-              </div>
-              {amountCents > 0 ? (
-                <span className="text-sm font-medium tabular-nums">
-                  {formatMoney(amountCents, currency)}
-                </span>
-              ) : null}
-            </div>
-          ) : (
+          {isPersonal ? null : (
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-3">
                 <FormLabelStatic>Split between</FormLabelStatic>
@@ -710,6 +703,7 @@ function AddExpenseForm({
                                 [member.id]: atmDigitsFromInput(e.target.value),
                               }))
                             }}
+                            onFocus={(e) => e.target.select()}
                             placeholder={formatAtmAmount("", fractionDigits)}
                             size="sm"
                             className="w-28 text-right tabular-nums"

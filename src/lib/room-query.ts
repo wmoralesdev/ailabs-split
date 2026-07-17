@@ -1,5 +1,6 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query"
 
+import { readRoomCache, writeRoomCache } from "@/lib/room-cache"
 import { getRoomByCode } from "@/server/rooms"
 
 export const roomKeys = {
@@ -14,17 +15,31 @@ export function roomQueryOptions(
   code: string,
   viewerMemberId?: string | null
 ) {
+  const cached = readRoomCache(code, viewerMemberId)
+
   return queryOptions({
     queryKey: roomKeys.detail(code, viewerMemberId),
-    queryFn: () =>
-      getRoomByCode({
+    queryFn: async () => {
+      const room = await getRoomByCode({
         data: {
           code,
           ...(viewerMemberId ? { viewerMemberId } : {}),
         },
-      }),
+      })
+      if (room) {
+        writeRoomCache(code, viewerMemberId, room)
+      }
+      return room
+    },
     staleTime: 15_000,
     // Keep trip shell visible while swapping anon → claimed viewer keys.
     placeholderData: keepPreviousData,
+    ...(cached
+      ? {
+          initialData: cached,
+          // Treat localStorage hydrate as stale so we refetch right away.
+          initialDataUpdatedAt: 0,
+        }
+      : {}),
   })
 }
