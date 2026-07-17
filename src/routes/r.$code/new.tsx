@@ -518,7 +518,6 @@ function AddExpenseForm({
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="sr-only"
                 disabled={ocrPending}
                 onChange={(e) => void onScan(e.target.files?.[0] ?? null)}
