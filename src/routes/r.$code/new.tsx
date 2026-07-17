@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { onlineManager, useMutation, useQuery } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
@@ -14,6 +14,7 @@ import {
 } from "@hugeicons/core-free-icons"
 
 import { CategoryChips } from "@/components/category-chips"
+import { MemberPicker } from "@/components/member-picker"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -51,6 +52,7 @@ import { useOnlineStatus } from "@/lib/online-status"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { roomQueryOptions } from "@/lib/room-query"
+import { redistributeAmounts } from "@/lib/amount-split"
 import { equalSplitCents, formatMoney, partsSplitCents } from "@/lib/settle"
 import type { SplitMode } from "@/lib/schemas"
 import { scanReceipt } from "@/server/ocr"
@@ -185,6 +187,8 @@ function AddExpenseForm({
   )
   /** Per-member ATM digit buffers when split mode is AMOUNT. */
   const [amounts, setAmounts] = useState<Record<string, string>>({})
+  /** Members whose Amounts fields were edited by the user (locked). */
+  const [manualIds, setManualIds] = useState<Set<string>>(() => new Set())
   const [splitError, setSplitError] = useState<string | null>(null)
   const [ocrPending, setOcrPending] = useState(false)
 
@@ -226,6 +230,55 @@ function AddExpenseForm({
     }
     return room.members.filter((m) => included.has(m.id)).map((m) => m.id)
   }, [isPersonal, selfMemberId, splitMode, room.members, weights, included])
+
+  // Seed / redistribute Amounts: manuals stay; unlocked share the remainder.
+  useEffect(() => {
+    if (splitMode !== "AMOUNT" || isPersonal) return
+
+    const includedIds = room.members
+      .filter((m) => included.has(m.id))
+      .map((m) => m.id)
+
+    setManualIds((prevManual) => {
+      const cleaned = new Set(
+        [...prevManual].filter((id) => includedIds.includes(id))
+      )
+
+      setAmounts((prevAmounts) => {
+        const next = redistributeAmounts({
+          totalCents: amountCents,
+          includedIds,
+          manualIds: cleaned,
+          amounts: prevAmounts,
+          fractionDigits,
+        })
+        const prevKeys = Object.keys(prevAmounts)
+        const nextKeys = Object.keys(next)
+        if (
+          prevKeys.length === nextKeys.length &&
+          nextKeys.every((key) => prevAmounts[key] === next[key])
+        ) {
+          return prevAmounts
+        }
+        return next
+      })
+
+      if (
+        cleaned.size === prevManual.size &&
+        [...cleaned].every((id) => prevManual.has(id))
+      ) {
+        return prevManual
+      }
+      return cleaned
+    })
+  }, [
+    splitMode,
+    isPersonal,
+    amountCents,
+    fractionDigits,
+    included,
+    room.members,
+  ])
 
   const preview = useMemo<Record<string, number>>(() => {
     if (amountCents <= 0) return {}
@@ -302,6 +355,42 @@ function AddExpenseForm({
       }
       return next
     })
+    setManualIds((prev) => {
+      if (!prev.has(memberId)) return prev
+      const next = new Set(prev)
+      next.delete(memberId)
+      return next
+    })
+  }
+
+  function onAmountShareChange(memberId: string, digits: string) {
+    setSplitError(null)
+    const nextManual = new Set(manualIds)
+    nextManual.add(memberId)
+    setManualIds(nextManual)
+
+    const includedIds = room.members
+      .filter((m) => included.has(m.id))
+      .map((m) => m.id)
+
+    setAmounts((prev) =>
+      redistributeAmounts({
+        totalCents: amountCents,
+        includedIds,
+        manualIds: nextManual,
+        amounts: { ...prev, [memberId]: digits },
+        fractionDigits,
+      })
+    )
+  }
+
+  function onSplitModeChange(value: string) {
+    const mode = value as SplitMode
+    setSplitMode(mode)
+    setSplitError(null)
+    if (mode === "AMOUNT") {
+      setManualIds(new Set())
+    }
   }
 
   function setWeight(memberId: string, next: number) {
@@ -425,10 +514,9 @@ function AddExpenseForm({
   }
 
   const currencyItems = room.currencies.map((c) => ({
-    label: c,
+    label: currencyLabel(c),
     value: c,
   }))
-  const memberItems = room.members.map((m) => ({ label: m.name, value: m.id }))
 
   return (
     <main className="page-gutter mx-auto max-w-content pt-6">
@@ -465,8 +553,7 @@ function AddExpenseForm({
                       inputMode="numeric"
                       autoComplete="off"
                       placeholder={formatAtmAmount("", fractionDigits)}
-                      size="lg"
-                      className="text-right tabular-nums"
+                      className="font-display text-right text-xl tabular-nums tracking-tight"
                       name={field.name}
                       ref={field.ref}
                       onBlur={field.onBlur}
@@ -497,7 +584,7 @@ function AddExpenseForm({
                         rememberLastCurrency(room.code, value)
                       }}
                     >
-                      <SelectTrigger size="lg" className="min-w-24">
+                      <SelectTrigger className="min-w-24">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="min-w-56">
@@ -581,22 +668,11 @@ function AddExpenseForm({
                 <FormItem>
                   <FormLabel>Paid by</FormLabel>
                   <FormControl>
-                    <Select
-                      items={memberItems}
+                    <MemberPicker
+                      members={room.members}
                       value={field.value}
-                      onValueChange={(value) => value && field.onChange(value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Who paid?" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {room.members.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -608,13 +684,7 @@ function AddExpenseForm({
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-3">
                 <FormLabelStatic>Split between</FormLabelStatic>
-                <Tabs
-                  value={splitMode}
-                  onValueChange={(value) => {
-                    setSplitMode(value as SplitMode)
-                    setSplitError(null)
-                  }}
-                >
+                <Tabs value={splitMode} onValueChange={onSplitModeChange}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="EQUAL">Equal</TabsTrigger>
                     <TabsTrigger value="PARTS">Parts</TabsTrigger>
@@ -711,11 +781,10 @@ function AddExpenseForm({
                               fractionDigits
                             )}
                             onChange={(e) => {
-                              setSplitError(null)
-                              setAmounts((prev) => ({
-                                ...prev,
-                                [member.id]: atmDigitsFromInput(e.target.value),
-                              }))
+                              onAmountShareChange(
+                                member.id,
+                                atmDigitsFromInput(e.target.value)
+                              )
                             }}
                             onFocus={(e) => e.target.select()}
                             placeholder={formatAtmAmount("", fractionDigits)}
