@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { onlineManager, useMutation, useQuery } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
@@ -35,6 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ADD_EXPENSE_MUTATION_KEY } from "@/lib/add-expense-mutation"
+import type { AddExpenseMutationVars } from "@/lib/add-expense-mutation"
 import {
   atmDigitsFromInput,
   atmDigitsToCents,
@@ -45,14 +47,14 @@ import {
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
 import { rememberLastCurrency, resolveLastCurrency } from "@/lib/last-currency"
+import { useOnlineStatus } from "@/lib/online-status"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
-import { roomKeys, roomQueryOptions } from "@/lib/room-query"
+import { roomQueryOptions } from "@/lib/room-query"
 import { equalSplitCents, formatMoney, partsSplitCents } from "@/lib/settle"
 import type { SplitMode } from "@/lib/schemas"
 import { scanReceipt } from "@/server/ocr"
-import { addExpense } from "@/server/rooms"
-import type { RoomDto } from "@/server/rooms"
+import type { ExpenseDto, RoomDto } from "@/server/rooms"
 
 export const Route = createFileRoute("/r/$code/new")({
   loader: async ({ params, context }) => {
@@ -106,18 +108,6 @@ const formSchema = z
 
 type FormValues = z.infer<typeof formSchema>
 
-type AddExpensePayload = {
-  code: string
-  title: string
-  category?: string
-  amountCents: number
-  currency?: string
-  paidById: string
-  splitMode: SplitMode
-  isPersonal: boolean
-  splits: Array<{ memberId: string; weight?: number; amountCents?: number }>
-}
-
 function AddExpenseSkeleton() {
   return (
     <main className="page-gutter mx-auto max-w-content pt-6">
@@ -136,7 +126,6 @@ function AddExpenseSkeleton() {
 function AddExpensePage() {
   const { code } = Route.useParams()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { memberId } = useRoomIdentity()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
 
@@ -149,7 +138,6 @@ function AddExpensePage() {
       code={code}
       selfMemberId={memberId}
       navigate={navigate}
-      queryClient={queryClient}
     />
   )
 }
@@ -159,13 +147,11 @@ function AddExpenseForm({
   code,
   selfMemberId,
   navigate,
-  queryClient,
 }: {
   room: RoomDto
   code: string
   selfMemberId: string
   navigate: ReturnType<typeof useNavigate>
-  queryClient: ReturnType<typeof useQueryClient>
 }) {
   const defaultPaidBy = room.members.some((m) => m.id === selfMemberId)
     ? selfMemberId
@@ -175,6 +161,8 @@ function AddExpenseForm({
     room.currencies,
     room.currency
   )
+
+  const isOnline = useOnlineStatus()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -289,10 +277,9 @@ function AddExpenseForm({
   )
   const remainingCents = amountCents - assignedCents
 
-  const mutation = useMutation({
-    mutationFn: (input: AddExpensePayload) => addExpense({ data: input }),
+  const mutation = useMutation<ExpenseDto, Error, AddExpenseMutationVars>({
+    mutationKey: ADD_EXPENSE_MUTATION_KEY,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
       toast.success("Expense added")
       await navigate({ to: "/r/$code", params: { code } })
     },
@@ -324,6 +311,10 @@ function AddExpenseForm({
 
   async function onScan(file: File | null) {
     if (!file) return
+    if (!onlineManager.isOnline()) {
+      toast.error("Scanning needs a connection")
+      return
+    }
     setOcrPending(true)
     try {
       const compressed = await compressImageForOcr(file)
@@ -412,7 +403,8 @@ function AddExpenseForm({
 
     rememberLastCurrency(room.code, values.currency)
 
-    mutation.mutate({
+    const vars: AddExpenseMutationVars = {
+      clientId: crypto.randomUUID(),
       code: room.code,
       title: values.title.trim(),
       category: values.category?.trim() || undefined,
@@ -422,7 +414,14 @@ function AddExpenseForm({
       splitMode: mode,
       isPersonal,
       splits,
-    })
+    }
+
+    mutation.mutate(vars)
+
+    if (!onlineManager.isOnline()) {
+      toast.message("Saved offline — will sync when online")
+      void navigate({ to: "/r/$code", params: { code } })
+    }
   }
 
   const currencyItems = room.currencies.map((c) => ({
@@ -544,20 +543,22 @@ function AddExpenseForm({
             )}
           />
 
-          <div className="flex flex-col gap-2">
-            <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
-            <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
-              <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
-              {ocrPending ? "Reading receipt…" : "Scan receipt"}
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                disabled={ocrPending}
-                onChange={(e) => void onScan(e.target.files?.[0] ?? null)}
-              />
-            </label>
-          </div>
+          {isOnline ? (
+            <div className="flex flex-col gap-2">
+              <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
+              <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
+                <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
+                {ocrPending ? "Reading receipt…" : "Scan receipt"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={ocrPending}
+                  onChange={(e) => void onScan(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+          ) : null}
 
           <label className="flex cursor-pointer items-center gap-3 py-1">
             <Checkbox

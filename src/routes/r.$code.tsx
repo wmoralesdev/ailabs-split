@@ -11,6 +11,7 @@ import { AppHeader } from "@/components/app-header"
 import { PageShell } from "@/components/page-shell"
 import { RoomTabBar } from "@/components/room-tab-bar"
 import { ShareTripButton } from "@/components/share-trip-button"
+import { SyncStatus } from "@/components/sync-status"
 import { SplitAtmosphere } from "@/components/split-atmosphere"
 import { Skeleton } from "@/components/ui/skeleton"
 import { WhoAreYouGate } from "@/components/who-are-you-gate"
@@ -42,17 +43,27 @@ export const Route = createFileRoute("/r/$code")({
     return { room }
   },
   component: RoomLayout,
-  errorComponent: ({ error }) => (
-    <PageShell
-      innerClassName="flex min-h-dvh flex-col justify-center"
-    >
-      <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
-      <p className="text-muted-foreground mt-2">{error.message}</p>
-      <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
-        Back to Split
-      </Link>
-    </PageShell>
-  ),
+  errorComponent: ({ error }) => {
+    const offline =
+      typeof navigator !== "undefined" && navigator.onLine === false
+    return (
+      <PageShell
+        innerClassName="flex min-h-dvh flex-col justify-center"
+      >
+        <h1 className="font-display text-3xl font-semibold">
+          {offline ? "Unavailable offline" : "Trip not found"}
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          {offline
+            ? "Open this trip once while online so it can be cached on this device."
+            : error.message}
+        </p>
+        <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
+          Back to Split
+        </Link>
+      </PageShell>
+    )
+  },
 })
 
 function RoomLayout() {
@@ -207,7 +218,12 @@ function RoomLayout() {
       <SplitAtmosphere className="flex flex-col" stippleClassName="opacity-30">
         <div className="relative flex min-h-dvh flex-col">
           <AppHeader
-            right={<ShareTripButton code={room.code} name={room.name} />}
+            right={
+              <>
+                <SyncStatus />
+                <ShareTripButton code={room.code} name={room.name} />
+              </>
+            }
           />
           <div className="pb-room-tab-bar flex-1">
             <Outlet />

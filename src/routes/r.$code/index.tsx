@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import {
   DndContext,
   KeyboardSensor,
@@ -36,6 +41,8 @@ import { CategoryChips } from "@/components/category-chips"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ADD_EXPENSE_MUTATION_KEY } from "@/lib/add-expense-mutation"
+import type { AddExpenseMutationVars } from "@/lib/add-expense-mutation"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -166,6 +173,18 @@ function RoomHomePage() {
   const { memberId, switchIdentity } = useRoomIdentity()
   const queryClient = useQueryClient()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
+  const pendingExpenseIds = useMutationState({
+    filters: { mutationKey: ADD_EXPENSE_MUTATION_KEY, status: "pending" },
+    select: (mutation) => {
+      const vars = mutation.state.variables as AddExpenseMutationVars | undefined
+      if (!vars || vars.code !== code) return null
+      return vars.clientId
+    },
+  }).filter((id): id is string => Boolean(id))
+  const pendingExpenseIdSet = useMemo(
+    () => new Set(pendingExpenseIds),
+    [pendingExpenseIds]
+  )
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
@@ -536,6 +555,7 @@ function RoomHomePage() {
                     key={expense.id}
                     expense={expense}
                     room={room}
+                    pending={pendingExpenseIdSet.has(expense.id)}
                   />
                 ))}
               </ul>
@@ -548,7 +568,14 @@ function RoomHomePage() {
                 key={expense.id}
                 expense={expense}
                 room={room}
-                onOpen={() => setSelectedExpenseId(expense.id)}
+                pending={pendingExpenseIdSet.has(expense.id)}
+                onOpen={() => {
+                  if (pendingExpenseIdSet.has(expense.id)) {
+                    toast.message("Still syncing this expense")
+                    return
+                  }
+                  setSelectedExpenseId(expense.id)
+                }}
               />
             ))}
           </ul>
@@ -570,11 +597,13 @@ function ExpenseRowContent({
   expense,
   room,
   compact,
+  pending,
 }: {
   expense: RoomDto["expenses"][number]
   room: RoomDto
   /** Reorder mode: shorter meta line, still shares title/badges/amount. */
   compact?: boolean
+  pending?: boolean
 }) {
   const isForeign = expense.currency !== room.currency
   const baseCents = convertToBase(
@@ -586,14 +615,19 @@ function ExpenseRowContent({
 
   return (
     <>
-      <Avatar className="size-9 shrink-0">
+      <Avatar className={cn("size-9 shrink-0", pending && "opacity-70")}>
         <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
           {initials(expense.paidByName)}
         </AvatarFallback>
       </Avatar>
-      <div className="min-w-0 flex-1">
+      <div className={cn("min-w-0 flex-1", pending && "opacity-80")}>
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-sm font-medium">{expense.title}</p>
+          {pending ? (
+            <Badge variant="secondary" className="shrink-0">
+              Syncing
+            </Badge>
+          ) : null}
           {expense.isPersonal ? (
             <Badge variant="secondary" className="shrink-0">
               Personal
@@ -606,16 +640,18 @@ function ExpenseRowContent({
           ) : null}
         </div>
         <p className="truncate text-xs text-muted-foreground">
-          {compact
-            ? formatRelativeTime(expense.createdAt)
-            : `${
-                expense.isPersonal
-                  ? `${expense.paidByName} paid`
-                  : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`
-              } · ${formatRelativeTime(expense.createdAt)}`}
+          {pending
+            ? "Waiting to sync"
+            : compact
+              ? formatRelativeTime(expense.createdAt)
+              : `${
+                  expense.isPersonal
+                    ? `${expense.paidByName} paid`
+                    : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`
+                } · ${formatRelativeTime(expense.createdAt)}`}
         </p>
       </div>
-      <div className="shrink-0 text-right">
+      <div className={cn("shrink-0 text-right", pending && "opacity-80")}>
         <p className="text-sm font-semibold tabular-nums">
           {formatMoney(expense.amountCents, expense.currency)}
         </p>
@@ -632,10 +668,12 @@ function ExpenseRowContent({
 function ExpenseRow({
   expense,
   room,
+  pending,
   onOpen,
 }: {
   expense: RoomDto["expenses"][number]
   room: RoomDto
+  pending?: boolean
   onOpen: () => void
 }) {
   return (
@@ -645,7 +683,7 @@ function ExpenseRow({
         className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 py-3 text-left transition-colors"
         onClick={onOpen}
       >
-        <ExpenseRowContent expense={expense} room={room} />
+        <ExpenseRowContent expense={expense} room={room} pending={pending} />
       </button>
     </li>
   )
@@ -654,9 +692,11 @@ function ExpenseRow({
 function SortableExpenseRow({
   expense,
   room,
+  pending,
 }: {
   expense: RoomDto["expenses"][number]
   room: RoomDto
+  pending?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: expense.id })
@@ -672,7 +712,8 @@ function SortableExpenseRow({
       style={style}
       className={cn(
         "border-border/70 bg-background flex items-center gap-3 border-b py-3",
-        isDragging && "relative z-10 opacity-90 shadow-lg"
+        isDragging && "relative z-10 opacity-90 shadow-lg",
+        pending && "opacity-80"
       )}
     >
       <button
@@ -688,7 +729,12 @@ function SortableExpenseRow({
           strokeWidth={2}
         />
       </button>
-      <ExpenseRowContent expense={expense} room={room} compact />
+      <ExpenseRowContent
+        expense={expense}
+        room={room}
+        compact
+        pending={pending}
+      />
     </li>
   )
 }
