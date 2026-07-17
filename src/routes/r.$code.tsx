@@ -8,6 +8,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { AppHeader } from "@/components/app-header"
+import { CreateTripSuccessSheet } from "@/components/create-trip-success-sheet"
 import { PageShell } from "@/components/page-shell"
 import { RoomTabBar } from "@/components/room-tab-bar"
 import { ShareTripButton } from "@/components/share-trip-button"
@@ -20,6 +21,7 @@ import {
   rememberMember,
   resolveRememberedMember,
 } from "@/lib/member-storage"
+import { markInstallEligible } from "@/lib/pwa-install"
 import { rememberRecentTrip } from "@/lib/recent-trips"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import { RoomIdentityContext } from "@/lib/room-identity"
@@ -27,11 +29,19 @@ import { claimMemberById, joinRoom } from "@/server/rooms"
 
 type RoomSearch = {
   as?: string
+  created?: boolean
 }
 
 export const Route = createFileRoute("/r/$code")({
   validateSearch: (search: Record<string, unknown>): RoomSearch => ({
-    as: typeof search.as === "string" && search.as.trim() ? search.as.trim() : undefined,
+    as:
+      typeof search.as === "string" && search.as.trim()
+        ? search.as.trim()
+        : undefined,
+    created:
+      search.created === "1" ||
+      search.created === true ||
+      search.created === "true",
   }),
   loader: async ({ params, context }) => {
     const room = await context.queryClient.ensureQueryData(
@@ -68,19 +78,40 @@ export const Route = createFileRoute("/r/$code")({
 
 function RoomLayout() {
   const { code } = Route.useParams()
-  const { as: asName } = Route.useSearch()
+  const { as: asName, created } = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [memberId, setMemberId] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
+  const [showCreatedSheet, setShowCreatedSheet] = useState(Boolean(created))
 
   const { data: room } = useQuery(roomQueryOptions(code, memberId))
 
   const members = room?.members
   const invalidateRoom = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
+
+  function dismissCreatedSheet() {
+    setShowCreatedSheet(false)
+    void navigate({
+      to: "/r/$code",
+      params: { code },
+      search: (prev) => ({ ...prev, created: undefined }),
+      replace: true,
+    })
+  }
+
+  const createdSheet =
+    room && showCreatedSheet ? (
+      <CreateTripSuccessSheet
+        open={showCreatedSheet}
+        code={room.code}
+        name={room.name}
+        onContinue={dismissCreatedSheet}
+      />
+    ) : null
 
   useEffect(() => {
     if (!room) return
@@ -141,6 +172,7 @@ function RoomLayout() {
         data: { code, memberId: id },
       })
       rememberMember(code, claimed.memberId)
+      markInstallEligible()
       setMemberId(claimed.memberId)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not claim member")
@@ -157,6 +189,7 @@ function RoomLayout() {
         data: { code, memberName: name },
       })
       rememberMember(result.room.code, result.memberId)
+      markInstallEligible()
       setMemberId(result.memberId)
       await invalidateRoom()
     } catch (err) {
@@ -174,7 +207,7 @@ function RoomLayout() {
 
   if (!room || !hydrated) {
     return (
-      <SplitAtmosphere className="flex flex-col" stippleClassName="opacity-30">
+      <SplitAtmosphere className="flex flex-col">
         <div className="relative flex min-h-dvh flex-col">
           <AppHeader />
           <main className="page-gutter mx-auto w-full max-w-content pt-6">
@@ -194,28 +227,32 @@ function RoomLayout() {
             </div>
           </main>
         </div>
+        {createdSheet}
       </SplitAtmosphere>
     )
   }
 
   if (!memberId) {
     return (
-      <WhoAreYouGate
-        roomName={room.name}
-        roomCode={room.code}
-        members={room.members}
-        suggestedName={asName}
-        pending={pending}
-        error={error}
-        onPickExisting={(id) => void pickExisting(id)}
-        onClaimName={(name) => void claimName(name)}
-      />
+      <>
+        <WhoAreYouGate
+          roomName={room.name}
+          roomCode={room.code}
+          members={room.members}
+          suggestedName={asName}
+          pending={pending}
+          error={error}
+          onPickExisting={(id) => void pickExisting(id)}
+          onClaimName={(name) => void claimName(name)}
+        />
+        {createdSheet}
+      </>
     )
   }
 
   return (
     <RoomIdentityContext.Provider value={{ memberId, switchIdentity }}>
-      <SplitAtmosphere className="flex flex-col" stippleClassName="opacity-30">
+      <SplitAtmosphere className="flex flex-col">
         <div className="relative flex min-h-dvh flex-col">
           <AppHeader
             right={
@@ -230,6 +267,7 @@ function RoomLayout() {
           </div>
           <RoomTabBar code={code} />
         </div>
+        {createdSheet}
       </SplitAtmosphere>
     </RoomIdentityContext.Provider>
   )
