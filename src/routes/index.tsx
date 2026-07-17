@@ -10,8 +10,8 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { RecentTripsList } from "@/components/recent-trips-list"
+import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
-import { SplitAtmosphere } from "@/components/split-atmosphere"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
@@ -115,61 +115,53 @@ function LandingPage() {
 
   if (resuming) {
     return (
-      <SplitAtmosphere as="main" className="overflow-hidden">
-        <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col items-center justify-center pb-12 pt-5">
-          <SiteLogo showWordmark={false} markClassName="size-8" />
-          <p className="text-muted-foreground mt-6 text-sm">Opening your trip…</p>
-        </div>
-      </SplitAtmosphere>
+      <PageShell
+        width="narrow"
+        className="overflow-hidden"
+        innerClassName="flex min-h-dvh flex-col items-center justify-center pb-12 pt-5"
+      >
+        <SiteLogo showWordmark={false} markClassName="size-8" />
+        <p className="text-muted-foreground mt-6 text-sm">Opening your trip…</p>
+      </PageShell>
     )
   }
 
   return (
-    <SplitAtmosphere as="main" className="overflow-hidden">
-      <div className="page-gutter relative mx-auto flex min-h-dvh max-w-narrow flex-col pt-5 pb-12">
-        <header className="animate-rise flex items-center justify-between">
-          <SiteLogo showWordmark={false} markClassName="size-8" />
-          <ThemeToggle />
-        </header>
+    <PageShell
+      width="narrow"
+      className="overflow-hidden"
+      innerClassName="flex min-h-dvh flex-col pt-5 pb-12"
+    >
+      <header className="animate-rise flex items-center justify-between">
+        <SiteLogo showWordmark={false} markClassName="size-8" />
+        <ThemeToggle />
+      </header>
 
-        <div className="animate-rise-delay mt-14 sm:mt-16">
-          <h1 className="font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl">
-            Split
-          </h1>
-          <p className="mt-4 max-w-[28ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
-            Trip costs, shared by code. No accounts.
-          </p>
-        </div>
-
-        <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
-          <div className="landing-panel rounded-2xl p-4 sm:p-5">
-            <Tabs defaultValue="create">
-              <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl p-1">
-                <TabsTrigger
-                  value="create"
-                  className="data-active:shadow-soft rounded-lg text-sm"
-                >
-                  Create
-                </TabsTrigger>
-                <TabsTrigger
-                  value="join"
-                  className="data-active:shadow-soft rounded-lg text-sm"
-                >
-                  Join
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="create" className="mt-6 text-base">
-                <CreateForm navigate={navigate} />
-              </TabsContent>
-              <TabsContent value="join" className="mt-6 text-base">
-                <JoinForm navigate={navigate} />
-              </TabsContent>
-            </Tabs>
-          </div>
-          <RecentTripsList />
-        </div>
+      <div className="animate-rise-delay mt-14 sm:mt-16">
+        <h1 className="font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl">
+          Split
+        </h1>
+        <p className="mt-4 max-w-[28ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
+          Trip costs, shared by code. No accounts.
+        </p>
       </div>
-    </SplitAtmosphere>
+
+      <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
+        <Tabs defaultValue="create">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="create">Create</TabsTrigger>
+            <TabsTrigger value="join">Join</TabsTrigger>
+          </TabsList>
+          <TabsContent value="create" className="mt-6 text-base">
+            <CreateForm navigate={navigate} />
+          </TabsContent>
+          <TabsContent value="join" className="mt-6 text-base">
+            <JoinForm navigate={navigate} />
+          </TabsContent>
+        </Tabs>
+        <RecentTripsList />
+      </div>
+    </PageShell>
   )
 }
 
@@ -534,7 +526,6 @@ function CreateForm({
 
         <Button
           type="submit"
-          size="lg"
           disabled={mutation.isPending}
           className="mt-1 w-full transition-transform duration-200 active:scale-[0.98]"
         >
@@ -667,7 +658,6 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
                 <Input
                   placeholder="7-character code"
                   maxLength={8}
-                  size="lg"
                   className="text-center font-display text-2xl tracking-[0.2em] uppercase"
                   {...field}
                   onChange={(e) => field.onChange(e.target.value.toUpperCase())}
@@ -682,7 +672,6 @@ function JoinForm({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
         />
         <Button
           type="submit"
-          size="lg"
           disabled={lookupMutation.isPending}
           className="w-full transition-transform duration-200 active:scale-[0.98]"
         >

@@ -24,43 +24,44 @@ export function RecentTripsList() {
       <h2 className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">
         Recent trips
       </h2>
-      <ul className="mt-3 flex flex-col gap-2">
+      <ul className="mt-3 flex flex-col">
         {trips.map((trip) => (
-          <li key={trip.code}>
-            <div className="landing-panel flex items-center gap-2 rounded-xl p-1 pl-3">
-              <button
-                type="button"
-                className="hover:bg-muted/50 flex min-w-0 flex-1 flex-col rounded-lg py-2.5 pr-2 text-left transition-colors"
-                onClick={() =>
-                  void navigate({
-                    to: "/r/$code",
-                    params: { code: trip.code },
-                  })
-                }
-              >
-                <span className="text-foreground truncate font-medium">
-                  {trip.name}
+          <li
+            key={trip.code}
+            className="border-border/70 flex items-center gap-2 border-t py-1"
+          >
+            <button
+              type="button"
+              className="hover:bg-muted/40 flex min-w-0 flex-1 flex-col rounded-md py-3 pr-2 text-left transition-colors"
+              onClick={() =>
+                void navigate({
+                  to: "/r/$code",
+                  params: { code: trip.code },
+                })
+              }
+            >
+              <span className="text-foreground truncate font-medium">
+                {trip.name}
+              </span>
+              <span className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
+                <span className="font-display tracking-[0.18em] uppercase">
+                  {trip.code}
                 </span>
-                <span className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
-                  <span className="font-display tracking-[0.18em] uppercase">
-                    {trip.code}
-                  </span>
-                  <span aria-hidden>·</span>
-                  <span>{formatRecentTripOpened(trip.updatedAt)}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted/60 mr-1 inline-flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors"
-                aria-label={`Remove ${trip.name} from recent trips`}
-                onClick={() => {
-                  forgetRecentTrip(trip.code)
-                  refresh()
-                }}
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-              </button>
-            </div>
+                <span aria-hidden>·</span>
+                <span>{formatRecentTripOpened(trip.updatedAt)}</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/60 inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors"
+              aria-label={`Remove ${trip.name} from recent trips`}
+              onClick={() => {
+                forgetRecentTrip(trip.code)
+                refresh()
+              }}
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
+            </button>
           </li>
         ))}
       </ul>
