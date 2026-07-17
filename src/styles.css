@@ -64,6 +64,9 @@
 
     --spacing-section-y: var(--space-section-y);
     --spacing-gutter: var(--space-gutter);
+    --spacing-base: var(--base-unit);
+    --spacing-grid-gap: var(--grid-gap);
+    --spacing-control: var(--control-height);
     --container-content: var(--max-width);
     --container-narrow: var(--max-width-narrow);
 }
@@ -79,7 +82,10 @@
     --brand-border: #e8e4f0;
     --brand-border-dark: #44414f;
 
-    /* Spacing / layout — tuned for a single mobile column. */
+    /* Spacing / layout — 8px rhythm, single mobile column. */
+    --base-unit: 8px;
+    --control-height: 3rem; /* 48px — form control source of truth */
+    --grid-gap: 1rem;
     --space-section-y: 4rem;
     --space-gutter: 1.5rem;
     --max-width: 40rem;
@@ -88,12 +94,12 @@
         7rem + env(safe-area-inset-bottom, 0px)
     );
 
-    /* Motion */
+    /* Motion — subtle enter (150–300ms preferred for micro). */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
     --dur-fast: 160ms;
     --dur-base: 240ms;
-    --dur-enter: 500ms;
+    --dur-enter: 280ms;
 
     /* shadcn semantic map → brand */
     --background: var(--brand-white);
@@ -136,10 +142,10 @@
     --on-dark: var(--brand-white);
     --on-dark-foreground: var(--brand-graphite);
 
-    /* Elevation — graphite/purple in light, black/purple in dark */
+    /* Elevation — hairline only; no purple glow. */
     --shadow-color: color-mix(in srgb, var(--brand-graphite) 8%, transparent);
     --shadow-color-strong: color-mix(in srgb, var(--brand-graphite) 12%, transparent);
-    --shadow-glow: color-mix(in srgb, var(--brand-purple) 32%, transparent);
+    --shadow-glow: transparent;
 }
 
 @media (min-width: 768px) {
@@ -185,7 +191,7 @@
     --surface-soft: color-mix(in srgb, var(--brand-purple) 14%, var(--brand-graphite));
     --shadow-color: color-mix(in srgb, black 40%, transparent);
     --shadow-color-strong: color-mix(in srgb, black 55%, transparent);
-    --shadow-glow: color-mix(in srgb, var(--brand-purple) 24%, transparent);
+    --shadow-glow: transparent;
 }
 
 @layer base {
@@ -214,25 +220,19 @@
     }
 
     .shadow-lift {
-        box-shadow: 0 2px 6px var(--shadow-color-strong);
+        box-shadow: 0 1px 2px var(--shadow-color-strong);
     }
 
     .shadow-elevated {
-        box-shadow:
-            0 1px 2px var(--shadow-color),
-            0 12px 32px -20px var(--shadow-glow);
+        box-shadow: 0 1px 2px var(--shadow-color);
     }
 
     .shadow-float {
-        box-shadow:
-            0 2px 6px var(--shadow-color-strong),
-            0 16px 40px var(--shadow-glow);
+        box-shadow: 0 1px 3px var(--shadow-color-strong);
     }
 
     .shadow-panel {
-        box-shadow:
-            0 2px 8px var(--shadow-color),
-            0 32px 80px -24px var(--shadow-glow);
+        box-shadow: none;
     }
 
     .section-y {
@@ -251,6 +251,32 @@
         max-width: var(--max-width-narrow);
     }
 
+    .content-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--grid-gap);
+    }
+
+    @media (min-width: 640px) {
+        .content-grid {
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+        }
+    }
+
+    .col-span-full {
+        grid-column: 1 / -1;
+    }
+
+    .col-span-half {
+        grid-column: span 2 / span 2;
+    }
+
+    @media (min-width: 640px) {
+        .col-span-half {
+            grid-column: span 6 / span 6;
+        }
+    }
+
     /* Bottom-chrome safe area for the mobile tab bar / sticky CTAs. */
     .pb-safe {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
@@ -264,51 +290,17 @@
         height: env(safe-area-inset-bottom, 0px);
     }
 
+    /* Flat shell — token background, no multi-radial wash. */
     .split-hero-wash {
-        background:
-            radial-gradient(
-                120% 80% at 10% 0%,
-                color-mix(in srgb, var(--brand-purple-soft) 30%, transparent),
-                transparent 55%
-            ),
-            radial-gradient(
-                90% 70% at 100% 20%,
-                color-mix(in srgb, var(--brand-purple) 20%, transparent),
-                transparent 50%
-            ),
-            linear-gradient(
-                165deg,
-                var(--brand-lavender) 0%,
-                var(--brand-white) 45%,
-                color-mix(in srgb, var(--brand-lavender) 55%, white) 100%
-            );
-    }
-
-    .dark .split-hero-wash {
-        background:
-            radial-gradient(
-                120% 80% at 10% 0%,
-                color-mix(in srgb, var(--brand-purple) 34%, transparent),
-                transparent 55%
-            ),
-            radial-gradient(
-                90% 70% at 100% 20%,
-                color-mix(in srgb, var(--brand-purple-soft) 12%, transparent),
-                transparent 50%
-            ),
-            linear-gradient(
-                165deg,
-                var(--brand-graphite) 0%,
-                color-mix(in srgb, var(--brand-purple) 12%, var(--brand-graphite)) 100%
-            );
+        background: var(--background);
     }
 
     .split-stipple {
         background-image: radial-gradient(
-            color-mix(in srgb, var(--brand-purple) 24%, transparent) 1px,
+            color-mix(in srgb, var(--foreground) 6%, transparent) 1px,
             transparent 1px
         );
-        background-size: 18px 18px;
+        background-size: 16px 16px;
     }
 
     .animate-rise {
@@ -317,38 +309,17 @@
 
     .animate-rise-delay {
         animation: split-rise var(--dur-enter) var(--ease-out) both;
-        animation-delay: 80ms;
+        animation-delay: 60ms;
     }
 
     .animate-rise-delay-2 {
         animation: split-rise var(--dur-enter) var(--ease-out) both;
-        animation-delay: 160ms;
+        animation-delay: 120ms;
     }
 
     .animate-rise-delay-3 {
         animation: split-rise var(--dur-enter) var(--ease-out) both;
-        animation-delay: 240ms;
-    }
-
-    /* Landing interaction surface — glass with edge refraction, not a dashboard card. */
-    .landing-panel {
-        border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
-        background: color-mix(in srgb, var(--background) 72%, transparent);
-        box-shadow:
-            inset 0 1px 0 color-mix(in srgb, white 55%, transparent),
-            0 1px 2px var(--shadow-color),
-            0 24px 48px -28px var(--shadow-glow);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-    }
-
-    .dark .landing-panel {
-        border-color: color-mix(in srgb, white 10%, transparent);
-        background: color-mix(in srgb, var(--brand-graphite) 55%, transparent);
-        box-shadow:
-            inset 0 1px 0 color-mix(in srgb, white 10%, transparent),
-            0 1px 2px var(--shadow-color),
-            0 28px 56px -28px var(--shadow-glow);
+        animation-delay: 180ms;
     }
 
     .landing-chip {
@@ -376,7 +347,7 @@
 @keyframes split-rise {
     from {
         opacity: 0;
-        transform: translateY(0.75rem);
+        transform: translateY(0.5rem);
     }
     to {
         opacity: 1;
