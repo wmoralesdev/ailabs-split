@@ -133,19 +133,6 @@ function RoomHomeSkeleton() {
   )
 }
 
-function balanceSummaryLabel(
-  netCents: number,
-  currency: string
-): string {
-  if (netCents > 0) {
-    return `You're owed ${formatMoney(netCents, currency)}`
-  }
-  if (netCents < 0) {
-    return `You owe ${formatMoney(Math.abs(netCents), currency)}`
-  }
-  return "All settled"
-}
-
 function RoomHomePage() {
   const { code } = roomRoute.useParams()
   const { memberId, switchIdentity } = useRoomIdentity()
@@ -156,6 +143,26 @@ function RoomHomePage() {
   )
 
   const me = room?.members.find((member) => member.id === memberId)
+
+  // Sum of this member's shares (their portion), not what they paid out.
+  const spentCents = useMemo(() => {
+    if (!room || !memberId) return 0
+    return room.expenses.reduce((sum, expense) => {
+      const myShare = expense.shares.find(
+        (share) => share.memberId === memberId
+      )
+      if (!myShare) return sum
+      return (
+        sum +
+        convertToBase(
+          myShare.amountCents,
+          expense.currency,
+          room.currency,
+          room.fxRates
+        )
+      )
+    }, 0)
+  }, [room, memberId])
 
   const nets = useMemo(() => {
     if (!room) return []
@@ -187,11 +194,6 @@ function RoomHomePage() {
       }))
     )
   }, [room])
-
-  const myNetCents = useMemo(() => {
-    if (!memberId) return 0
-    return nets.find((line) => line.memberId === memberId)?.netCents ?? 0
-  }, [nets, memberId])
 
   const transfers = useMemo(() => simplifyTransfers(nets), [nets])
 
@@ -226,7 +228,7 @@ function RoomHomePage() {
         </h1>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <p className="text-sm text-muted-foreground tabular-nums">
-            {balanceSummaryLabel(myNetCents, room.currency)}
+            You spent {formatMoney(spentCents, room.currency)}
           </p>
           <button
             type="button"
