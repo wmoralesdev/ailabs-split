@@ -38,11 +38,13 @@ import {
 import { toast } from "sonner"
 
 import { CategoryChips } from "@/components/category-chips"
+import { PullToRefresh } from "@/components/pull-to-refresh"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ADD_EXPENSE_MUTATION_KEY } from "@/lib/add-expense-mutation"
 import type { AddExpenseMutationVars } from "@/lib/add-expense-mutation"
+import { useOnlineStatus } from "@/lib/online-status"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -172,11 +174,17 @@ function RoomHomePage() {
   const { code } = roomRoute.useParams()
   const { memberId, switchIdentity } = useRoomIdentity()
   const queryClient = useQueryClient()
-  const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
+  const online = useOnlineStatus()
+  const {
+    data: room,
+    isPending,
+    refetch,
+  } = useQuery(roomQueryOptions(code, memberId))
   const pendingExpenseIds = useMutationState({
     filters: { mutationKey: ADD_EXPENSE_MUTATION_KEY, status: "pending" },
     select: (mutation) => {
-      const vars = mutation.state.variables as AddExpenseMutationVars | undefined
+      const vars = mutation.state.variables as
+        AddExpenseMutationVars | undefined
       if (!vars || vars.code !== code) return null
       return vars.clientId
     },
@@ -359,237 +367,239 @@ function RoomHomePage() {
   }
 
   return (
-    <main className="page-gutter mx-auto max-w-content pt-4">
-      <header>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
-          {room.name}
-        </h1>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <p className="text-sm text-muted-foreground tabular-nums">
-            You spent {formatMoney(spentCents, room.currency)}
-          </p>
-          <button
-            type="button"
-            onClick={() => void copyCode()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
-          >
-            <span className="font-display tracking-widest text-foreground">
-              {room.code}
-            </span>
-            <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
-            {copied === "code" ? "Copied" : "Copy"}
-          </button>
-          <Badge variant="secondary">Base {room.currency}</Badge>
-        </div>
-      </header>
-
-      <section className="border-border/70 mt-4 border-y py-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Avatar className="size-8">
-              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                {me ? initials(me.name) : "?"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">
-                You · {me?.name ?? "Unknown"}
-              </p>
-              <button
-                type="button"
-                onClick={() => void copyMyLink()}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-              >
-                <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={2} />
-                {copied === "link"
-                  ? "Personal link copied"
-                  : "Copy my device link"}
-              </button>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={switchIdentity}
-            className="shrink-0 text-sm font-medium text-primary"
-          >
-            Switch
-          </button>
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="font-display text-xl font-semibold">Balances</h2>
-          {transfers.length > 0 ? (
-            <Link
-              to="/r/$code/settle"
-              params={{ code: room.code }}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary"
-            >
-              Settle
-              <HugeiconsIcon
-                icon={ArrowRight01Icon}
-                size={14}
-                strokeWidth={2}
-              />
-            </Link>
-          ) : null}
-        </div>
-        <ul className="mt-1">
-          {nets.map((line) => {
-            const owed = line.netCents > 0
-            const owes = line.netCents < 0
-            return (
-              <li
-                key={line.memberId}
-                className="border-border/70 flex items-center gap-3 border-b py-3"
-              >
-                <Avatar className="size-8">
-                  <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
-                    {initials(line.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {line.name}
-                  {line.memberId === memberId ? (
-                    <span className="font-normal text-muted-foreground">
-                      {" "}
-                      (you)
-                    </span>
-                  ) : null}
-                </span>
-                <span
-                  className={
-                    owed
-                      ? "text-sm font-semibold text-primary tabular-nums"
-                      : owes
-                        ? "text-sm font-semibold text-destructive tabular-nums"
-                        : "text-sm text-muted-foreground tabular-nums"
-                  }
-                >
-                  {line.netCents === 0
-                    ? "settled"
-                    : `${owed ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
-
-      <section className="mt-6">
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="font-display text-xl font-semibold">Expenses</h2>
-          {room.expenses.length > 1 ? (
+    <PullToRefresh disabled={!online || reordering} onRefresh={() => refetch()}>
+      <main className="page-gutter mx-auto max-w-content pt-4">
+        <header>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            {room.name}
+          </h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <p className="text-sm text-muted-foreground tabular-nums">
+              You spent {formatMoney(spentCents, room.currency)}
+            </p>
             <button
               type="button"
-              disabled={reordering && savingOrder}
-              onClick={() => {
-                if (reordering) {
-                  if (savingOrderRef.current) return
-                  setReordering(false)
-                  return
-                }
-                setReordering(true)
-              }}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary disabled:opacity-60"
+              onClick={() => void copyCode()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
             >
-              {reordering ? (
-                savingOrder ? (
-                  "Saving…"
-                ) : (
-                  "Done"
-                )
-              ) : (
-                <>
-                  <HugeiconsIcon
-                    icon={ArrowUpDownIcon}
-                    size={14}
-                    strokeWidth={2}
-                  />
-                  Reorder
-                </>
-              )}
+              <span className="font-display tracking-widest text-foreground">
+                {room.code}
+              </span>
+              <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
+              {copied === "code" ? "Copied" : "Copy"}
             </button>
-          ) : null}
-        </div>
-        {room.expenses.length === 0 ? (
-          <div className="border-border/70 mt-3 flex flex-col items-center gap-3 border-y py-10 text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
-              <HugeiconsIcon
-                icon={ReceiptDollarIcon}
-                size={24}
-                strokeWidth={2}
-              />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                No expenses yet
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Add the first one to start splitting.
-              </p>
-            </div>
-            <Link
-              to="/r/$code/new"
-              params={{ code: room.code }}
-              className="bg-primary text-primary-foreground hover:bg-primary/80 inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md px-5 text-base font-medium"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
-              Add expense
-            </Link>
+            <Badge variant="secondary">Base {room.currency}</Badge>
           </div>
-        ) : reordering ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={order}
-              strategy={verticalListSortingStrategy}
+        </header>
+
+        <section className="mt-4 border-y border-border/70 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Avatar className="size-8">
+                <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                  {me ? initials(me.name) : "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">
+                  You · {me?.name ?? "Unknown"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void copyMyLink()}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <HugeiconsIcon icon={Link01Icon} size={12} strokeWidth={2} />
+                  {copied === "link"
+                    ? "Personal link copied"
+                    : "Copy my device link"}
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={switchIdentity}
+              className="shrink-0 text-sm font-medium text-primary"
             >
-              <ul className="mt-1">
-                {orderedExpenses.map((expense) => (
-                  <SortableExpenseRow
-                    key={expense.id}
-                    expense={expense}
-                    room={room}
-                    pending={pendingExpenseIdSet.has(expense.id)}
-                  />
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
-        ) : (
+              Switch
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-6">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="font-display text-xl font-semibold">Balances</h2>
+            {transfers.length > 0 ? (
+              <Link
+                to="/r/$code/settle"
+                params={{ code: room.code }}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary"
+              >
+                Settle
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  size={14}
+                  strokeWidth={2}
+                />
+              </Link>
+            ) : null}
+          </div>
           <ul className="mt-1">
-            {room.expenses.map((expense) => (
-              <ExpenseRow
-                key={expense.id}
-                expense={expense}
-                room={room}
-                pending={pendingExpenseIdSet.has(expense.id)}
-                onOpen={() => {
-                  if (pendingExpenseIdSet.has(expense.id)) {
-                    toast.message("Still syncing this expense")
+            {nets.map((line) => {
+              const owed = line.netCents > 0
+              const owes = line.netCents < 0
+              return (
+                <li
+                  key={line.memberId}
+                  className="flex items-center gap-3 border-b border-border/70 py-3"
+                >
+                  <Avatar className="size-8">
+                    <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
+                      {initials(line.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {line.name}
+                    {line.memberId === memberId ? (
+                      <span className="font-normal text-muted-foreground">
+                        {" "}
+                        (you)
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    className={
+                      owed
+                        ? "text-sm font-semibold text-primary tabular-nums"
+                        : owes
+                          ? "text-sm font-semibold text-destructive tabular-nums"
+                          : "text-sm text-muted-foreground tabular-nums"
+                    }
+                  >
+                    {line.netCents === 0
+                      ? "settled"
+                      : `${owed ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+
+        <section className="mt-6">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="font-display text-xl font-semibold">Expenses</h2>
+            {room.expenses.length > 1 ? (
+              <button
+                type="button"
+                disabled={reordering && savingOrder}
+                onClick={() => {
+                  if (reordering) {
+                    if (savingOrderRef.current) return
+                    setReordering(false)
                     return
                   }
-                  setSelectedExpenseId(expense.id)
+                  setReordering(true)
                 }}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-      <ExpenseDetailSheet
-        room={room}
-        expense={selectedExpense}
-        open={selectedExpense !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelectedExpenseId(null)
-        }}
-      />
-    </main>
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary disabled:opacity-60"
+              >
+                {reordering ? (
+                  savingOrder ? (
+                    "Saving…"
+                  ) : (
+                    "Done"
+                  )
+                ) : (
+                  <>
+                    <HugeiconsIcon
+                      icon={ArrowUpDownIcon}
+                      size={14}
+                      strokeWidth={2}
+                    />
+                    Reorder
+                  </>
+                )}
+              </button>
+            ) : null}
+          </div>
+          {room.expenses.length === 0 ? (
+            <div className="mt-3 flex flex-col items-center gap-3 border-y border-border/70 py-10 text-center">
+              <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                <HugeiconsIcon
+                  icon={ReceiptDollarIcon}
+                  size={24}
+                  strokeWidth={2}
+                />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  No expenses yet
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Add the first one to start splitting.
+                </p>
+              </div>
+              <Link
+                to="/r/$code/new"
+                params={{ code: room.code }}
+                className="inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md bg-primary px-5 text-base font-medium text-primary-foreground hover:bg-primary/80"
+              >
+                <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
+                Add expense
+              </Link>
+            </div>
+          ) : reordering ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={order}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="mt-1">
+                  {orderedExpenses.map((expense) => (
+                    <SortableExpenseRow
+                      key={expense.id}
+                      expense={expense}
+                      room={room}
+                      pending={pendingExpenseIdSet.has(expense.id)}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <ul className="mt-1">
+              {room.expenses.map((expense) => (
+                <ExpenseRow
+                  key={expense.id}
+                  expense={expense}
+                  room={room}
+                  pending={pendingExpenseIdSet.has(expense.id)}
+                  onOpen={() => {
+                    if (pendingExpenseIdSet.has(expense.id)) {
+                      toast.message("Still syncing this expense")
+                      return
+                    }
+                    setSelectedExpenseId(expense.id)
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+        <ExpenseDetailSheet
+          room={room}
+          expense={selectedExpense}
+          open={selectedExpense !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedExpenseId(null)
+          }}
+        />
+      </main>
+    </PullToRefresh>
   )
 }
 
@@ -677,10 +687,10 @@ function ExpenseRow({
   onOpen: () => void
 }) {
   return (
-    <li className="border-border/70 border-b">
+    <li className="border-b border-border/70">
       <button
         type="button"
-        className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 py-3 text-left transition-colors"
+        className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-muted/30"
         onClick={onOpen}
       >
         <ExpenseRowContent expense={expense} room={room} pending={pending} />
@@ -698,8 +708,14 @@ function SortableExpenseRow({
   room: RoomDto
   pending?: boolean
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: expense.id })
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: expense.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -711,23 +727,19 @@ function SortableExpenseRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "border-border/70 bg-background flex items-center gap-3 border-b py-3",
+        "flex items-center gap-3 border-b border-border/70 bg-background py-3",
         isDragging && "relative z-10 opacity-90 shadow-lg",
         pending && "opacity-80"
       )}
     >
       <button
         type="button"
-        className="text-muted-foreground hover:text-foreground shrink-0 touch-none cursor-grab active:cursor-grabbing"
+        className="shrink-0 cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
         aria-label="Drag to reorder expense"
         {...attributes}
         {...listeners}
       >
-        <HugeiconsIcon
-          icon={DragDropVerticalIcon}
-          size={18}
-          strokeWidth={2}
-        />
+        <HugeiconsIcon icon={DragDropVerticalIcon} size={18} strokeWidth={2} />
       </button>
       <ExpenseRowContent
         expense={expense}
@@ -886,7 +898,7 @@ function ExpenseDetailSheet({
                   </div>
                   <div className="grid gap-2">
                     <Label>Currency</Label>
-                    <div className="border-border bg-muted/40 flex h-(--control-height) min-w-16 items-center justify-center rounded-md px-3 text-base font-medium">
+                    <div className="flex h-(--control-height) min-w-16 items-center justify-center rounded-md border-border bg-muted/40 px-3 text-base font-medium">
                       {expense.currency}
                     </div>
                   </div>
