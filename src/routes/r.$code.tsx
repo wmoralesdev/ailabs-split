@@ -8,6 +8,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { AppHeader } from "@/components/app-header"
+import { PageShell } from "@/components/page-shell"
 import { RoomTabBar } from "@/components/room-tab-bar"
 import { ShareTripButton } from "@/components/share-trip-button"
 import { SplitAtmosphere } from "@/components/split-atmosphere"
@@ -42,15 +43,15 @@ export const Route = createFileRoute("/r/$code")({
   },
   component: RoomLayout,
   errorComponent: ({ error }) => (
-    <SplitAtmosphere as="main">
-      <div className="page-gutter relative mx-auto flex min-h-dvh max-w-content flex-col justify-center">
-        <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
-        <p className="text-muted-foreground mt-2">{error.message}</p>
-        <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
-          Back to Split
-        </Link>
-      </div>
-    </SplitAtmosphere>
+    <PageShell
+      innerClassName="flex min-h-dvh flex-col justify-center"
+    >
+      <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
+      <p className="text-muted-foreground mt-2">{error.message}</p>
+      <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
+        Back to Split
+      </Link>
+    </PageShell>
   ),
 })
 

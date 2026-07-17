@@ -63,7 +63,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       <Link
         to="/"
         search={{ stay: true }}
-        className="bg-primary text-primary-foreground mt-8 inline-flex h-11 w-fit items-center rounded-md px-5 text-sm font-medium"
+        className="bg-primary text-primary-foreground mt-8 inline-flex h-(--control-height) w-fit items-center rounded-md px-5 text-base font-medium"
       >
         Back to Split
       </Link>

@@ -95,7 +95,7 @@ function MemberIdentityPicker({
               Matches an existing member (case-insensitive) or adds you.
             </p>
           </div>
-          <Button type="submit" size="lg" disabled={pending || !newName.trim()}>
+          <Button type="submit" disabled={pending || !newName.trim()}>
             {pending ? "Continuing…" : "Continue"}
           </Button>
           {members.length > 0 ? (
