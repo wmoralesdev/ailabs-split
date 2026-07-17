@@ -10,7 +10,6 @@ import {
   Edit02Icon,
   Link01Icon,
   ReceiptDollarIcon,
-  Share01Icon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
@@ -37,7 +36,7 @@ import {
   formatAtmAmount,
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
-import { copyText, shareOrCopyInvite } from "@/lib/invite-link"
+import { copyText } from "@/lib/invite-link"
 import { memberLink } from "@/lib/member-storage"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import { useRoomIdentity } from "@/lib/room-identity"
@@ -117,8 +116,7 @@ function RoomHomeSkeleton() {
   return (
     <main className="page-gutter mx-auto max-w-content pt-4">
       <Skeleton className="h-8 w-40" />
-      <Skeleton className="mt-2 h-4 w-28" />
-      <Skeleton className="mt-3 h-6 w-36 rounded-full" />
+      <Skeleton className="mt-2 h-6 w-full max-w-sm rounded-full" />
       <Skeleton className="mt-4 h-14 w-full" />
       <Skeleton className="mt-6 h-5 w-24" />
       <div className="mt-2 space-y-2">
@@ -135,33 +133,29 @@ function RoomHomeSkeleton() {
   )
 }
 
+function balanceSummaryLabel(
+  netCents: number,
+  currency: string
+): string {
+  if (netCents > 0) {
+    return `You're owed ${formatMoney(netCents, currency)}`
+  }
+  if (netCents < 0) {
+    return `You owe ${formatMoney(Math.abs(netCents), currency)}`
+  }
+  return "All settled"
+}
+
 function RoomHomePage() {
   const { code } = roomRoute.useParams()
   const { memberId, switchIdentity } = useRoomIdentity()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
-  const [copied, setCopied] = useState<"code" | "link" | "invite" | null>(null)
+  const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
   )
 
   const me = room?.members.find((member) => member.id === memberId)
-
-  const spentCents = useMemo(() => {
-    if (!room || !memberId) return 0
-    return room.expenses
-      .filter((expense) => expense.paidById === memberId)
-      .reduce(
-        (sum, expense) =>
-          sum +
-          convertToBase(
-            expense.amountCents,
-            expense.currency,
-            room.currency,
-            room.fxRates
-          ),
-        0
-      )
-  }, [room, memberId])
 
   const nets = useMemo(() => {
     if (!room) return []
@@ -194,6 +188,11 @@ function RoomHomePage() {
     )
   }, [room])
 
+  const myNetCents = useMemo(() => {
+    if (!memberId) return 0
+    return nets.find((line) => line.memberId === memberId)?.netCents ?? 0
+  }, [nets, memberId])
+
   const transfers = useMemo(() => simplifyTransfers(nets), [nets])
 
   if (!room) {
@@ -212,23 +211,6 @@ function RoomHomePage() {
     window.setTimeout(() => setCopied(null), 1500)
   }
 
-  async function shareInvite() {
-    try {
-      const result = await shareOrCopyInvite({
-        code: room!.code,
-        name: room!.name,
-      })
-      if (result === "cancelled") return
-      if (result === "copied") {
-        setCopied("invite")
-        toast.success("Invite link copied")
-        window.setTimeout(() => setCopied(null), 1500)
-      }
-    } catch {
-      toast.error("Could not share trip")
-    }
-  }
-
   async function copyMyLink() {
     if (!me) return
     await copyText(memberLink(room!.code, me.name))
@@ -242,10 +224,10 @@ function RoomHomePage() {
         <h1 className="font-display text-2xl font-semibold tracking-tight">
           {room.name}
         </h1>
-        <p className="mt-0.5 text-sm text-muted-foreground tabular-nums">
-          You spent {formatMoney(spentCents, room.currency)}
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {balanceSummaryLabel(myNetCents, room.currency)}
+          </p>
           <button
             type="button"
             onClick={() => void copyCode()}
@@ -256,14 +238,6 @@ function RoomHomePage() {
             </span>
             <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
             {copied === "code" ? "Copied" : "Copy"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void shareInvite()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
-          >
-            <HugeiconsIcon icon={Share01Icon} size={12} strokeWidth={2} />
-            {copied === "invite" ? "Link copied" : "Share link"}
           </button>
           <Badge variant="secondary">Base {room.currency}</Badge>
         </div>
