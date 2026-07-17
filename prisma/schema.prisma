@@ -19,6 +19,10 @@ model Room {
   currencies  String[]     @default([])
   // Exchange rates as units of the currency per 1 base currency, e.g. { "CRC": 505 }.
   fxRates     Json?
+  // Bank FX markup in basis points from multi-sample calibration (87 = +0.87%).
+  fxAdjustmentBps Int @default(0)
+  // Calibration samples: [{ appCents, bankCents, expenseId? }].
+  fxCalibrationSamples Json?
   createdAt   DateTime     @default(now())
   members     Member[]
   expenses    Expense[]
