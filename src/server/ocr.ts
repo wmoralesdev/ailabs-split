@@ -3,16 +3,10 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
 
 import { prisma } from "@/lib/prisma"
+import { extractDraft } from "@/lib/receipt-ocr"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { normalizeRoomCode } from "@/lib/room-code"
-import { parseAmountToCents } from "@/lib/settle"
-
-export type OcrDraft = {
-  title?: string
-  amountCents?: number
-  date?: string
-  rawText?: string
-}
+import type { OcrDraft } from "@/lib/receipt-ocr"
 
 const ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -25,51 +19,6 @@ const ALLOWED_MIME = new Set([
 /** ~1MB binary ≈ 1.37MB base64 — keep OCR payloads small and cheap. */
 const MAX_BASE64_CHARS = 1_400_000
 const OCR_TIMEOUT_MS = 20_000
-
-function extractDraft(markdown: string): OcrDraft {
-  const lines = markdown
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^[#>*\-\s]+/, "").trim())
-    .filter(Boolean)
-
-  let amountCents: number | undefined
-  const amountPatterns = [
-    /(?:total|amount|sum|importe|total\s*a\s*pagar)[^\d]{0,20}(\d+[.,]\d{2})/i,
-    /\$\s*(\d+[.,]\d{2})/,
-    /(\d+[.,]\d{2})\s*(?:USD|EUR|SVC)?/,
-  ]
-
-  for (const pattern of amountPatterns) {
-    const match = markdown.match(pattern)
-    if (match?.[1]) {
-      const parsed = parseAmountToCents(match[1])
-      if (parsed !== null && parsed > 0) {
-        amountCents = parsed
-        break
-      }
-    }
-  }
-
-  const dateMatch = markdown.match(
-    /(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/
-  )
-
-  const title =
-    lines.find(
-      (line) =>
-        line.length >= 3 &&
-        line.length <= 48 &&
-        !/\d+[.,]\d{2}/.test(line) &&
-        !/total|subtotal|tax|iva/i.test(line)
-    ) ?? lines[0]
-
-  return {
-    title,
-    amountCents,
-    date: dateMatch?.[1],
-    rawText: markdown.slice(0, 2000),
-  }
-}
 
 function clientKey(): string {
   const forwarded = getRequestHeader("x-forwarded-for")

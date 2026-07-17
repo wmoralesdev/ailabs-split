@@ -406,7 +406,7 @@ function AddExpenseForm({
   }
 
   const currencyItems = room.currencies.map((c) => ({
-    label: currencyLabel(c),
+    label: c,
     value: c,
   }))
   const memberItems = room.members.map((m) => ({ label: m.name, value: m.id }))
@@ -471,7 +471,7 @@ function AddExpenseForm({
                       <SelectContent>
                         {room.currencies.map((c) => (
                           <SelectItem key={c} value={c}>
-                            {c}
+                            {currencyLabel(c)}
                           </SelectItem>
                         ))}
                       </SelectContent>

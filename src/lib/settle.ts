@@ -248,12 +248,30 @@ export function equalSplitCents(
 }
 
 export function parseAmountToCents(raw: string): number | null {
-  const cleaned = raw
-    .trim()
-    .replace(/[^0-9.,]/g, "")
-    .replace(",", ".")
+  const cleaned = raw.trim().replace(/[^0-9.,]/g, "")
   if (!cleaned) return null
-  const value = Number.parseFloat(cleaned)
+
+  const separators = [...cleaned.matchAll(/[.,]/g)]
+  let normalized = cleaned
+
+  if (separators.length === 1) {
+    const separator = separators[0]!
+    const digitsAfter = cleaned.length - separator.index - 1
+    normalized =
+      digitsAfter === 1 || digitsAfter === 2
+        ? cleaned.replace(separator[0], ".")
+        : cleaned.replace(/[.,]/g, "")
+  } else if (separators.length > 1) {
+    const last = separators[separators.length - 1]!
+    const digitsAfter = cleaned.length - last.index - 1
+    if (digitsAfter === 1 || digitsAfter === 2) {
+      normalized = `${cleaned.slice(0, last.index).replace(/[.,]/g, "")}.${cleaned.slice(last.index + 1)}`
+    } else {
+      normalized = cleaned.replace(/[.,]/g, "")
+    }
+  }
+
+  const value = Number.parseFloat(normalized)
   if (!Number.isFinite(value) || value < 0) return null
   return Math.round(value * 100)
 }

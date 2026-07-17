@@ -330,7 +330,7 @@ function CreateForm({
   }
 
   const currencyItems = CURRENCY_OPTIONS.map((o) => ({
-    label: o.label,
+    label: o.code,
     value: o.code,
   }))
   const extraCodes = Object.keys(extras)
