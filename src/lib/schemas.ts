@@ -148,6 +148,11 @@ export const deleteExpenseSchema = z.object({
   expenseId: z.string().min(1, "Missing expense"),
 })
 
+export const reorderExpensesSchema = z.object({
+  code: roomCodeSchema,
+  expenseIds: z.array(z.string().min(1)).min(1, "Nothing to reorder"),
+})
+
 export const recordSettlementSchema = z.object({
   code: roomCodeSchema,
   fromMemberId: z.string().min(1, "Pick who paid"),
@@ -166,6 +171,7 @@ export type JoinRoomInput = z.input<typeof joinRoomSchema>
 export type AddExpenseInput = z.input<typeof addExpenseSchema>
 export type UpdateExpenseInput = z.input<typeof updateExpenseSchema>
 export type DeleteExpenseInput = z.input<typeof deleteExpenseSchema>
+export type ReorderExpensesInput = z.input<typeof reorderExpensesSchema>
 export type RecordSettlementInput = z.input<typeof recordSettlementSchema>
 export type DeleteSettlementInput = z.input<typeof deleteSettlementSchema>
 export type ExpenseSplitInput = z.input<typeof expenseSplitSchema>

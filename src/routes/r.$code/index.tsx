@@ -1,12 +1,31 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import type { DragEndEvent } from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowRight01Icon,
+  ArrowUpDownIcon,
   Copy01Icon,
   Delete02Icon,
+  DragDropVerticalIcon,
   Edit02Icon,
   Link01Icon,
   ReceiptDollarIcon,
@@ -36,6 +55,7 @@ import {
   formatAtmAmount,
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
+import { formatRelativeTime } from "@/lib/format-relative-time"
 import { copyText } from "@/lib/invite-link"
 import { memberLink } from "@/lib/member-storage"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
@@ -47,12 +67,13 @@ import {
   partsSplitCents,
   simplifyTransfers,
 } from "@/lib/settle"
+import { cn } from "@/lib/utils"
 import type {
   DeleteExpenseInput,
   SplitMode,
   UpdateExpenseInput,
 } from "@/lib/schemas"
-import { deleteExpense, updateExpense } from "@/server/rooms"
+import { deleteExpense, reorderExpenses, updateExpense } from "@/server/rooms"
 import type { RoomDto } from "@/server/rooms"
 
 const roomRoute = getRouteApi("/r/$code")
@@ -79,6 +100,13 @@ function splitModeLabel(mode: string): string {
 function normalizedSplitMode(mode: string): SplitMode {
   if (mode === "PARTS" || mode === "AMOUNT") return mode
   return "EQUAL"
+}
+
+function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })
 }
 
 function splitsForEditedExpense(
@@ -136,11 +164,102 @@ function RoomHomeSkeleton() {
 function RoomHomePage() {
   const { code } = roomRoute.useParams()
   const { memberId, switchIdentity } = useRoomIdentity()
+  const queryClient = useQueryClient()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
   )
+  const [reordering, setReordering] = useState(false)
+  const [order, setOrder] = useState<string[]>([])
+  const [savingOrder, setSavingOrder] = useState(false)
+  const savingOrderRef = useRef(false)
+  const queuedOrderRef = useRef<string[] | null>(null)
+  /** Last server-confirmed order; restored if a persist fails. */
+  const savedOrderRef = useRef<string[] | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  async function persistExpenseOrder(expenseIds: string[]) {
+    if (savingOrderRef.current) {
+      queuedOrderRef.current = expenseIds
+      return
+    }
+
+    savingOrderRef.current = true
+    setSavingOrder(true)
+    let pending: string[] | null = expenseIds
+
+    try {
+      while (pending) {
+        const ids = pending
+        pending = null
+        try {
+          await reorderExpenses({ data: { code, expenseIds: ids } })
+          savedOrderRef.current = ids
+        } catch (error) {
+          const rollback = savedOrderRef.current
+          if (rollback) setOrder(rollback)
+          queuedOrderRef.current = null
+          toast.error(
+            error instanceof Error ? error.message : "Could not save order"
+          )
+          break
+        } finally {
+          await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
+        }
+
+        const queued = queuedOrderRef.current
+        queuedOrderRef.current = null
+        if (
+          queued &&
+          (queued.length !== ids.length ||
+            queued.some((id, index) => id !== ids[index]))
+        ) {
+          pending = queued
+        }
+      }
+    } finally {
+      savingOrderRef.current = false
+      setSavingOrder(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!room || reordering) return
+    setOrder(room.expenses.map((expense) => expense.id))
+  }, [room?.expenses, reordering])
+
+  const orderedExpenses = useMemo(() => {
+    if (!room) return []
+    const byId = new Map(room.expenses.map((expense) => [expense.id, expense]))
+    return order
+      .map((id) => byId.get(id))
+      .filter((expense): expense is RoomDto["expenses"][number] => !!expense)
+  }, [order, room])
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = order.indexOf(String(active.id))
+    const newIndex = order.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const previous = order
+    const next = arrayMove(order, oldIndex, newIndex)
+    setOrder(next)
+
+    if (!savingOrderRef.current) {
+      savedOrderRef.current = previous
+    }
+    void persistExpenseOrder(next)
+  }
 
   const me = room?.members.find((member) => member.id === memberId)
 
@@ -340,7 +459,41 @@ function RoomHomePage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="font-display text-xl font-semibold">Expenses</h2>
+        <div className="flex items-end justify-between gap-3">
+          <h2 className="font-display text-xl font-semibold">Expenses</h2>
+          {room.expenses.length > 1 ? (
+            <button
+              type="button"
+              disabled={reordering && savingOrder}
+              onClick={() => {
+                if (reordering) {
+                  if (savingOrderRef.current) return
+                  setReordering(false)
+                  return
+                }
+                setReordering(true)
+              }}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary disabled:opacity-60"
+            >
+              {reordering ? (
+                savingOrder ? (
+                  "Saving…"
+                ) : (
+                  "Done"
+                )
+              ) : (
+                <>
+                  <HugeiconsIcon
+                    icon={ArrowUpDownIcon}
+                    size={14}
+                    strokeWidth={2}
+                  />
+                  Reorder
+                </>
+              )}
+            </button>
+          ) : null}
+        </div>
         {room.expenses.length === 0 ? (
           <div className="border-border/70 mt-3 flex flex-col items-center gap-3 border-y py-10 text-center">
             <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -367,6 +520,27 @@ function RoomHomePage() {
               Add expense
             </Link>
           </div>
+        ) : reordering ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={order}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="mt-1">
+                {orderedExpenses.map((expense) => (
+                  <SortableExpenseRow
+                    key={expense.id}
+                    expense={expense}
+                    room={room}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         ) : (
           <ul className="mt-1">
             {room.expenses.map((expense) => (
@@ -392,6 +566,69 @@ function RoomHomePage() {
   )
 }
 
+function ExpenseRowContent({
+  expense,
+  room,
+  compact,
+}: {
+  expense: RoomDto["expenses"][number]
+  room: RoomDto
+  /** Reorder mode: shorter meta line, still shares title/badges/amount. */
+  compact?: boolean
+}) {
+  const isForeign = expense.currency !== room.currency
+  const baseCents = convertToBase(
+    expense.amountCents,
+    expense.currency,
+    room.currency,
+    room.fxRates
+  )
+
+  return (
+    <>
+      <Avatar className="size-9 shrink-0">
+        <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+          {initials(expense.paidByName)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-medium">{expense.title}</p>
+          {expense.isPersonal ? (
+            <Badge variant="secondary" className="shrink-0">
+              Personal
+            </Badge>
+          ) : null}
+          {expense.category ? (
+            <Badge variant="outline" className="shrink-0">
+              {expense.category}
+            </Badge>
+          ) : null}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {compact
+            ? formatRelativeTime(expense.createdAt)
+            : `${
+                expense.isPersonal
+                  ? `${expense.paidByName} paid`
+                  : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`
+              } · ${formatRelativeTime(expense.createdAt)}`}
+        </p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-semibold tabular-nums">
+          {formatMoney(expense.amountCents, expense.currency)}
+        </p>
+        {isForeign ? (
+          <p className="text-xs text-muted-foreground tabular-nums">
+            ≈ {formatMoney(baseCents, room.currency)}
+          </p>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
 function ExpenseRow({
   expense,
   room,
@@ -401,13 +638,6 @@ function ExpenseRow({
   room: RoomDto
   onOpen: () => void
 }) {
-  const isForeign = expense.currency !== room.currency
-  const baseCents = convertToBase(
-    expense.amountCents,
-    expense.currency,
-    room.currency,
-    room.fxRates
-  )
   return (
     <li className="border-border/70 border-b">
       <button
@@ -415,44 +645,50 @@ function ExpenseRow({
         className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 py-3 text-left transition-colors"
         onClick={onOpen}
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar className="size-9">
-            <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-              {initials(expense.paidByName)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <p className="truncate text-sm font-medium">{expense.title}</p>
-              {expense.isPersonal ? (
-                <Badge variant="secondary" className="shrink-0">
-                  Personal
-                </Badge>
-              ) : null}
-              {expense.category ? (
-                <Badge variant="outline" className="shrink-0">
-                  {expense.category}
-                </Badge>
-              ) : null}
-            </div>
-            <p className="truncate text-xs text-muted-foreground">
-              {expense.isPersonal
-                ? `${expense.paidByName} paid`
-                : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`}
-            </p>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-sm font-semibold tabular-nums">
-            {formatMoney(expense.amountCents, expense.currency)}
-          </p>
-          {isForeign ? (
-            <p className="text-xs text-muted-foreground tabular-nums">
-              ≈ {formatMoney(baseCents, room.currency)}
-            </p>
-          ) : null}
-        </div>
+        <ExpenseRowContent expense={expense} room={room} />
       </button>
+    </li>
+  )
+}
+
+function SortableExpenseRow({
+  expense,
+  room,
+}: {
+  expense: RoomDto["expenses"][number]
+  room: RoomDto
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: expense.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "border-border/70 bg-background flex items-center gap-3 border-b py-3",
+        isDragging && "relative z-10 opacity-90 shadow-lg"
+      )}
+    >
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground shrink-0 touch-none cursor-grab active:cursor-grabbing"
+        aria-label="Drag to reorder expense"
+        {...attributes}
+        {...listeners}
+      >
+        <HugeiconsIcon
+          icon={DragDropVerticalIcon}
+          size={18}
+          strokeWidth={2}
+        />
+      </button>
+      <ExpenseRowContent expense={expense} room={room} compact />
     </li>
   )
 }
@@ -579,6 +815,8 @@ function ExpenseDetailSheet({
               {expense.isPersonal
                 ? `${expense.paidByName} paid`
                 : `${expense.paidByName} paid · ${splitModeLabel(expense.splitMode)}`}
+              {" · "}
+              {formatDateTime(expense.createdAt)}
             </SheetDescription>
           </SheetHeader>
 

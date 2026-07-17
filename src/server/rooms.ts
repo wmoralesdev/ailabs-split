@@ -14,6 +14,7 @@ import {
   getRoomByCodeSchema,
   joinRoomSchema,
   recordSettlementSchema,
+  reorderExpensesSchema,
   updateExpenseSchema,
 } from "@/lib/schemas"
 import { equalSplitCents, partsSplitCents } from "@/lib/settle"
@@ -255,7 +256,7 @@ async function loadRoomByCode(
     include: {
       members: { orderBy: { name: "asc" } },
       expenses: {
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ sortIndex: "asc" }, { createdAt: "desc" }],
         include: {
           paidBy: true,
           shares: { include: { member: true } },
@@ -428,6 +429,15 @@ export const addExpense = createServerFn({ method: "POST" })
         : (data.currency ?? room.currency)
     const { splitMode, shares } = buildExpenseShares(data)
 
+    // Newest at top: list order is sortIndex asc, then createdAt desc.
+    // Place new rows just above the current minimum sortIndex.
+    const minSort = await prisma.expense.aggregate({
+      where: { roomId: room.id },
+      _min: { sortIndex: true },
+    })
+    const sortIndex =
+      minSort._min.sortIndex == null ? 0 : minSort._min.sortIndex - 1
+
     const expense = await prisma.expense.create({
       data: {
         roomId: room.id,
@@ -438,6 +448,7 @@ export const addExpense = createServerFn({ method: "POST" })
         splitMode,
         isPersonal: data.isPersonal,
         paidById: data.paidById,
+        sortIndex,
         shares: {
           create: shares.map((share) => ({
             memberId: share.memberId,
@@ -541,6 +552,54 @@ export const deleteExpense = createServerFn({ method: "POST" })
 
     await prisma.expense.delete({ where: { id: data.expenseId } })
     return { expenseId: data.expenseId }
+  })
+
+/** Persist a manual drag-to-reorder so every trip member sees the same order. */
+export const reorderExpenses = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(reorderExpensesSchema, data))
+  .handler(async ({ data }): Promise<{ expenseIds: string[] }> => {
+    limitWrites("reorder-expenses")
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      select: { id: true },
+    })
+    if (!room) throw new Error("Trip not found")
+
+    const roomExpenses = await prisma.expense.findMany({
+      where: { roomId: room.id },
+      select: { id: true, isPersonal: true },
+    })
+    const roomById = new Map(
+      roomExpenses.map((expense) => [expense.id, expense])
+    )
+    const orderedIds = data.expenseIds
+
+    if (new Set(orderedIds).size !== orderedIds.length) {
+      throw new Error("Reorder list has duplicate expenses")
+    }
+    for (const id of orderedIds) {
+      if (!roomById.has(id)) {
+        throw new Error("Unknown expense in reorder")
+      }
+    }
+    // Clients only see their own personal expenses; other members' personal
+    // rows may be omitted. Every shared expense must still be present.
+    for (const expense of roomExpenses) {
+      if (!expense.isPersonal && !orderedIds.includes(expense.id)) {
+        throw new Error("Reorder must include every shared expense")
+      }
+    }
+
+    await prisma.$transaction(
+      orderedIds.map((id, index) =>
+        prisma.expense.update({
+          where: { id },
+          data: { sortIndex: index },
+        })
+      )
+    )
+
+    return { expenseIds: orderedIds }
   })
 
 export const recordSettlement = createServerFn({ method: "POST" })
