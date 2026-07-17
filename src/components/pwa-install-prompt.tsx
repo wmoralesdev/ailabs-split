@@ -18,6 +18,7 @@ import {
 import {
   dismissInstallPrompt,
   isInstallDismissed,
+  isInstallEligible,
   isIosDevice,
   isStandaloneDisplay,
 } from "@/lib/pwa-install"
@@ -33,30 +34,56 @@ function PwaInstallPrompt() {
     null
   )
   const [ios, setIos] = useState(false)
+  const [eligible, setEligible] = useState(() =>
+    typeof window === "undefined" ? false : isInstallEligible()
+  )
 
   useEffect(() => {
     if (isStandaloneDisplay() || isInstallDismissed()) return
 
     setIos(isIosDevice())
+    setEligible(isInstallEligible())
 
     const onBeforeInstall = (event: Event) => {
       event.preventDefault()
       setDeferred(event as BeforeInstallPromptEvent)
-      setVisible(true)
+    }
+
+    const onEligible = () => {
+      setEligible(true)
     }
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall)
-
-    // iOS never fires beforeinstallprompt — show a soft prompt after a beat.
-    const timer = window.setTimeout(() => {
-      if (isIosDevice()) setVisible(true)
-    }, 1800)
+    window.addEventListener("split:pwa-install-eligible", onEligible)
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall)
-      window.clearTimeout(timer)
+      window.removeEventListener("split:pwa-install-eligible", onEligible)
     }
   }, [])
+
+  useEffect(() => {
+    if (!eligible || isStandaloneDisplay() || isInstallDismissed()) {
+      setVisible(false)
+      return
+    }
+
+    // Android: show when BIP is available. iOS: soft prompt after eligibility.
+    if (deferred) {
+      setVisible(true)
+      return
+    }
+
+    if (!isIosDevice()) return
+
+    const timer = window.setTimeout(() => {
+      setVisible(true)
+    }, 600)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [eligible, deferred])
 
   function dismiss() {
     dismissInstallPrompt()

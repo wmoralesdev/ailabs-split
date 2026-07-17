@@ -1,4 +1,5 @@
 const DISMISS_KEY = "split:pwa-install-dismissed"
+const ELIGIBLE_KEY = "split:pwa-install-eligible"
 const DISMISS_MS = 1000 * 60 * 60 * 24 * 14 // 14 days
 
 export type BeforeInstallPromptEvent = Event & {
@@ -36,4 +37,16 @@ export function isInstallDismissed(): boolean {
 export function dismissInstallPrompt(): void {
   if (typeof window === "undefined") return
   window.localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_MS))
+}
+
+/** Call after first successful create or join so the install banner can appear. */
+export function markInstallEligible(): void {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(ELIGIBLE_KEY, "1")
+  window.dispatchEvent(new Event("split:pwa-install-eligible"))
+}
+
+export function isInstallEligible(): boolean {
+  if (typeof window === "undefined") return false
+  return window.localStorage.getItem(ELIGIBLE_KEY) === "1"
 }
