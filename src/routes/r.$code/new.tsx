@@ -468,7 +468,7 @@ function AddExpenseForm({
                       <SelectTrigger size="lg" className="min-w-24">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="min-w-56">
                         {room.currencies.map((c) => (
                           <SelectItem key={c} value={c}>
                             {currencyLabel(c)}
