@@ -57,6 +57,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { redistributeAmounts } from "@/lib/amount-split"
 import {
   atmDigitsFromInput,
   atmDigitsToCents,
@@ -74,7 +75,6 @@ import {
   computeNetsWithSettlements,
   convertToBase,
   formatMoney,
-  partsSplitCents,
   simplifyTransfers,
 } from "@/lib/settle"
 import { cn } from "@/lib/utils"
@@ -120,8 +120,7 @@ function formatDateTime(value: string): string {
 }
 
 function splitsForEditedExpense(
-  expense: RoomDto["expenses"][number],
-  amountCents: number
+  expense: RoomDto["expenses"][number]
 ): Array<{ memberId: string; weight?: number; amountCents?: number }> {
   if (expense.isPersonal) {
     return [{ memberId: expense.paidById }]
@@ -134,20 +133,26 @@ function splitsForEditedExpense(
     }))
   }
 
-  if (expense.splitMode === "AMOUNT") {
-    return partsSplitCents(
-      amountCents,
-      expense.shares.map((share) => ({
-        memberId: share.memberId,
-        weight: Math.max(0, share.amountCents),
-      }))
-    ).map((share) => ({
-      memberId: share.memberId,
-      amountCents: share.amountCents,
-    }))
-  }
-
   return expense.shares.map((share) => ({ memberId: share.memberId }))
+}
+
+function seedAmountSplitState(
+  expense: RoomDto["expenses"][number],
+  fractionDigits: number
+): {
+  included: Set<string>
+  amounts: Record<string, string>
+  manualIds: Set<string>
+} {
+  const included = new Set(expense.shares.map((share) => share.memberId))
+  const amounts = Object.fromEntries(
+    expense.shares.map((share) => [
+      share.memberId,
+      centsToAtmDigits(share.amountCents, fractionDigits),
+    ])
+  )
+  const manualIds = new Set(expense.shares.map((share) => share.memberId))
+  return { included, amounts, manualIds }
 }
 
 function RoomHomeSkeleton() {
@@ -799,20 +804,101 @@ function ExpenseDetailSheet({
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState("")
   const [amountDigits, setAmountDigits] = useState("")
+  const [included, setIncluded] = useState<Set<string>>(() => new Set())
+  const [amounts, setAmounts] = useState<Record<string, string>>({})
+  const [manualIds, setManualIds] = useState<Set<string>>(() => new Set())
+  const [splitError, setSplitError] = useState<string | null>(null)
 
   useEffect(() => {
     setEditing(false)
     setTitle(expense?.title ?? "")
     setCategory(expense?.category ?? "")
-    setAmountDigits(
-      expense
-        ? centsToAtmDigits(
-            expense.amountCents,
-            currencyFractionDigits(expense.currency)
-          )
-        : ""
-    )
+    setSplitError(null)
+    if (!expense) {
+      setAmountDigits("")
+      setIncluded(new Set())
+      setAmounts({})
+      setManualIds(new Set())
+      return
+    }
+    const fractionDigits = currencyFractionDigits(expense.currency)
+    setAmountDigits(centsToAtmDigits(expense.amountCents, fractionDigits))
+    const seeded = seedAmountSplitState(expense, fractionDigits)
+    setIncluded(seeded.included)
+    setAmounts(seeded.amounts)
+    setManualIds(seeded.manualIds)
   }, [expense?.id])
+
+  const isAmountSplit =
+    expense != null &&
+    !expense.isPersonal &&
+    normalizedSplitMode(expense.splitMode) === "AMOUNT"
+
+  const fractionDigits = expense
+    ? currencyFractionDigits(expense.currency)
+    : 0
+  const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
+
+  useEffect(() => {
+    if (!expense || !isAmountSplit || !editing) return
+
+    const includedIds = room.members
+      .filter((member) => included.has(member.id))
+      .map((member) => member.id)
+
+    setManualIds((prevManual) => {
+      const cleaned = new Set(
+        [...prevManual].filter((id) => includedIds.includes(id))
+      )
+
+      setAmounts((prevAmounts) => {
+        const next = redistributeAmounts({
+          totalCents: amountCents,
+          includedIds,
+          manualIds: cleaned,
+          amounts: prevAmounts,
+          fractionDigits,
+        })
+        const prevKeys = Object.keys(prevAmounts)
+        const nextKeys = Object.keys(next)
+        if (
+          prevKeys.length === nextKeys.length &&
+          nextKeys.every((key) => prevAmounts[key] === next[key])
+        ) {
+          return prevAmounts
+        }
+        return next
+      })
+
+      if (
+        cleaned.size === prevManual.size &&
+        [...cleaned].every((id) => prevManual.has(id))
+      ) {
+        return prevManual
+      }
+      return cleaned
+    })
+  }, [
+    expense,
+    isAmountSplit,
+    editing,
+    amountCents,
+    fractionDigits,
+    included,
+    room.members,
+  ])
+
+  const assignedCents = useMemo(() => {
+    if (!isAmountSplit) return 0
+    return room.members
+      .filter((member) => included.has(member.id))
+      .reduce(
+        (sum, member) =>
+          sum + atmDigitsToCents(amounts[member.id] ?? "", fractionDigits),
+        0
+      )
+  }, [isAmountSplit, room.members, included, amounts, fractionDigits])
+  const remainingCents = amountCents - assignedCents
 
   const updateMutation = useMutation({
     mutationFn: (input: UpdateExpenseInput) => updateExpense({ data: input }),
@@ -850,7 +936,6 @@ function ExpenseDetailSheet({
     return <Sheet open={open} onOpenChange={onOpenChange} />
   }
 
-  const fractionDigits = currencyFractionDigits(expense.currency)
   const baseCents = convertToBase(
     expense.amountCents,
     expense.currency,
@@ -860,10 +945,66 @@ function ExpenseDetailSheet({
   )
   const isForeign = expense.currency !== room.currency
 
+  function resetEditState() {
+    if (!expense) return
+    const fd = currencyFractionDigits(expense.currency)
+    setTitle(expense.title)
+    setCategory(expense.category ?? "")
+    setAmountDigits(centsToAtmDigits(expense.amountCents, fd))
+    const seeded = seedAmountSplitState(expense, fd)
+    setIncluded(seeded.included)
+    setAmounts(seeded.amounts)
+    setManualIds(seeded.manualIds)
+    setSplitError(null)
+    setEditing(false)
+  }
+
+  function toggleMember(memberId: string) {
+    setSplitError(null)
+    setIncluded((prev) => {
+      const next = new Set(prev)
+      if (next.has(memberId)) {
+        if (next.size === 1) return prev
+        next.delete(memberId)
+      } else {
+        next.add(memberId)
+      }
+      return next
+    })
+    setManualIds((prev) => {
+      if (!prev.has(memberId)) return prev
+      const next = new Set(prev)
+      next.delete(memberId)
+      return next
+    })
+  }
+
+  function onAmountShareChange(memberId: string, digits: string) {
+    setSplitError(null)
+    const nextManual = new Set(manualIds)
+    nextManual.add(memberId)
+    setManualIds(nextManual)
+
+    const includedIds = room.members
+      .filter((member) => included.has(member.id))
+      .map((member) => member.id)
+
+    setAmounts((prev) =>
+      redistributeAmounts({
+        totalCents: amountCents,
+        includedIds,
+        manualIds: nextManual,
+        amounts: { ...prev, [memberId]: digits },
+        fractionDigits,
+      })
+    )
+  }
+
   function saveEdit() {
     if (!expense) return
-    const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
-    if (amountCents <= 0) {
+    setSplitError(null)
+    const nextAmountCents = atmDigitsToCents(amountDigits, fractionDigits)
+    if (nextAmountCents <= 0) {
       toast.error("Enter a valid amount")
       return
     }
@@ -873,17 +1014,49 @@ function ExpenseDetailSheet({
       return
     }
 
+    const splitMode = normalizedSplitMode(expense.splitMode)
+    let splits: Array<{
+      memberId: string
+      weight?: number
+      amountCents?: number
+    }>
+
+    if (expense.isPersonal) {
+      splits = [{ memberId: expense.paidById }]
+    } else if (splitMode === "AMOUNT") {
+      const ids = room.members
+        .filter((member) => included.has(member.id))
+        .map((member) => member.id)
+      if (ids.length === 0) {
+        setSplitError("Pick at least one person")
+        return
+      }
+      splits = ids.map((memberId) => ({
+        memberId,
+        amountCents: atmDigitsToCents(amounts[memberId] ?? "", fractionDigits),
+      }))
+      const sum = splits.reduce((total, split) => total + (split.amountCents ?? 0), 0)
+      if (sum !== nextAmountCents) {
+        setSplitError(
+          `Amounts add up to ${formatMoney(sum, expense.currency)}, need ${formatMoney(nextAmountCents, expense.currency)}`
+        )
+        return
+      }
+    } else {
+      splits = splitsForEditedExpense(expense)
+    }
+
     updateMutation.mutate({
       code: room.code,
       expenseId: expense.id,
       title: nextTitle,
       category: category.trim() || undefined,
-      amountCents,
+      amountCents: nextAmountCents,
       currency: expense.currency,
       paidById: expense.paidById,
-      splitMode: normalizedSplitMode(expense.splitMode),
+      splitMode,
       isPersonal: expense.isPersonal,
-      splits: splitsForEditedExpense(expense, amountCents),
+      splits,
     })
   }
 
@@ -954,6 +1127,100 @@ function ExpenseDetailSheet({
                     placeholder="Custom category…"
                   />
                 </div>
+                {isAmountSplit ? (
+                  <div className="flex flex-col gap-3">
+                    <Label>Amounts per person</Label>
+                    <ul className="divide-y divide-border/60">
+                      {room.members.map((member) => {
+                        const active = included.has(member.id)
+                        return (
+                          <li
+                            key={member.id}
+                            className="flex items-center justify-between gap-3 py-2.5"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleMember(member.id)}
+                              className="flex min-w-0 items-center gap-3 text-left"
+                            >
+                              <Avatar
+                                className={
+                                  active
+                                    ? "size-9"
+                                    : "size-9 opacity-40 grayscale"
+                                }
+                              >
+                                <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                                  {initials(member.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span
+                                className={
+                                  active
+                                    ? "truncate font-medium"
+                                    : "truncate text-muted-foreground"
+                                }
+                              >
+                                {member.name}
+                              </span>
+                            </button>
+                            {active ? (
+                              <Input
+                                inputMode="numeric"
+                                autoComplete="off"
+                                value={formatAtmAmountInput(
+                                  amounts[member.id] ?? "",
+                                  fractionDigits
+                                )}
+                                onChange={(event) => {
+                                  onAmountShareChange(
+                                    member.id,
+                                    atmDigitsFromInput(event.target.value)
+                                  )
+                                }}
+                                onFocus={(event) => event.target.select()}
+                                placeholder={formatAtmAmount(
+                                  "",
+                                  fractionDigits
+                                )}
+                                className="h-9 w-28 text-right tabular-nums"
+                              />
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                Not included
+                              </span>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {included.size} of {room.members.length} people
+                      </span>
+                      {amountCents > 0 ? (
+                        <span
+                          className={
+                            remainingCents === 0
+                              ? "font-medium text-primary"
+                              : "font-medium text-destructive"
+                          }
+                        >
+                          {remainingCents === 0
+                            ? "Balanced"
+                            : remainingCents > 0
+                              ? `${formatMoney(remainingCents, expense.currency)} left`
+                              : `${formatMoney(-remainingCents, expense.currency)} over`}
+                        </span>
+                      ) : null}
+                    </div>
+                    {splitError ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {splitError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : (
               <>
@@ -1014,7 +1281,7 @@ function ExpenseDetailSheet({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setEditing(false)}
+                  onClick={resetEditState}
                   disabled={updateMutation.isPending}
                 >
                   Cancel
