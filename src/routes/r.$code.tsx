@@ -7,13 +7,12 @@ import {
 } from "@tanstack/react-router"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { AppHeader } from "@/components/app-header"
 import { CreateTripSuccessSheet } from "@/components/create-trip-success-sheet"
 import { PageShell } from "@/components/page-shell"
+import { RoomShell } from "@/components/room-shell"
 import { RoomTabBar } from "@/components/room-tab-bar"
 import { ShareTripButton } from "@/components/share-trip-button"
 import { SyncStatus } from "@/components/sync-status"
-import { SplitAtmosphere } from "@/components/split-atmosphere"
 import { Skeleton } from "@/components/ui/skeleton"
 import { WhoAreYouGate } from "@/components/who-are-you-gate"
 import {
@@ -207,9 +206,8 @@ function RoomLayout() {
 
   if (!room || !hydrated) {
     return (
-      <SplitAtmosphere className="flex flex-col">
-        <div className="relative flex min-h-dvh flex-col">
-          <AppHeader />
+      <>
+        <RoomShell>
           <main className="page-gutter mx-auto w-full max-w-content pt-6">
             <Skeleton className="h-8 w-40" />
             <Skeleton className="mt-3 h-6 w-28 rounded-full" />
@@ -226,9 +224,9 @@ function RoomLayout() {
               <Skeleton className="h-16 w-full rounded-lg" />
             </div>
           </main>
-        </div>
+        </RoomShell>
         {createdSheet}
-      </SplitAtmosphere>
+      </>
     )
   }
 
@@ -252,23 +250,18 @@ function RoomLayout() {
 
   return (
     <RoomIdentityContext.Provider value={{ memberId, switchIdentity }}>
-      <SplitAtmosphere className="flex flex-col">
-        <div className="relative flex min-h-dvh flex-col">
-          <AppHeader
-            right={
-              <>
-                <SyncStatus />
-                <ShareTripButton code={room.code} name={room.name} />
-              </>
-            }
-          />
-          <div className="pb-room-tab-bar flex-1">
-            <Outlet />
-          </div>
-          <RoomTabBar code={code} />
-        </div>
-        {createdSheet}
-      </SplitAtmosphere>
+      <RoomShell
+        headerRight={
+          <>
+            <SyncStatus />
+            <ShareTripButton code={room.code} name={room.name} />
+          </>
+        }
+        footer={<RoomTabBar code={code} />}
+      >
+        <Outlet />
+      </RoomShell>
+      {createdSheet}
     </RoomIdentityContext.Provider>
   )
 }

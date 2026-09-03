@@ -1,27 +1,33 @@
 import type { ReactNode } from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Link } from "@tanstack/react-router"
 
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
+import {
+  findScrollParent,
+  readScrollTop,
+  subscribeScroll,
+} from "@/lib/scroll-parent"
 import { cn } from "@/lib/utils"
 
 const SCROLL_THRESHOLD = 12
 
-/** Whether the window has been scrolled past the header's frosted-glass threshold. */
-function useScrolled(threshold: number): boolean {
+/** Whether the nearest scroller has passed the header's frosted-glass threshold. */
+function useScrolled(threshold: number) {
+  const hostRef = useRef<HTMLElement>(null)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
+    const scroller = findScrollParent(hostRef.current)
     function onScroll() {
-      setScrolled(window.scrollY > threshold)
+      setScrolled(readScrollTop(scroller) > threshold)
     }
     onScroll()
-    window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
+    return subscribeScroll(scroller, onScroll)
   }, [threshold])
 
-  return scrolled
+  return { scrolled, hostRef }
 }
 
 /** Sticky top chrome: brand mark on the left, theme toggle + optional slot on the right. */
@@ -34,12 +40,13 @@ export function AppHeader({
   className?: string
   showWordmark?: boolean
 }) {
-  const scrolled = useScrolled(SCROLL_THRESHOLD)
+  const { scrolled, hostRef } = useScrolled(SCROLL_THRESHOLD)
 
   return (
     <header
+      ref={hostRef}
       className={cn(
-        "sticky top-0 z-30 border-b border-transparent transition-colors duration-200",
+        "sticky top-0 z-30 shrink-0 border-b border-transparent transition-colors duration-200",
         scrolled &&
           "border-foreground/5 bg-background/70 backdrop-blur-xl supports-backdrop-filter:bg-background/40",
         className

@@ -3,15 +3,12 @@ import type { ReactNode } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Loading03Icon } from "@hugeicons/core-free-icons"
 
+import { findScrollParent, readScrollTop } from "@/lib/scroll-parent"
 import { cn } from "@/lib/utils"
 
 const PULL_THRESHOLD_PX = 70
 const MAX_PULL_PX = 120
 const RESISTANCE = 0.45
-
-function scrollTop(): number {
-  return window.scrollY || document.documentElement.scrollTop || 0
-}
 
 type PullToRefreshProps = {
   onRefresh: () => Promise<unknown>
@@ -21,7 +18,7 @@ type PullToRefreshProps = {
 }
 
 /**
- * Touch-only pull-to-refresh for document-scrolling pages (Instagram-style).
+ * Touch-only pull-to-refresh for the nearest overflow scroller (or window).
  * Inactive while `disabled`; callers should pass offline / reorder gates.
  */
 export function PullToRefresh({
@@ -53,6 +50,7 @@ export function PullToRefresh({
   useEffect(() => {
     const root = rootRef.current
     if (!root) return
+    const scroller = findScrollParent(root)
 
     function setPullDistance(next: number) {
       pullRef.current = next
@@ -75,7 +73,7 @@ export function PullToRefresh({
 
     function onTouchStart(event: TouchEvent) {
       if (disabledRef.current || refreshingRef.current) return
-      if (scrollTop() > 0) {
+      if (readScrollTop(scroller) > 0) {
         startYRef.current = null
         return
       }
@@ -93,7 +91,7 @@ export function PullToRefresh({
       }
 
       const delta = event.touches[0].clientY - startYRef.current
-      if (delta <= 0 || scrollTop() > 0) {
+      if (delta <= 0 || readScrollTop(scroller) > 0) {
         if (pullingRef.current) {
           pullingRef.current = false
           setPullDistance(0)
