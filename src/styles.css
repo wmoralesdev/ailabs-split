@@ -287,6 +287,18 @@
         padding-bottom: var(--room-tab-bar-clearance);
     }
 
+    /* Lock document scroll while a trip shell owns the viewport (native-app feel). */
+    html.room-lock-scroll,
+    html.room-lock-scroll body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
+    [data-app-scroll] {
+        -webkit-overflow-scrolling: touch;
+    }
+
     .h-safe-bottom {
         height: env(safe-area-inset-bottom, 0px);
     }

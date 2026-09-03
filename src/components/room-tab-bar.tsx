@@ -18,7 +18,7 @@ export function RoomTabBar({ code }: { code: string }) {
   return (
     <nav
       aria-label="Trip navigation"
-      className="border-border/60 bg-background pb-safe fixed inset-x-0 bottom-0 z-30 border-t"
+      className="border-border/60 bg-background pb-safe relative z-30 shrink-0 border-t"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-2">
         <TabLink
