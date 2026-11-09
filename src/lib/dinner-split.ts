@@ -1,3 +1,4 @@
+import { atmDigitsToCents } from "@/lib/atm-amount"
 import { partsSplitCents } from "@/lib/settle"
 
 export type ItemSplit =
@@ -26,6 +27,8 @@ export type Adjustment = {
   kind: AdjustmentKind
   name: string
   amountCents: number
+  /** Present when the user entered a %; amountCents is the snapshot at add time. */
+  percent?: number | null
   allocate: "BY_ITEMS"
   source: "OCR" | "MANUAL"
   confidence: number | null
@@ -115,6 +118,42 @@ export function tipCentsFromPercent(
   return Math.round((subtotalCents * percent) / 100)
 }
 
+export type ManualFeeUnit = "amount" | "percent"
+
+export function resolveManualFee(input: {
+  unit: ManualFeeUnit
+  amountDigits: string
+  percentText: string
+  fractionDigits: number
+  itemSubtotalCents: number
+}): { amountCents: number; percent: number | null } | null {
+  switch (input.unit) {
+    case "percent": {
+      const percent = Number.parseFloat(
+        input.percentText.trim().replace(",", ".")
+      )
+      if (!Number.isFinite(percent) || percent <= 0 || percent > 100) {
+        return null
+      }
+      const amountCents = tipCentsFromPercent(input.itemSubtotalCents, percent)
+      if (amountCents <= 0) return null
+      return { amountCents, percent }
+    }
+    case "amount": {
+      const amountCents = atmDigitsToCents(
+        input.amountDigits,
+        input.fractionDigits
+      )
+      if (amountCents <= 0) return null
+      return { amountCents, percent: null }
+    }
+    default: {
+      const _exhaustive: never = input.unit
+      return _exhaustive
+    }
+  }
+}
+
 export function emptyCheckPayload(): CheckPayload {
   return {
     items: [],
@@ -184,7 +223,10 @@ export function splitLineItemShares(item: LineItem): LineSplitResult {
     }
     case "QUANTITY": {
       const assigned = item.split.shares.filter((share) => share.quantity > 0)
-      const assignedQty = assigned.reduce((sum, share) => sum + share.quantity, 0)
+      const assignedQty = assigned.reduce(
+        (sum, share) => sum + share.quantity,
+        0
+      )
       if (assigned.length === 0 || assignedQty <= 0) {
         return {
           shares: new Map(),
@@ -302,8 +344,7 @@ export function computeDinnerSplit(input: {
     0
   )
   const tipCents = input.tip.amountCents > 0 ? input.tip.amountCents : 0
-  const computedTotalCents =
-    itemSubtotalCents + adjustmentTotalCents + tipCents
+  const computedTotalCents = itemSubtotalCents + adjustmentTotalCents + tipCents
 
   const adjustmentCents = new Map<string, number>()
   let feesNeedItems = false
@@ -403,8 +444,10 @@ export function splitLineItem(
       { memberId: "a", weight: qtyA },
       { memberId: "b", weight: qtyB },
     ])
-    const amountA = parts.find((part) => part.memberId === "a")?.amountCents ?? 0
-    const amountB = parts.find((part) => part.memberId === "b")?.amountCents ?? 0
+    const amountA =
+      parts.find((part) => part.memberId === "a")?.amountCents ?? 0
+    const amountB =
+      parts.find((part) => part.memberId === "b")?.amountCents ?? 0
     return [
       {
         ...item,
@@ -634,7 +677,9 @@ export function itemSplitMemberIds(split: ItemSplit): string[] {
     case "EQUAL":
       return [...split.memberIds]
     case "PARTS":
-      return split.parts.filter((part) => part.weight > 0).map((part) => part.memberId)
+      return split.parts
+        .filter((part) => part.weight > 0)
+        .map((part) => part.memberId)
     case "QUANTITY":
       return split.shares
         .filter((share) => share.quantity > 0)

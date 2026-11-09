@@ -9,6 +9,7 @@ import {
   expenseSharesFromDinner,
   itemToAdjustment,
   manualTip,
+  resolveManualFee,
   splitLineItem,
   ticketTip,
   tipCentsFromPercent,
@@ -16,7 +17,9 @@ import {
 } from "./dinner-split"
 import type { LineItem, TipConfig } from "./dinner-split"
 
-function item(partial: Partial<LineItem> & Pick<LineItem, "id" | "name" | "amountCents">): LineItem {
+function item(
+  partial: Partial<LineItem> & Pick<LineItem, "id" | "name" | "amountCents">
+): LineItem {
   return {
     quantity: 1,
     unitPriceCents: partial.amountCents,
@@ -207,7 +210,10 @@ describe("BY_ITEMS fees and ticket-only tip", () => {
     expect(celeste.itemSubtotalCents).toBe(4440)
     expect(celeste.tipCents).toBe(444)
     expect(celeste.totalCents).toBe(4884)
-    const tipSum = celeste.shares.reduce((sum, share) => sum + share.tipCents, 0)
+    const tipSum = celeste.shares.reduce(
+      (sum, share) => sum + share.tipCents,
+      0
+    )
     expect(tipSum).toBe(444)
   })
 
@@ -322,7 +328,10 @@ describe("split line, assign rest, reclassify, force total", () => {
   })
 
   it("copies the previous item’s people onto the next line", () => {
-    const copied = copyItemSplit(pizzaA, item({ id: "next", name: "Coke", amountCents: 200 }))
+    const copied = copyItemSplit(
+      pizzaA,
+      item({ id: "next", name: "Coke", amountCents: 200 })
+    )
     expect(copied.split).toEqual({
       mode: "EQUAL",
       memberIds: ["ana", "ben", "cara", "dan"],
@@ -355,9 +364,9 @@ describe("split line, assign rest, reclassify, force total", () => {
     })
     expect(result.totalCents).toBe(5000)
     expect(result.ocrDeltaCents).toBe(0)
-    expect(result.shares.reduce((sum, share) => sum + share.totalCents, 0)).toBe(
-      5000
-    )
+    expect(
+      result.shares.reduce((sum, share) => sum + share.totalCents, 0)
+    ).toBe(5000)
   })
 
   it("uses largest-remainder so a 1¢ tip still sums", () => {
@@ -395,5 +404,43 @@ describe("split line, assign rest, reclassify, force total", () => {
   it("computes a manual 10% from the item subtotal only when asked", () => {
     expect(tipCentsFromPercent(4800, 10)).toBe(480)
     expect(tipCentsFromPercent(8475, 10)).toBe(848)
+  })
+})
+
+describe("resolveManualFee", () => {
+  it("keeps an entered amount and does not invent a percent", () => {
+    expect(
+      resolveManualFee({
+        unit: "amount",
+        amountDigits: "250",
+        percentText: "10",
+        fractionDigits: 2,
+        itemSubtotalCents: 2000,
+      })
+    ).toEqual({ amountCents: 250, percent: null })
+  })
+
+  it("turns a percent into cents from the item subtotal", () => {
+    expect(
+      resolveManualFee({
+        unit: "percent",
+        amountDigits: "999",
+        percentText: "10",
+        fractionDigits: 2,
+        itemSubtotalCents: 18710,
+      })
+    ).toEqual({ amountCents: 1871, percent: 10 })
+  })
+
+  it("rejects percent when there are no items to take a cut of", () => {
+    expect(
+      resolveManualFee({
+        unit: "percent",
+        amountDigits: "",
+        percentText: "10",
+        fractionDigits: 2,
+        itemSubtotalCents: 0,
+      })
+    ).toBeNull()
   })
 })

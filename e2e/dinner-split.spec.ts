@@ -159,6 +159,25 @@ test.describe("dinner split", () => {
   })
 })
 
+test("manual service fee can be a percent of items", async ({ page }) => {
+  await createDinner(page, `Service fee ${Date.now()}`, "Ana")
+  await startManualCheck(page)
+  await addCheckItem(page, "Taco", "20.00")
+  await page
+    .getByRole("button", { name: "Add a fee or service charge" })
+    .click()
+  await page.getByLabel("Add fee").fill("Service")
+  await page.getByRole("button", { name: "Fee as percent" }).click()
+  await expect(
+    page.getByRole("button", { name: "Fee as percent" })
+  ).toHaveAttribute("aria-pressed", "true")
+  await page.getByLabel("Fee percent").fill("10")
+  await expect(page.getByText("Adds $2.00")).toBeVisible()
+  await page.getByRole("button", { name: "Add fee" }).click()
+  await expect(page.getByText("Service · 10%")).toBeVisible()
+  await expect(page.locator("main")).toContainText("$22.00")
+})
+
 test("new check offers camera and gallery", async ({ page }) => {
   await createDinner(page, `Gallery pick ${Date.now()}`, "Ana")
   await page.getByRole("link", { name: "Scan ticket" }).click()
