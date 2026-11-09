@@ -9,12 +9,12 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowLeft01Icon,
-  Camera01Icon,
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
 import { CategoryChips } from "@/components/category-chips"
 import { MemberPicker } from "@/components/member-picker"
+import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -637,20 +637,13 @@ function AddExpenseForm({
           />
 
           {isOnline ? (
-            <div className="flex flex-col gap-2">
-              <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
-              <label className="split-cta-tinted cursor-pointer">
-                <HugeiconsIcon icon={Camera01Icon} size={16} strokeWidth={2} />
-                {ocrPending ? "Reading receipt…" : "Scan receipt"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  disabled={ocrPending}
-                  onChange={(e) => void onScan(e.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
+            <TicketPhotoPicker
+              pending={ocrPending}
+              pendingLabel="Reading receipt…"
+              title="Scan ticket (optional)"
+              hint="Take a photo or pick one from your gallery."
+              onFile={(file) => void onScan(file)}
+            />
           ) : null}
 
           <label className="surface flex min-h-12 cursor-pointer items-center gap-3 px-4 py-2.5">
