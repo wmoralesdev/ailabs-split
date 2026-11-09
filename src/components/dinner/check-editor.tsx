@@ -509,7 +509,7 @@ export function CheckEditor({
             <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
               <div className="grid gap-1.5">
                 <Label htmlFor="new-item-qty">Qty</Label>
-                <div className="flex h-(--control-height) items-center rounded-xl bg-muted">
+                <div className="flex h-(--control-height) items-center rounded-xl border border-border bg-card">
                   <button
                     type="button"
                     className="inline-flex h-full w-10 items-center justify-center rounded-l-xl text-muted-foreground disabled:opacity-40"
@@ -567,7 +567,7 @@ export function CheckEditor({
             <Button
               type="submit"
               variant="secondary"
-              className="w-full bg-muted font-semibold text-primary"
+              className="w-full bg-primary/8 font-semibold text-primary"
               disabled={!newName.trim() || atmDigitsToCents(newAmount, fd) <= 0}
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
@@ -641,37 +641,37 @@ export function CheckEditor({
                   prints it.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[10, 15].map((percent) => (
                   <Button
                     key={percent}
                     type="button"
-                    variant="outline"
-                    className="rounded-xl"
+                    variant="secondary"
+                    className="rounded-xl bg-primary/8 text-primary"
                     onClick={() => applyTipPercent(percent)}
                   >
                     {percent}%
                   </Button>
                 ))}
-              </div>
-              <Input
-                id="custom-tip"
-                inputMode="numeric"
-                value={formatAtmAmountInput(customTip, fd)}
-                onChange={(event) =>
-                  setCustomTip(atmDigitsFromInput(event.target.value))
-                }
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault()
-                    applyCustomTip()
+                <Input
+                  id="custom-tip"
+                  inputMode="numeric"
+                  value={formatAtmAmountInput(customTip, fd)}
+                  onChange={(event) =>
+                    setCustomTip(atmDigitsFromInput(event.target.value))
                   }
-                }}
-                onBlur={applyCustomTip}
-                placeholder={formatAtmAmount("", fd)}
-                aria-label="Custom tip amount"
-                className="text-right tabular-nums"
-              />
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault()
+                      applyCustomTip()
+                    }
+                  }}
+                  onBlur={applyCustomTip}
+                  placeholder={formatAtmAmount("", fd)}
+                  aria-label="Custom tip amount"
+                  className="text-center tabular-nums"
+                />
+              </div>
             </div>
           ) : payload.tip.amountCents > 0 ? (
             <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
@@ -791,7 +791,7 @@ export function CheckEditor({
               <Button
                 type="submit"
                 variant="secondary"
-                className="w-full bg-muted font-semibold text-primary"
+                className="w-full bg-primary/8 font-semibold text-primary"
                 disabled={!pendingFee}
               >
                 Add fee
