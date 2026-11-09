@@ -47,13 +47,17 @@ export function AppHeader({
       ref={hostRef}
       className={cn(
         "sticky top-0 z-30 shrink-0 border-b border-transparent transition-colors duration-200",
-        scrolled &&
-          "border-foreground/5 bg-background/70 backdrop-blur-xl supports-backdrop-filter:bg-background/40",
+        scrolled && "border-foreground/10 bg-background",
         className
       )}
     >
       <div className="page-gutter mx-auto flex h-14 max-w-content items-center justify-between gap-3">
-        <Link to="/" search={{ stay: true }} className="rounded-md" aria-label="Split home">
+        <Link
+          to="/"
+          search={{ stay: true }}
+          className="rounded-full"
+          aria-label="Split home"
+        >
           <SiteLogo showWordmark={showWordmark} />
         </Link>
         <div className="flex items-center gap-1">

@@ -71,7 +71,9 @@ export function ItemSplitSheet({
         setTab(item.quantity > 1 ? "QUANTITY" : "EQUAL")
         setEqualIds(new Set())
         setWeights(Object.fromEntries(members.map((member) => [member.id, 0])))
-        setQtyShares(Object.fromEntries(members.map((member) => [member.id, 0])))
+        setQtyShares(
+          Object.fromEntries(members.map((member) => [member.id, 0]))
+        )
         setAmountShares({})
         break
       case "EQUAL":
@@ -127,7 +129,10 @@ export function ItemSplitSheet({
   }, [item, fractionDigits, members])
 
   const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
-  const qtyAssigned = Object.values(qtyShares).reduce((sum, qty) => sum + qty, 0)
+  const qtyAssigned = Object.values(qtyShares).reduce(
+    (sum, qty) => sum + qty,
+    0
+  )
   const qtyLeft = quantity - qtyAssigned
 
   const tabs = useMemo(() => {
@@ -282,7 +287,7 @@ export function ItemSplitSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[90dvh] overflow-y-auto rounded-t-2xl"
+        className="max-h-[90dvh] overflow-y-auto rounded-t-3xl"
       >
         <div className="mx-auto flex w-full max-w-content flex-col">
           <SheetHeader>
@@ -313,10 +318,16 @@ export function ItemSplitSheet({
                     variant="outline"
                     size="icon"
                     className="size-8 rounded-full"
-                    onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+                    onClick={() =>
+                      setQuantity((value) => Math.max(1, value - 1))
+                    }
                     aria-label="Fewer"
                   >
-                    <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
+                    <HugeiconsIcon
+                      icon={MinusSignIcon}
+                      size={14}
+                      strokeWidth={2}
+                    />
                   </Button>
                   <span className="w-8 text-center text-sm font-semibold tabular-nums">
                     {quantity}

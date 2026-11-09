@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
 import { CreateDinnerForm } from "@/components/dinner/create-dinner-form"
+import { HalftoneMark } from "@/components/halftone-mark"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { RecentTripsList } from "@/components/recent-trips-list"
 import { PageShell } from "@/components/page-shell"
@@ -31,7 +32,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
 import { rememberMember } from "@/lib/member-storage"
 import { isStandaloneDisplay, markInstallEligible } from "@/lib/pwa-install"
-import { resolveMostRecentTripCode, getMostRecentTripCode } from "@/lib/resume-trip"
+import {
+  resolveMostRecentTripCode,
+  getMostRecentTripCode,
+} from "@/lib/resume-trip"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
 import { fetchFxRates } from "@/server/fx"
@@ -51,15 +55,19 @@ type LandingSearch = {
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): LandingSearch => {
-    const tabRaw = typeof search.tab === "string" ? search.tab.toLowerCase() : ""
+    const tabRaw =
+      typeof search.tab === "string" ? search.tab.toLowerCase() : ""
     const codeRaw =
       typeof search.code === "string" ? search.code.trim().toUpperCase() : ""
     return {
       stay:
-        search.stay === "1" ||
-        search.stay === true ||
-        search.stay === "true",
-      tab: tabRaw === "join" || codeRaw ? "join" : tabRaw === "create" ? "create" : undefined,
+        search.stay === "1" || search.stay === true || search.stay === "true",
+      tab:
+        tabRaw === "join" || codeRaw
+          ? "join"
+          : tabRaw === "create"
+            ? "create"
+            : undefined,
       code: codeRaw || undefined,
     }
   },
@@ -126,7 +134,7 @@ function LandingPage() {
         innerClassName="flex min-h-dvh flex-col items-center justify-center pb-12 pt-5"
       >
         <SiteLogo showWordmark={false} markClassName="size-8" />
-        <p className="text-muted-foreground mt-6 text-sm">Opening your trip…</p>
+        <p className="mt-6 text-sm text-muted-foreground">Opening your trip…</p>
       </PageShell>
     )
   }
@@ -136,23 +144,27 @@ function LandingPage() {
       className="overflow-hidden"
       innerClassName="flex min-h-dvh flex-col pt-5 pb-12"
     >
-      <header className="animate-rise flex items-center justify-between">
+      <header className="animate-rise relative z-10 flex items-center justify-between">
         <SiteLogo showWordmark={false} markClassName="size-8" />
         <ThemeToggle />
       </header>
 
-      <div className="animate-rise-delay mt-14 sm:mt-16">
-        <h1 className="font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl">
+      <div className="animate-rise-delay relative mt-14 pr-28 sm:mt-16 sm:pr-40">
+        <HalftoneMark className="absolute -top-12 -right-16 z-0 size-[14.5rem] sm:-right-4 sm:size-[20rem]" />
+        <h1
+          data-enter
+          className="relative z-10 font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl"
+        >
           Split
         </h1>
-        <p className="mt-4 max-w-[32ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
+        <p className="relative z-10 mt-4 max-w-[20ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
           {kind === "DINNER"
             ? "Split the bill. Scan the ticket. No accounts."
             : "Share a trip code. Split costs. No accounts."}
         </p>
       </div>
 
-      <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
+      <div className="animate-rise-delay-2 pb-safe relative z-10 mt-10 flex-1">
         <div className="mb-4 flex gap-1.5" role="group" aria-label="Mode">
           <button
             type="button"
@@ -712,7 +724,9 @@ function JoinForm({
                     maxLength={8}
                     className="text-center font-display text-2xl tracking-[0.2em] uppercase"
                     {...field}
-                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    onChange={(e) =>
+                      field.onChange(e.target.value.toUpperCase())
+                    }
                   />
                 </FormControl>
                 <Button

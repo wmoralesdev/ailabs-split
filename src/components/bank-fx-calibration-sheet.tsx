@@ -124,8 +124,7 @@ export function BankFxCalibrationSheet({
   const [rows, setRows] = useState<DraftRow[]>([])
 
   const foreignExpenses = useMemo(
-    () =>
-      room.expenses.filter((expense) => expense.currency !== room.currency),
+    () => room.expenses.filter((expense) => expense.currency !== room.currency),
     [room.expenses, room.currency]
   )
 
@@ -203,7 +202,9 @@ export function BankFxCalibrationSheet({
     mutationFn: (input: CalibrateRoomFxInput) =>
       calibrateRoomFx({ data: input }),
     onSuccess: async (updated) => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.room(room.code) })
+      await queryClient.invalidateQueries({
+        queryKey: roomKeys.room(room.code),
+      })
       toast.success(
         `Using ${formatAdjustmentPercent(updated.fxAdjustmentBps)} bank match`
       )
@@ -301,12 +302,12 @@ export function BankFxCalibrationSheet({
               >
                 <div className="grid gap-1.5">
                   {row.appCents > 0 ? (
-                    <p className="flex h-(--control-height) items-center rounded-md border border-border bg-muted/40 px-3 text-sm font-medium tabular-nums">
+                    <p className="flex h-(--control-height) items-center rounded-full border border-border bg-muted/40 px-3 text-sm font-medium tabular-nums">
                       {formatMoney(row.appCents, room.currency)}
                     </p>
                   ) : (
                     <select
-                      className="border-input bg-background h-(--control-height) w-full rounded-md border px-2 text-sm"
+                      className="h-(--control-height) w-full rounded-full border border-input bg-background px-2 text-sm"
                       value=""
                       onChange={(event) =>
                         setExpenseForRow(row.key, event.target.value)

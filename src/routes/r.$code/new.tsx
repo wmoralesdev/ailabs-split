@@ -556,7 +556,7 @@ function AddExpenseForm({
                       inputMode="numeric"
                       autoComplete="off"
                       placeholder={formatAtmAmount("", fractionDigits)}
-                      className="font-display text-right text-xl tabular-nums tracking-tight"
+                      className="text-right font-display text-xl tracking-tight tabular-nums"
                       name={field.name}
                       ref={field.ref}
                       onBlur={field.onBlur}
@@ -624,7 +624,10 @@ function AddExpenseForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category (optional)</FormLabel>
-                <CategoryChips value={field.value ?? ""} onChange={field.onChange} />
+                <CategoryChips
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                />
                 <FormControl>
                   <Input placeholder="Custom category…" {...field} />
                 </FormControl>
@@ -636,7 +639,7 @@ function AddExpenseForm({
           {isOnline ? (
             <div className="flex flex-col gap-2">
               <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
-              <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
+              <label className="flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-full border border-dashed border-border text-sm hover:bg-muted/40">
                 <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
                 {ocrPending ? "Reading receipt…" : "Scan receipt"}
                 <input

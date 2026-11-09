@@ -435,7 +435,7 @@ function RoomHomePage() {
             <button
               type="button"
               onClick={() => void copyMyLink()}
-              className="text-muted-foreground hover:text-foreground inline-flex size-9 shrink-0 items-center justify-center rounded-md"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
               aria-label={
                 copied === "link"
                   ? "Personal link copied"
@@ -575,7 +575,7 @@ function RoomHomePage() {
               <Link
                 to="/r/$code/new"
                 params={{ code: room.code }}
-                className="inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md bg-primary px-5 text-base font-medium text-primary-foreground hover:bg-primary/80"
+                className="split-cta"
               >
                 <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
                 Add expense
@@ -846,9 +846,7 @@ function ExpenseDetailSheet({
     !expense.isPersonal &&
     normalizedSplitMode(expense.splitMode) === "AMOUNT"
 
-  const fractionDigits = expense
-    ? currencyFractionDigits(expense.currency)
-    : 0
+  const fractionDigits = expense ? currencyFractionDigits(expense.currency) : 0
   const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
 
   useEffect(() => {
@@ -1047,7 +1045,10 @@ function ExpenseDetailSheet({
         memberId,
         amountCents: atmDigitsToCents(amounts[memberId] ?? "", fractionDigits),
       }))
-      const sum = splits.reduce((total, split) => total + (split.amountCents ?? 0), 0)
+      const sum = splits.reduce(
+        (total, split) => total + (split.amountCents ?? 0),
+        0
+      )
       if (sum !== nextAmountCents) {
         setSplitError(
           `Amounts add up to ${formatMoney(sum, expense.currency)}, need ${formatMoney(nextAmountCents, expense.currency)}`
@@ -1116,7 +1117,7 @@ function ExpenseDetailSheet({
                   </div>
                   <div className="grid gap-2">
                     <Label>Currency</Label>
-                    <div className="flex h-(--control-height) min-w-16 items-center justify-center rounded-md border-border bg-muted/40 px-3 text-base font-medium">
+                    <div className="flex h-(--control-height) min-w-16 items-center justify-center rounded-full border-border bg-muted/40 px-3 text-base font-medium">
                       {expense.currency}
                     </div>
                   </div>

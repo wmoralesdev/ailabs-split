@@ -62,7 +62,10 @@ export function CreateTripSuccessSheet({
         if (!next) onContinue()
       }}
     >
-      <SheetContent side="bottom" className="gap-0 rounded-t-2xl px-5 pt-5 pb-safe">
+      <SheetContent
+        side="bottom"
+        className="pb-safe gap-0 rounded-t-3xl px-5 pt-5"
+      >
         <SheetHeader className="gap-2 p-0 text-left">
           <SheetTitle className="font-display text-2xl font-semibold tracking-tight">
             {isDinner ? "Dinner ready" : "Trip ready"}
@@ -72,7 +75,7 @@ export function CreateTripSuccessSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 flex flex-col items-center rounded-xl border border-border bg-muted/40 px-4 py-6">
+        <div className="mt-6 flex flex-col items-center rounded-3xl border border-border bg-muted/50 px-4 py-6">
           <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
             {isDinner ? "Dinner code" : "Trip code"}
           </p>

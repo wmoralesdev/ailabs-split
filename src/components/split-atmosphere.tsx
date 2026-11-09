@@ -10,7 +10,7 @@ type SplitAtmosphereProps = {
 }
 
 /**
- * Soft gradient background shell (top-down brand wash).
+ * Dotted paper shell (halftone screen on the brand ground).
  * Put interactive content in a `relative` child when stacking layers.
  */
 export function SplitAtmosphere({

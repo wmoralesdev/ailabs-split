@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { onlineManager, useMutation, useQueryClient } from "@tanstack/react-query"
+import {
+  onlineManager,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { toast } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -221,7 +225,9 @@ export function CheckEditor({
       setPhase(next.items.length > 0 ? "review" : "assign")
       toast.success("Ticket scanned")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read ticket")
+      toast.error(
+        error instanceof Error ? error.message : "Could not read ticket"
+      )
     } finally {
       setOcrPending(false)
     }
@@ -314,7 +320,7 @@ export function CheckEditor({
         />
         <div className="mt-8 flex flex-col gap-3">
           {isOnline ? (
-            <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
+            <label className="flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-full border border-dashed border-border text-sm hover:bg-muted/40">
               <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
               {ocrPending ? "Reading ticket…" : "Scan ticket"}
               <input
@@ -333,7 +339,11 @@ export function CheckEditor({
               Scanning needs a connection. Enter the bill by hand.
             </p>
           )}
-          <Button type="button" variant="outline" onClick={() => setPhase("assign")}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPhase("assign")}
+          >
             Enter bill manually
           </Button>
         </div>
@@ -363,7 +373,11 @@ export function CheckEditor({
           {isPrecuenta ? (
             <p className="text-xs text-muted-foreground">Marked as precuenta</p>
           ) : null}
-          <OcrReview payload={payload} currency={room.currency} onChange={setPayload} />
+          <OcrReview
+            payload={payload}
+            currency={room.currency}
+            onChange={setPayload}
+          />
           <Button type="button" onClick={() => setPhase("assign")}>
             Continue to assign
           </Button>
@@ -457,7 +471,9 @@ export function CheckEditor({
                 inputMode="numeric"
                 value={String(newQty)}
                 onChange={(event) =>
-                  setNewQty(Math.max(1, Number.parseInt(event.target.value, 10) || 1))
+                  setNewQty(
+                    Math.max(1, Number.parseInt(event.target.value, 10) || 1)
+                  )
                 }
                 aria-label="Quantity"
               />
@@ -551,7 +567,11 @@ export function CheckEditor({
                   placeholder="Custom amount"
                   className="text-right tabular-nums"
                 />
-                <Button type="button" variant="outline" onClick={applyCustomTip}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applyCustomTip}
+                >
                   Add
                 </Button>
               </div>
@@ -601,7 +621,7 @@ export function CheckEditor({
           )}
 
           {isOnline && payload.items.length === 0 ? (
-            <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
+            <label className="flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-full border border-dashed border-border text-sm hover:bg-muted/40">
               <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
               {ocrPending ? "Reading ticket…" : "Scan ticket instead"}
               <input
@@ -609,7 +629,9 @@ export function CheckEditor({
                 accept="image/*"
                 className="sr-only"
                 disabled={ocrPending}
-                onChange={(event) => void onScan(event.target.files?.[0] ?? null)}
+                onChange={(event) =>
+                  void onScan(event.target.files?.[0] ?? null)
+                }
               />
             </label>
           ) : null}
@@ -633,7 +655,9 @@ export function CheckEditor({
                     key={share.memberId}
                     className="flex items-center justify-between py-2 text-sm"
                   >
-                    <span>{nameById.get(share.memberId) ?? share.memberId}</span>
+                    <span>
+                      {nameById.get(share.memberId) ?? share.memberId}
+                    </span>
                     <span className="tabular-nums">
                       {formatMoney(share.totalCents, room.currency)}
                     </span>

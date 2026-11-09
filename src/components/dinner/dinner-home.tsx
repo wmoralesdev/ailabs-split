@@ -114,7 +114,7 @@ export function DinnerHome({
             <button
               type="button"
               onClick={() => void copyMyLink()}
-              className="text-muted-foreground hover:text-foreground inline-flex size-9 shrink-0 items-center justify-center rounded-md"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
               aria-label={
                 copied === "link"
                   ? "Personal link copied"
@@ -256,15 +256,19 @@ export function DinnerHome({
                   to="/r/$code/check"
                   params={{ code: room.code }}
                   search={{ scan: true }}
-                  className="inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md bg-primary px-5 text-base font-medium text-primary-foreground hover:bg-primary/80"
+                  className="split-cta"
                 >
-                  <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
+                  <HugeiconsIcon
+                    icon={Camera01Icon}
+                    size={18}
+                    strokeWidth={2}
+                  />
                   Scan ticket
                 </Link>
                 <Link
                   to="/r/$code/check"
                   params={{ code: room.code }}
-                  className="inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md border border-border px-5 text-base font-medium hover:bg-muted/40"
+                  className="split-cta-outline"
                 >
                   <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
                   Enter bill manually
@@ -283,7 +287,7 @@ export function DinnerHome({
               <Link
                 to="/r/$code/check"
                 params={{ code: room.code }}
-                className="border-border hover:bg-muted/40 inline-flex h-(--control-height) w-full items-center justify-center gap-2 rounded-md border px-5 text-base font-medium"
+                className="split-cta-outline w-full"
               >
                 <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
                 New check
@@ -341,7 +345,8 @@ function CheckRow({ check, room }: { check: CheckDto; room: RoomDto }) {
             ) : null}
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground">
-            {check.paidByName} paid{tipLabel} · {formatRelativeTime(check.createdAt)}
+            {check.paidByName} paid{tipLabel} ·{" "}
+            {formatRelativeTime(check.createdAt)}
           </p>
         </div>
         <p className="shrink-0 text-sm font-semibold tabular-nums">

@@ -25,7 +25,7 @@ export function RoomTabBar({
   return (
     <nav
       aria-label={isDinner ? "Dinner navigation" : "Trip navigation"}
-      className="border-border/60 bg-background pb-safe relative z-30 shrink-0 border-t"
+      className="pb-safe relative z-30 shrink-0 border-t border-border bg-background"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-2">
         <TabLink
@@ -41,7 +41,7 @@ export function RoomTabBar({
               to="/r/$code/check"
               params={{ code }}
               aria-label="Add check"
-              className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
+              className="-mt-6 inline-flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
             >
               <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
             </Link>
@@ -50,7 +50,7 @@ export function RoomTabBar({
               to="/r/$code/new"
               params={{ code }}
               aria-label="Add expense"
-              className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
+              className="-mt-6 inline-flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
             >
               <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
             </Link>
