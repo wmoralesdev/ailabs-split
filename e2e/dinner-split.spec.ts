@@ -174,10 +174,10 @@ test("new check offers camera and gallery", async ({ page }) => {
   )
 })
 
-test("OCR review when Mistral is configured", async ({ page }) => {
+test("OCR review when OpenAI is configured", async ({ page }) => {
   test.skip(
-    !process.env.MISTRAL_API_KEY || !existsSync(TICKET_PATH),
-    "MISTRAL_API_KEY or ticket fixture is missing"
+    !process.env.OPENAI_API_KEY || !existsSync(TICKET_PATH),
+    "OPENAI_API_KEY or ticket fixture is missing"
   )
 
   const name = `Biblioteca OCR ${Date.now()}`
