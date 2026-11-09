@@ -93,12 +93,12 @@ export function DinnerHome({
     <PullToRefresh disabled={!online} onRefresh={() => refetch()}>
       <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
             <span className="font-medium text-foreground">Dinner</span>
             <span aria-hidden>·</span>
             <span>{room.currency}</span>
           </div>
-          <h1 className="mt-1 font-display text-[2rem] leading-tight font-semibold tracking-tight">
+          <h1 className="mt-0.5 font-display text-[28px] leading-tight font-bold tracking-tight">
             {room.name}
           </h1>
         </header>
@@ -110,30 +110,30 @@ export function DinnerHome({
           confirmedTotalCents={confirmedTotalCents}
         />
 
-        <section className="mt-8" aria-labelledby="people-heading">
+        <section className="mt-6" aria-labelledby="people-heading">
           <div className="flex items-baseline justify-between gap-3">
             <h2
               id="people-heading"
-              className="font-display text-xl font-semibold"
+              className="font-display text-lg font-semibold"
             >
               People
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground">
               {room.members.length}{" "}
               {room.members.length === 1 ? "person" : "people"}
             </p>
           </div>
-          <ul className="mt-3 flex flex-wrap gap-2">
+          <ul className="mt-2 flex flex-wrap gap-1.5">
             {room.members.map((member) => (
               <li
                 key={member.id}
                 className={cn(
-                  "person-chip pl-1.5",
+                  "person-chip pl-1",
                   member.id === memberId && "border-foreground"
                 )}
               >
-                <Avatar className="size-8">
-                  <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
+                <Avatar className="size-6">
+                  <AvatarFallback className="bg-muted text-[10px] font-semibold text-muted-foreground">
                     {initials(member.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -145,14 +145,14 @@ export function DinnerHome({
             code={room.code}
             existing={room.members.map((member) => member.name)}
           />
-          <div className="mt-4 flex items-center gap-1 rounded-full bg-muted py-1 pr-1 pl-4">
-            <p className="min-w-0 flex-1 truncate text-sm font-medium">
+          <div className="mt-3 flex h-11 items-center gap-1 rounded-xl bg-card pr-1.5 pl-3.5">
+            <p className="min-w-0 flex-1 truncate text-[15px]">
               You · {me?.name ?? "Unknown"}
             </p>
             <Button
               type="button"
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               onClick={() => void copyMyLink()}
               aria-label={
                 copied === "link"
@@ -160,12 +160,13 @@ export function DinnerHome({
                   : "Copy my device link"
               }
             >
-              <HugeiconsIcon icon={Link01Icon} size={18} strokeWidth={2} />
+              <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={2} />
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              className="text-primary"
               onClick={switchIdentity}
             >
               Not you?
@@ -173,33 +174,33 @@ export function DinnerHome({
           </div>
         </section>
 
-        <section className="mt-8" aria-labelledby="checks-heading">
+        <section className="mt-6" aria-labelledby="checks-heading">
           <div className="flex items-baseline justify-between gap-3">
             <h2
               id="checks-heading"
-              className="font-display text-xl font-semibold"
+              className="font-display text-lg font-semibold"
             >
               Checks
             </h2>
             <button
               type="button"
               onClick={() => void copyCode()}
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
               aria-label={`Copy dinner code ${room.code}`}
             >
               <span className="font-display tracking-widest text-foreground">
                 {room.code}
               </span>
-              <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+              <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={2} />
               {copied === "code" ? "Copied" : "Copy"}
             </button>
           </div>
           {room.checks.length === 0 ? (
-            <p className="mt-2 text-base text-muted-foreground">
+            <p className="mt-1 text-[15px] text-muted-foreground">
               Nothing yet. Scan the ticket or type the items in.
             </p>
           ) : (
-            <ul className="mt-3 flex flex-col gap-2">
+            <ul className="group-list mt-1">
               {room.checks.map((check) => (
                 <CheckRow key={check.id} check={check} room={room} />
               ))}
@@ -209,9 +210,9 @@ export function DinnerHome({
             <Link
               to="/r/$code/check"
               params={{ code: room.code }}
-              className="split-cta-outline mt-3 w-full"
+              className="split-cta-tinted mt-3 w-full"
             >
-              <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
               New check
             </Link>
           ) : null}
@@ -234,27 +235,27 @@ function PositionCard({
 }) {
   if (room.checks.length === 0) {
     return (
-      <section className="surface mt-5 p-5">
-        <p className="font-display text-xl font-semibold">Add the bill</p>
-        <p className="mt-1 text-base text-muted-foreground">
+      <section className="surface mt-4 p-4">
+        <p className="font-display text-lg font-semibold">Add the bill</p>
+        <p className="mt-0.5 text-[15px] text-muted-foreground">
           A photo of the ticket fills the items for you.
         </p>
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-3.5 flex flex-col gap-2">
           <Link
             to="/r/$code/check"
             params={{ code: room.code }}
             search={{ scan: true }}
-            className="split-cta h-14"
+            className="split-cta"
           >
-            <HugeiconsIcon icon={Camera01Icon} size={20} strokeWidth={2} />
+            <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
             Scan ticket
           </Link>
           <Link
             to="/r/$code/check"
             params={{ code: room.code }}
-            className="split-cta-outline h-14"
+            className="split-cta-tinted"
           >
-            <HugeiconsIcon icon={PencilEdit02Icon} size={20} strokeWidth={2} />
+            <HugeiconsIcon icon={PencilEdit02Icon} size={18} strokeWidth={2} />
             Enter bill manually
           </Link>
         </div>
@@ -296,20 +297,20 @@ function PositionCard({
   }
 
   return (
-    <section className="surface mt-5 p-5" aria-label="Your balance">
+    <section className="surface mt-4 p-4" aria-label="Your balance">
       <p className="eyebrow">
         {formatMoney(confirmedTotalCents, room.currency)} confirmed ·{" "}
         {confirmedCount} {confirmedCount === 1 ? "check" : "checks"}
       </p>
-      <p className="mt-2 font-display text-[1.75rem] leading-tight font-semibold tracking-tight tabular-nums">
+      <p className="mt-1 font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums">
         {headline}
       </p>
-      <p className="mt-1 text-base text-muted-foreground">{detail}</p>
+      <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
       {transfers.length > 0 ? (
         <Link
           to="/r/$code/settle"
           params={{ code: room.code }}
-          className="split-cta mt-4 h-14 w-full"
+          className="split-cta mt-3.5 w-full"
         >
           {oweCents > 0 ? "Pay and mark it done" : "See who owes what"}
           <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
@@ -355,7 +356,7 @@ function InlineAddPeople({
 
   return (
     <form
-      className="mt-3 flex flex-col gap-2"
+      className="mt-2.5 flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault()
         submit()
@@ -378,7 +379,7 @@ function InlineAddPeople({
         <Button
           type="submit"
           variant="outline"
-          className="shrink-0 px-5"
+          className="shrink-0 border-transparent bg-card px-4 text-primary disabled:text-muted-foreground"
           disabled={!draft.trim() || mutation.isPending}
         >
           Add
@@ -402,26 +403,26 @@ function CheckRow({ check, room }: { check: CheckDto; room: RoomDto }) {
       <Link
         to="/r/$code/check/$checkId"
         params={{ code: room.code, checkId: check.id }}
-        className="surface flex min-h-18 w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors active:bg-muted"
+        className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors active:bg-muted"
       >
-        <Avatar className="size-10 shrink-0">
-          <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
+        <Avatar className="size-8 shrink-0">
+          <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
             {initials(check.paidByName)}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold">{check.merchant}</p>
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+          <p className="truncate text-[15px] font-semibold">{check.merchant}</p>
+          <p className="truncate text-[13px] text-muted-foreground">
             {check.paidByName} paid · {formatRelativeTime(check.createdAt)}
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-base font-semibold tabular-nums">
+          <p className="text-[15px] font-semibold tabular-nums">
             {formatMoney(split.totalCents, check.currency)}
           </p>
           <p
             className={cn(
-              "text-sm font-medium",
+              "text-[13px] font-medium",
               confirmed ? "text-muted-foreground" : "text-primary"
             )}
           >

@@ -122,7 +122,7 @@ export function CreateDinnerForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-5"
       >
         <FormField
           control={form.control}
@@ -196,7 +196,7 @@ export function CreateDinnerForm({
                 </>
               ) : (
                 <div className="flex min-h-11 items-center justify-between gap-3">
-                  <p className="text-base text-muted-foreground">
+                  <p className="text-[15px] text-muted-foreground">
                     Paying in{" "}
                     <span className="font-semibold text-foreground">
                       {currency}
@@ -206,6 +206,7 @@ export function CreateDinnerForm({
                     type="button"
                     variant="ghost"
                     size="sm"
+                    className="text-primary"
                     onClick={() => setEditCurrency(true)}
                   >
                     Change currency

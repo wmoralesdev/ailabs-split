@@ -66,7 +66,7 @@ export function BaseCurrencyPicker({
           <SelectTrigger
             size="sm"
             className={cn(
-              "landing-chip min-w-14 px-3 text-sm shadow-none",
+              "landing-chip min-w-14 rounded-full px-3 text-sm shadow-none",
               moreSelected ? "landing-chip-on" : "landing-chip-idle"
             )}
             aria-label="Other currencies"

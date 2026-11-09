@@ -50,10 +50,10 @@ export function NameListInput({
     .join(" ")
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
       {fixed.length + names.length > 0 ? (
-        <ul className="flex flex-wrap gap-2" aria-label="Added so far">
+        <ul className="flex flex-wrap gap-1.5" aria-label="Added so far">
           {fixed.map((name) => (
             <li key={name} className="person-chip bg-muted">
               {name}
@@ -67,10 +67,10 @@ export function NameListInput({
                 onClick={() =>
                   onNamesChange(names.filter((entry) => entry !== name))
                 }
-                className="inline-flex h-12 w-10 items-center justify-center rounded-r-full text-muted-foreground hover:text-foreground"
+                className="relative inline-flex h-8 w-7 items-center justify-center rounded-r-full text-muted-foreground after:absolute after:-inset-y-1.5 after:inset-x-0 hover:text-foreground"
                 aria-label={`Remove ${name}`}
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
+                <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2.2} />
               </button>
             </li>
           ))}
@@ -98,7 +98,7 @@ export function NameListInput({
         <Button
           type="button"
           variant="outline"
-          className="shrink-0 px-5"
+          className="shrink-0 border-transparent bg-card px-4 text-primary disabled:text-muted-foreground"
           onClick={commit}
           disabled={!draft.trim()}
         >
@@ -106,12 +106,12 @@ export function NameListInput({
         </Button>
       </div>
       {hint && !error ? (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
+        <p id={`${id}-hint`} className="text-[13px] leading-snug text-muted-foreground">
           {hint}
         </p>
       ) : null}
       {error ? (
-        <p id={`${id}-error`} className="text-sm text-destructive" role="alert">
+        <p id={`${id}-error`} className="text-[13px] leading-snug text-destructive" role="alert">
           {error}
         </p>
       ) : null}

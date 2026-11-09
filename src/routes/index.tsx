@@ -158,20 +158,20 @@ function LandingPage() {
   }
 
   return (
-    <PageShell innerClassName="flex min-h-dvh flex-col pt-4">
-      <header className="flex h-12 items-center justify-between">
-        <SiteLogo showWordmark={false} markClassName="size-8" />
+    <PageShell innerClassName="flex min-h-dvh flex-col pt-2">
+      <header className="flex h-11 items-center justify-between">
+        <SiteLogo showWordmark={false} markClassName="size-7" />
         <ThemeToggle />
       </header>
 
-      <div className="animate-rise mt-6">
+      <div className="animate-rise mt-3">
         <h1
           data-enter
-          className="font-display text-[2.75rem] leading-none font-semibold tracking-tighter text-foreground"
+          className="font-display text-[34px] leading-tight font-bold tracking-tight text-foreground"
         >
           Split
         </h1>
-        <p className="mt-3 max-w-[26ch] text-base leading-relaxed text-muted-foreground">
+        <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
           {kind === "DINNER"
             ? "Tap who had what. Everyone sees what they owe."
             : "One code for the whole trip. Settle up at the end."}
@@ -180,22 +180,22 @@ function LandingPage() {
 
       <Tabs
         defaultValue={defaultTab}
-        className="animate-rise-delay mt-7 flex-1"
+        className="animate-rise-delay mt-5 flex-1"
       >
-        <TabsList className="segmented h-auto w-full grid-cols-2">
-          <TabsTrigger value="create" className="segmented-item h-12">
+        <TabsList className="segmented w-full grid-cols-2 group-data-horizontal/tabs:h-9">
+          <TabsTrigger value="create" className="segmented-item">
             Create
           </TabsTrigger>
-          <TabsTrigger value="join" className="segmented-item h-12">
+          <TabsTrigger value="join" className="segmented-item">
             Join
           </TabsTrigger>
         </TabsList>
         <TabsContent
           value="create"
-          className="tab-panel mt-6 flex flex-col text-base"
+          className="tab-panel mt-4 flex flex-col text-base"
         >
           <div
-            className="mb-6 grid grid-cols-2 gap-2"
+            className="mb-5 grid grid-cols-2 gap-2.5"
             role="group"
             aria-label="Mode"
           >
@@ -250,20 +250,27 @@ function ModeButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex min-h-20 flex-col items-start justify-between gap-2 rounded-3xl border p-4 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
+        "flex flex-col items-start gap-3 rounded-2xl border px-4 pt-4 pb-3.5 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
         active
           ? "border-foreground bg-foreground text-background"
-          : "border-border bg-card text-foreground"
+          : "border-transparent bg-card text-foreground"
       )}
     >
-      <HugeiconsIcon icon={icon} size={22} strokeWidth={1.8} />
+      <span
+        className={cn(
+          "inline-flex size-8 items-center justify-center rounded-lg",
+          active ? "bg-background/15" : "bg-muted"
+        )}
+      >
+        <HugeiconsIcon icon={icon} size={18} strokeWidth={1.8} />
+      </span>
       <span>
-        <span className="block text-base leading-tight font-semibold">
+        <span className="block text-[15px] leading-tight font-semibold">
           {label}
         </span>
         <span
           className={cn(
-            "block text-sm",
+            "mt-0.5 block text-[13px]",
             active ? "text-background/70" : "text-muted-foreground"
           )}
         >
@@ -421,9 +428,9 @@ function CreateForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-7"
+        className="flex flex-col gap-5"
       >
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           <FormField
             control={form.control}
             name="name"
@@ -473,12 +480,12 @@ function CreateForm({
           error={membersError}
         />
 
-        <div className="flex flex-col gap-3 border-t border-border/60 pt-5">
+        <div className="flex flex-col gap-3">
           {!extrasOpen ? (
             <button
               type="button"
               onClick={() => setShowExtras(true)}
-              className="inline-flex min-h-11 items-center text-left text-base font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex min-h-11 items-center text-left text-[15px] font-medium text-primary transition-colors hover:text-foreground"
             >
               Add other currencies
             </button>
@@ -662,15 +669,15 @@ function JoinForm({
 
   if (room) {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="surface p-5">
+      <div className="flex flex-col gap-5">
+        <div className="surface p-4">
           <p className="eyebrow">
             Joining {room.kind === "DINNER" ? "dinner" : "trip"}
           </p>
-          <p className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground">
+          <p className="mt-0.5 font-display text-xl font-semibold tracking-tight text-foreground">
             {room.name}
           </p>
-          <p className="mt-1 font-display tracking-[0.22em] text-muted-foreground">
+          <p className="mt-0.5 font-display text-sm tracking-[0.22em] text-muted-foreground">
             {room.code}
           </p>
         </div>
@@ -685,7 +692,7 @@ function JoinForm({
 
         <button
           type="button"
-          className="min-h-11 text-left text-base font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="min-h-11 text-left text-[15px] font-medium text-primary transition-colors hover:text-foreground"
           onClick={goBackToCode}
           disabled={pending}
         >
@@ -699,7 +706,7 @@ function JoinForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onCodeSubmit)}
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-5"
       >
         <FormField
           control={form.control}
@@ -716,7 +723,7 @@ function JoinForm({
                   autoCorrect="off"
                   spellCheck={false}
                   enterKeyHint="go"
-                  className="h-16 rounded-3xl text-center font-display text-3xl tracking-[0.24em] uppercase placeholder:text-muted-foreground/40"
+                  className="h-14 rounded-2xl text-center font-display text-2xl tracking-[0.24em] uppercase placeholder:text-muted-foreground/40"
                   {...field}
                   onChange={(e) => {
                     const next = e.target.value.toUpperCase().replace(/\s/g, "")

@@ -3,7 +3,6 @@ import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  ArrowRight02Icon,
   CheckmarkCircle02Icon,
   Share01Icon,
   Tick02Icon,
@@ -235,10 +234,10 @@ function SettlePage() {
     <main className="page-gutter mx-auto max-w-content pt-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-[2rem] leading-tight font-semibold tracking-tight">
+          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
             Settle up
           </h1>
-          <p className="mt-1 text-base text-muted-foreground">
+          <p className="mt-0.5 text-[15px] text-muted-foreground">
             {transfers.length === 0
               ? paidCount > 0
                 ? `All ${paidCount} ${paidCount === 1 ? "payment" : "payments"} done`
@@ -248,19 +247,19 @@ function SettlePage() {
         </div>
         <Button
           type="button"
-          variant="outline"
+          variant="secondary"
           size="sm"
-          className="mt-1"
+          className="mt-1 bg-card font-semibold text-primary"
           onClick={() => void shareSummary()}
         >
-          <HugeiconsIcon icon={Share01Icon} size={16} strokeWidth={2} />
+          <HugeiconsIcon icon={Share01Icon} size={14} strokeWidth={2} />
           Share summary
         </Button>
       </div>
 
       {stepCount > 0 ? (
         <div
-          className="mt-4 flex gap-1"
+          className="mt-3 flex gap-1"
           role="progressbar"
           aria-label="Payments done"
           aria-valuemin={0}
@@ -272,8 +271,8 @@ function SettlePage() {
               key={index}
               className={
                 index < paidCount
-                  ? "h-1.5 flex-1 rounded-full bg-foreground"
-                  : "h-1.5 flex-1 rounded-full bg-border"
+                  ? "h-1 flex-1 rounded-full bg-foreground"
+                  : "h-1 flex-1 rounded-full bg-border"
               }
             />
           ))}
@@ -309,19 +308,19 @@ function SettlePage() {
       ) : null}
 
       {transfers.length === 0 ? (
-        <div className="surface mt-6 flex flex-col items-center gap-3 px-5 py-10 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-foreground text-background">
+        <div className="surface mt-5 flex flex-col items-center gap-3 px-4 py-8 text-center">
+          <span className="flex size-11 items-center justify-center rounded-full bg-foreground text-background">
             <HugeiconsIcon
               icon={CheckmarkCircle02Icon}
-              size={28}
+              size={22}
               strokeWidth={2}
             />
           </span>
           <div>
-            <p className="font-display text-xl font-semibold">
+            <p className="font-display text-lg font-semibold">
               {room.expenses.length === 0 ? "Nothing to settle" : "All settled"}
             </p>
-            <p className="mt-1 text-base text-muted-foreground">
+            <p className="mt-0.5 text-[15px] text-muted-foreground">
               {room.expenses.length === 0
                 ? room.kind === "DINNER"
                   ? "Confirm a check to see who owes what."
@@ -333,11 +332,11 @@ function SettlePage() {
       ) : null}
 
       {mine.length > 0 ? (
-        <section className="mt-6" aria-labelledby="yours-heading">
-          <h2 id="yours-heading" className="eyebrow">
+        <section className="mt-5" aria-labelledby="yours-heading">
+          <h2 id="yours-heading" className="group-label">
             Yours
           </h2>
-          <ul className="mt-2 flex flex-col gap-3">
+          <ul className="flex flex-col gap-2.5">
             {mine.map((transfer) => (
               <TransferCard
                 key={transferKey(transfer)}
@@ -357,10 +356,10 @@ function SettlePage() {
 
       {others.length > 0 ? (
         <section className="mt-6" aria-labelledby="others-heading">
-          <h2 id="others-heading" className="eyebrow">
+          <h2 id="others-heading" className="group-label">
             {mine.length > 0 ? "Between others" : "Who pays whom"}
           </h2>
-          <ul className="mt-2 flex flex-col gap-3">
+          <ul className="group-list">
             {others.map((transfer) => (
               <TransferCard
                 key={transferKey(transfer)}
@@ -386,25 +385,25 @@ function SettlePage() {
       ) : null}
 
       {room.settlements.length > 0 ? (
-        <section className="mt-8" aria-labelledby="paid-heading">
-          <h2 id="paid-heading" className="eyebrow">
+        <section className="mt-6" aria-labelledby="paid-heading">
+          <h2 id="paid-heading" className="group-label">
             Paid
           </h2>
-          <ul className="mt-2 divide-y divide-border">
+          <ul className="group-list">
             {room.settlements.map((settlement) => (
               <li
                 key={settlement.id}
-                className="flex min-h-16 items-center gap-3 py-2"
+                className="flex min-h-13 items-center gap-3 py-2 pr-1.5 pl-4"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
                   <HugeiconsIcon
                     icon={Tick02Icon}
-                    size={18}
+                    size={14}
                     strokeWidth={2.2}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base">
+                  <p className="truncate text-[15px]">
                     <span className="font-medium">
                       {settlement.fromMemberId === memberId
                         ? "You"
@@ -417,7 +416,7 @@ function SettlePage() {
                         : settlement.toMemberName}
                     </span>
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-[13px] text-muted-foreground">
                     {formatMoney(settlement.amountCents, settlement.currency)} ·{" "}
                     {formatRelativeTime(settlement.createdAt)}
                   </p>
@@ -426,7 +425,7 @@ function SettlePage() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="shrink-0"
+                  className="shrink-0 text-primary"
                   onClick={() =>
                     deleteMutation.mutate({
                       code: room.code,
@@ -436,7 +435,7 @@ function SettlePage() {
                   disabled={deleteMutation.isPending}
                   aria-label={`Undo payment from ${settlement.fromMemberName} to ${settlement.toMemberName}`}
                 >
-                  <HugeiconsIcon icon={UndoIcon} size={16} strokeWidth={2} />
+                  <HugeiconsIcon icon={UndoIcon} size={14} strokeWidth={2} />
                   Undo
                 </Button>
               </li>
@@ -484,56 +483,78 @@ function TransferCard({
       ? `${transfer.fromName} paid me`
       : "Mark paid"
 
-  return (
-    <li
-      className={
-        emphasis
-          ? "rounded-3xl border-2 border-foreground bg-card p-5"
-          : "rounded-3xl border border-border bg-card p-5"
-      }
-    >
-      <div className="flex items-center gap-2">
-        <Avatar className="size-10">
-          <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
-            {initials(transfer.fromName)}
-          </AvatarFallback>
-        </Avatar>
-        <HugeiconsIcon
-          icon={ArrowRight02Icon}
-          size={18}
-          strokeWidth={2}
-          className="shrink-0 text-muted-foreground"
-        />
-        <Avatar className="size-10">
-          <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
-            {initials(transfer.toName)}
-          </AvatarFallback>
-        </Avatar>
-      </div>
-      <p className="mt-3 text-lg font-medium">{sentence}</p>
-      <p className="font-display text-[2.5rem] leading-none font-semibold tracking-tight tabular-nums">
-        {formatMoney(transfer.amountCents, currency)}
-      </p>
-      <div className="mt-5 flex gap-2">
+  if (!emphasis) {
+    return (
+      <li className="flex min-h-14 items-center gap-3 py-2 pr-2 pl-4">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px]">{sentence}</p>
+          <p className="text-[15px] font-semibold tabular-nums">
+            {formatMoney(transfer.amountCents, currency)}
+          </p>
+        </div>
         <Button
           type="button"
-          variant={emphasis ? "default" : "outline"}
-          className="h-14 flex-1 text-base font-semibold"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground"
+          onClick={onRemind}
+          aria-label={`Remind ${transfer.fromName}`}
+        >
+          <HugeiconsIcon icon={Share01Icon} size={16} strokeWidth={2} />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="bg-muted font-semibold text-primary"
+          onClick={onMarkPaid}
+          disabled={disabled}
+        >
+          {pending ? "Saving…" : markLabel}
+        </Button>
+      </li>
+    )
+  }
+
+  return (
+    <li className="surface p-4 ring-1 ring-foreground/80">
+      <div className="flex items-center gap-2.5">
+        <div className="flex -space-x-1.5">
+          <Avatar className="size-7 ring-2 ring-card">
+            <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+              {initials(transfer.fromName)}
+            </AvatarFallback>
+          </Avatar>
+          <Avatar className="size-7 ring-2 ring-card">
+            <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
+              {initials(transfer.toName)}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <p className="min-w-0 truncate text-[15px] font-medium">{sentence}</p>
+      </div>
+      <p className="mt-2 font-display text-[34px] leading-none font-bold tracking-tight tabular-nums">
+        {formatMoney(transfer.amountCents, currency)}
+      </p>
+      <div className="mt-4 flex gap-2">
+        <Button
+          type="button"
+          className="flex-1 font-semibold"
           onClick={onMarkPaid}
           disabled={disabled}
         >
           <HugeiconsIcon
             icon={CheckmarkCircle02Icon}
-            size={20}
+            size={18}
             strokeWidth={2}
           />
           {pending ? "Saving…" : markLabel}
         </Button>
         <Button
           type="button"
-          variant="outline"
-          size="icon"
-          className="size-14"
+          variant="secondary"
+          size="icon-lg"
+          className="bg-muted text-primary"
           onClick={onRemind}
           aria-label={
             iPay
@@ -541,7 +562,7 @@ function TransferCard({
               : `Remind ${transfer.fromName}`
           }
         >
-          <HugeiconsIcon icon={Share01Icon} size={20} strokeWidth={2} />
+          <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
         </Button>
       </div>
     </li>

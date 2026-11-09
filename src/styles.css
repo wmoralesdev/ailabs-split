@@ -56,8 +56,8 @@
   --color-on-dark-foreground: var(--on-dark-foreground);
 
   --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1.125rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
@@ -89,10 +89,10 @@
   --brand-graphite: var(--brand-ink);
 
   --base-unit: 8px;
-  --control-height: 3rem;
+  --control-height: 2.75rem;
   --grid-gap: 1rem;
   --space-section-y: 4rem;
-  --space-gutter: 1.5rem;
+  --space-gutter: 1rem;
   --max-width: 40rem;
   --max-width-narrow: 28rem;
   --room-tab-bar-clearance: calc(7rem + env(safe-area-inset-bottom, 0px));
@@ -126,7 +126,7 @@
   --chart-3: var(--brand-muted);
   --chart-4: var(--brand-ink);
   --chart-5: var(--brand-border-dark);
-  --radius: 1.25rem;
+  --radius: 0.75rem;
   --sidebar: var(--brand-white);
   --sidebar-foreground: var(--brand-ink);
   --sidebar-primary: var(--brand-purple);
@@ -148,7 +148,7 @@
 @media (min-width: 768px) {
   :root {
     --space-section-y: 5rem;
-    --space-gutter: 2rem;
+    --space-gutter: 1.5rem;
   }
 }
 
@@ -306,29 +306,63 @@
   }
 
   .surface {
-    @apply rounded-3xl border border-border bg-card;
+    @apply rounded-2xl bg-card;
   }
 
   .eyebrow {
     @apply text-[13px] font-medium text-muted-foreground;
   }
 
+  /* iOS-style segmented control: 36px track, 32px thumbs that always fit inside it. */
   .segmented {
-    @apply grid gap-1 rounded-full bg-muted p-1;
+    @apply grid h-9 gap-0.5 rounded-full bg-muted p-0.5;
   }
 
   .segmented-item {
-    @apply inline-flex h-12 items-center justify-center gap-2 rounded-full text-base font-medium text-muted-foreground transition-[background-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply inline-flex h-full items-center justify-center gap-1.5 rounded-full py-0 text-[15px] font-medium text-muted-foreground transition-[background-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring;
     transition-timing-function: var(--ease-out);
   }
 
   .segmented-item[aria-pressed="true"],
-  .segmented-item[aria-selected="true"] {
+  .segmented-item[aria-selected="true"],
+  .segmented-item[data-active] {
     @apply bg-card text-foreground shadow-[0_1px_2px_var(--shadow-color-strong)];
   }
 
+  /* iOS inset grouped list: one card, hairline-separated 44px rows. */
+  .group-list {
+    @apply overflow-hidden rounded-2xl bg-card;
+  }
+
+  .group-row {
+    @apply flex min-h-11 items-center gap-3 px-4 py-2.5 text-[15px];
+  }
+
+  .group-list > * {
+    position: relative;
+  }
+
+  .group-list > * + *::before {
+    content: "";
+    @apply pointer-events-none absolute top-0 right-0 left-4 h-px bg-border/70;
+  }
+
+  .group-label {
+    @apply px-4 pb-1.5 text-[13px] font-medium text-muted-foreground;
+  }
+
+  .group-footer {
+    @apply px-4 pt-1.5 text-[13px] leading-snug text-muted-foreground;
+  }
+
+  /* 32px visual chip with an invisible 44px hit area. */
   .person-chip {
-    @apply inline-flex h-12 min-w-12 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-4 text-[15px] font-medium text-foreground transition-[transform,background-color,border-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
+    @apply relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground transition-[transform,background-color,border-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
+  }
+
+  button.person-chip::after {
+    content: "";
+    @apply absolute inset-x-0 -inset-y-1.5;
   }
 
   .person-chip[aria-pressed="true"] {
@@ -355,7 +389,7 @@
   }
 
   .cta-lg {
-    @apply h-14 w-full text-[17px] font-semibold;
+    @apply h-12 w-full text-[17px] font-semibold;
   }
 
   /* Sticky inside [data-app-scroll], whose pb-8 would otherwise lift the bar off the screen edge. */
@@ -384,7 +418,7 @@
   }
 
   .landing-chip {
-    @apply inline-flex h-12 min-h-12 items-center justify-center rounded-full border px-4 text-[15px] font-medium transition-[transform,background-color,border-color,color] duration-200;
+    @apply inline-flex h-8 items-center justify-center rounded-full border px-3 text-sm font-medium transition-[transform,background-color,border-color,color] duration-200;
     transition-timing-function: var(--ease-out);
   }
 
@@ -405,11 +439,20 @@
   }
 
   .split-cta {
-    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-primary px-5 text-base font-medium text-primary-foreground transition-[transform,background-color] duration-200 hover:bg-primary/90 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
+    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-primary px-5 text-[15px] font-semibold text-primary-foreground transition-[transform,background-color] duration-200 hover:bg-primary/90 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
   }
 
   .split-cta-outline {
-    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-base font-medium text-foreground transition-[transform,background-color] duration-200 hover:bg-muted/70 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
+    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[15px] font-medium text-foreground transition-[transform,background-color] duration-200 hover:bg-muted/70 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
+  }
+
+  :is(.surface, .group-list, [data-slot="sheet-content"]) .split-cta-tinted,
+  :is(.surface, .group-list, [data-slot="sheet-content"]) [data-slot="input"] {
+    background-color: var(--muted);
+  }
+
+  .split-cta-tinted {
+    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-card px-5 text-[15px] font-semibold text-primary transition-[transform,background-color] duration-200 active:bg-muted;
   }
 }
 

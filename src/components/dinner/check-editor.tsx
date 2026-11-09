@@ -388,17 +388,17 @@ export function CheckEditor({
         onBack={backHome}
       />
 
-      <div className="mt-5 flex flex-col gap-7 pb-6">
+      <div className="mt-3 flex flex-col gap-6 pb-6">
         {payload.items.length === 0 && isOnline ? (
-          <label className="surface flex min-h-24 cursor-pointer items-center gap-4 border-dashed p-5 transition-colors active:bg-muted">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <HugeiconsIcon icon={Camera01Icon} size={22} strokeWidth={2} />
+          <label className="surface flex cursor-pointer items-center gap-3 p-3.5 transition-colors active:bg-muted">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <HugeiconsIcon icon={Camera01Icon} size={20} strokeWidth={2} />
             </span>
             <span className="min-w-0">
-              <span className="block text-base font-semibold">
+              <span className="block text-[15px] font-semibold">
                 {ocrPending ? "Reading ticket…" : "Scan ticket"}
               </span>
-              <span className="block text-sm text-muted-foreground">
+              <span className="block text-[13px] text-muted-foreground">
                 Fills the items. Or type them in below.
               </span>
             </span>
@@ -413,12 +413,12 @@ export function CheckEditor({
           </label>
         ) : null}
         {payload.items.length === 0 && !isOnline ? (
-          <p className="text-base text-muted-foreground">
+          <p className="text-[15px] text-muted-foreground">
             Scanning needs a connection. Type the items in below.
           </p>
         ) : null}
 
-        <div className="grid gap-2">
+        <div className="grid gap-1.5">
           <Label htmlFor="merchant-assign">Place</Label>
           <Input
             id="merchant-assign"
@@ -430,7 +430,7 @@ export function CheckEditor({
         </div>
 
         {room.members.length > 1 ? (
-          <div className="grid gap-2.5">
+          <div className="grid gap-2">
             <Label>Paid by</Label>
             <MemberPicker
               members={room.members}
@@ -444,14 +444,14 @@ export function CheckEditor({
           <div className="flex items-baseline justify-between gap-3">
             <h2
               id="items-heading"
-              className="font-display text-xl font-semibold"
+              className="font-display text-lg font-semibold"
             >
               Items
             </h2>
             {unassignedCount > 0 && room.members.length > 1 ? (
               <button
                 type="button"
-                className="min-h-11 text-sm font-medium text-primary"
+                className="min-h-11 text-[15px] font-medium text-primary"
                 onClick={() =>
                   setPayload((prev) => ({
                     ...prev,
@@ -464,13 +464,13 @@ export function CheckEditor({
             ) : null}
           </div>
           {room.members.length > 1 && payload.items.length > 0 ? (
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-[13px] leading-snug text-muted-foreground">
               Tap who shared each item. Tap the item for parts or amounts.
             </p>
           ) : null}
 
           {payload.items.length > 0 ? (
-            <ul className="mt-3 flex flex-col gap-2">
+            <ul className="group-list mt-2.5">
               {payload.items.map((item) => (
                 <ItemCard
                   key={item.id}
@@ -492,13 +492,13 @@ export function CheckEditor({
           ) : null}
 
           <form
-            className="surface mt-3 flex flex-col gap-3 p-4"
+            className="surface mt-2.5 flex flex-col gap-3 p-3.5"
             onSubmit={(event) => {
               event.preventDefault()
               addManualItem()
             }}
           >
-            <div className="grid gap-2">
+            <div className="grid gap-1.5">
               <Label htmlFor="new-item-name">Item</Label>
               <Input
                 ref={itemNameRef}
@@ -510,13 +510,13 @@ export function CheckEditor({
                 enterKeyHint="next"
               />
             </div>
-            <div className="grid grid-cols-[auto_1fr] items-end gap-3">
-              <div className="grid gap-2">
+            <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
+              <div className="grid gap-1.5">
                 <Label htmlFor="new-item-qty">Qty</Label>
-                <div className="flex h-(--control-height) items-center rounded-full border border-input bg-card">
+                <div className="flex h-(--control-height) items-center rounded-xl bg-muted">
                   <button
                     type="button"
-                    className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground disabled:opacity-40"
+                    className="inline-flex h-full w-10 items-center justify-center rounded-l-xl text-muted-foreground disabled:opacity-40"
                     onClick={() => setNewQty((value) => Math.max(1, value - 1))}
                     disabled={newQty <= 1}
                     aria-label="One fewer"
@@ -540,11 +540,11 @@ export function CheckEditor({
                       )
                     }
                     onFocus={(event) => event.target.select()}
-                    className="w-8 bg-transparent text-center text-base font-semibold tabular-nums outline-none"
+                    className="w-7 bg-transparent text-center text-base font-semibold tabular-nums outline-none"
                   />
                   <button
                     type="button"
-                    className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground"
+                    className="inline-flex h-full w-10 items-center justify-center rounded-r-xl text-muted-foreground"
                     onClick={() => setNewQty((value) => value + 1)}
                     aria-label="One more"
                   >
@@ -552,7 +552,7 @@ export function CheckEditor({
                   </button>
                 </div>
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <Label htmlFor="new-item-amount">Price</Label>
                 <Input
                   id="new-item-amount"
@@ -564,17 +564,17 @@ export function CheckEditor({
                   }
                   onFocus={(event) => event.target.select()}
                   placeholder={formatAtmAmount("", fd)}
-                  className="text-right text-lg tabular-nums"
+                  className="text-right tabular-nums"
                 />
               </div>
             </div>
             <Button
               type="submit"
-              variant="outline"
-              className="w-full"
+              variant="secondary"
+              className="w-full bg-muted font-semibold text-primary"
               disabled={!newName.trim() || atmDigitsToCents(newAmount, fd) <= 0}
             >
-              <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
               Add item
             </Button>
           </form>
@@ -582,24 +582,24 @@ export function CheckEditor({
 
         <section
           aria-labelledby="extras-heading"
-          className="flex flex-col gap-3"
+          className="flex flex-col gap-2.5"
         >
           <h2
             id="extras-heading"
-            className="font-display text-xl font-semibold"
+            className="font-display text-lg font-semibold"
           >
             Tip and fees
           </h2>
           {payload.adjustments.length > 0 ? (
-            <ul className="divide-y divide-border">
+            <ul className="group-list">
               {payload.adjustments.map((adjustment) => (
                 <li
                   key={adjustment.id}
-                  className="flex min-h-12 items-center justify-between gap-3"
+                  className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
                 >
-                  <span className="text-base">{adjustment.name}</span>
+                  <span className="text-[15px]">{adjustment.name}</span>
                   <span className="flex items-center gap-1">
-                    <span className="text-base tabular-nums">
+                    <span className="text-[15px] tabular-nums">
                       {formatMoney(adjustment.amountCents, room.currency)}
                     </span>
                     <Button
@@ -629,10 +629,10 @@ export function CheckEditor({
           ) : null}
 
           {showTipChips ? (
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2">
               <div>
                 <Label htmlFor="custom-tip">Add tip</Label>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
                   Only if you want one. Nothing is added unless the ticket
                   prints it.
                 </p>
@@ -642,7 +642,7 @@ export function CheckEditor({
                   <button
                     key={percent}
                     type="button"
-                    className="person-chip min-w-16"
+                    className="person-chip h-(--control-height) min-w-14 rounded-xl border-transparent"
                     onClick={() => applyTipPercent(percent)}
                   >
                     {percent}%
@@ -669,8 +669,8 @@ export function CheckEditor({
               </div>
             </div>
           ) : payload.tip.amountCents > 0 ? (
-            <div className="flex min-h-12 items-center justify-between gap-3">
-              <p className="text-base">
+            <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
+              <p className="text-[15px]">
                 Tip
                 <span className="text-muted-foreground">
                   {payload.tip.source === "TICKET"
@@ -679,7 +679,7 @@ export function CheckEditor({
                 </span>
               </p>
               <span className="flex items-center gap-1">
-                <span className="text-base font-semibold tabular-nums">
+                <span className="text-[15px] font-semibold tabular-nums">
                   {formatMoney(payload.tip.amountCents, room.currency)}
                 </span>
                 {payload.tip.source === "TICKET" ? null : (
@@ -729,7 +729,7 @@ export function CheckEditor({
                   className="w-28 text-right tabular-nums"
                 />
               </div>
-              <Button type="submit" variant="outline" className="w-full">
+              <Button type="submit" variant="secondary" className="w-full bg-card font-semibold text-primary">
                 Add fee
               </Button>
             </form>
@@ -737,7 +737,7 @@ export function CheckEditor({
             <Button
               type="button"
               variant="ghost"
-              className="self-start px-0 text-muted-foreground hover:bg-transparent"
+              className="self-start px-0 text-primary hover:bg-transparent"
               onClick={() => setShowFee(true)}
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
@@ -760,15 +760,15 @@ export function CheckEditor({
           <section aria-labelledby="by-person-heading">
             <h2
               id="by-person-heading"
-              className="font-display text-xl font-semibold"
+              className="font-display text-lg font-semibold"
             >
               By person
             </h2>
-            <ul className="mt-2 divide-y divide-border">
+            <ul className="group-list mt-2.5">
               {split.shares.map((share) => (
                 <li
                   key={share.memberId}
-                  className="flex min-h-12 items-center justify-between text-base"
+                  className="flex min-h-11 items-center justify-between px-4 text-[15px]"
                 >
                   <span>{nameById.get(share.memberId) ?? share.memberId}</span>
                   <span className="font-semibold tabular-nums">
@@ -820,19 +820,19 @@ export function CheckEditor({
       </div>
 
       <div className="action-bar mt-auto">
-        <div className="mb-2.5 flex items-baseline justify-between gap-3">
-          <p className="font-display text-2xl font-semibold tabular-nums">
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <p className="font-display text-xl font-bold tabular-nums">
             {formatMoney(split.totalCents, room.currency)}
           </p>
           {split.confirmBlockReason ? (
             <p
-              className="text-right text-sm font-medium text-destructive"
+              className="text-right text-[13px] font-medium text-destructive"
               role="alert"
             >
               {split.confirmBlockReason}
             </p>
           ) : payload.items.length > 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground">
               Split between {split.shares.length}{" "}
               {split.shares.length === 1 ? "person" : "people"}
             </p>
@@ -928,28 +928,28 @@ function ItemCard({
   return (
     <li
       className={cn(
-        "surface overflow-hidden",
-        unassigned && members.length > 1 && "border-destructive/40"
+        "overflow-hidden",
+        unassigned && members.length > 1 && "bg-destructive/[0.04]"
       )}
     >
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-start justify-between gap-3 px-4 pt-3.5 pb-2 text-left outline-none focus-visible:bg-muted"
+        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted"
       >
         <span className="min-w-0">
-          <span className="block text-base font-semibold">
+          <span className="block text-[15px] font-semibold">
             {item.quantity > 1 ? `${item.quantity} × ` : ""}
             {item.name}
           </span>
           {item.modifiers.length > 0 ? (
-            <span className="block text-sm text-muted-foreground">
+            <span className="block text-[13px] text-muted-foreground">
               {item.modifiers.join(" · ")}
             </span>
           ) : null}
           <span
             className={cn(
-              "mt-0.5 block text-sm",
+              "block text-[13px]",
               unassigned
                 ? "font-medium text-destructive"
                 : "text-muted-foreground"
@@ -958,12 +958,12 @@ function ItemCard({
             {summary}
           </span>
         </span>
-        <span className="shrink-0 text-base font-semibold tabular-nums">
+        <span className="shrink-0 text-[15px] font-semibold tabular-nums">
           {formatMoney(item.amountCents, currency)}
         </span>
       </button>
       {members.length > 1 ? (
-        <div className="flex flex-wrap gap-2 px-4 pb-3.5">
+        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
           {inlineEditable ? (
             <>
               {members.map((member) => (
@@ -1011,18 +1011,18 @@ function EditorHeader({
   onBack: () => void
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <Button
         type="button"
         variant="ghost"
         size="icon-lg"
-        className="-ml-2"
+        className="-ml-3"
         onClick={onBack}
         aria-label="Back"
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
       </Button>
-      <h1 className="min-w-0 truncate font-display text-2xl font-semibold tracking-tight">
+      <h1 className="min-w-0 truncate font-display text-[22px] font-bold tracking-tight">
         {title}
       </h1>
     </div>
@@ -1039,7 +1039,7 @@ function Totals({
   onForcePrinted?: () => void
 }) {
   return (
-    <div className="flex flex-col gap-1.5 border-y border-border py-4 text-base">
+    <div className="surface flex flex-col gap-1.5 p-4 text-[15px]">
       <div className="flex justify-between">
         <span className="text-muted-foreground">Subtotal</span>
         <span className="tabular-nums">
@@ -1062,7 +1062,7 @@ function Totals({
           </span>
         </div>
       ) : null}
-      <div className="flex justify-between text-lg font-semibold">
+      <div className="mt-1 flex justify-between border-t border-border/70 pt-2.5 text-[17px] font-semibold">
         <span>Total</span>
         <span className="tabular-nums">
           {formatMoney(split.totalCents, currency)}

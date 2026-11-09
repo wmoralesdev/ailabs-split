@@ -27,6 +27,7 @@ import {
 } from "@/lib/atm-amount"
 import { formatMoney } from "@/lib/settle"
 import type { RoomMemberDto } from "@/server/rooms"
+import { cn } from "@/lib/utils"
 
 type SplitTab = "EQUAL" | "PARTS" | "QUANTITY" | "AMOUNT"
 
@@ -291,28 +292,28 @@ export function ItemSplitSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex max-h-[92dvh] flex-col gap-0 rounded-t-3xl p-0"
+        className="flex max-h-[92dvh] flex-col gap-0 rounded-t-3xl bg-background p-0"
       >
         <div className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col">
-          <SheetHeader className="gap-1 px-5 pt-5 pb-3 text-left">
+          <SheetHeader className="gap-0.5 px-4 pt-4 pb-3 text-left">
             <SheetTitle className="eyebrow">Split item</SheetTitle>
             <div className="flex items-baseline justify-between gap-3">
-              <p className="min-w-0 truncate font-display text-2xl font-semibold tracking-tight">
+              <p className="min-w-0 truncate font-display text-xl font-bold tracking-tight">
                 {quantity > 1 ? `${quantity} × ` : ""}
                 {name || item.name}
               </p>
-              <p className="shrink-0 font-display text-2xl font-semibold tabular-nums">
+              <p className="shrink-0 font-display text-xl font-bold tabular-nums">
                 {formatMoney(amountCents, currency)}
               </p>
             </div>
-            <SheetDescription>
+            <SheetDescription className="text-[13px]">
               {item.modifiers.length > 0
                 ? item.modifiers.join(", ")
                 : "Pick who had it and how to split it."}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
             <Tabs
               value={tab}
               onValueChange={(value) => {
@@ -327,7 +328,7 @@ export function ItemSplitSheet({
               }}
             >
               <TabsList
-                className="segmented h-auto w-full"
+                className="segmented w-full group-data-horizontal/tabs:h-9"
                 style={{
                   gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
                 }}
@@ -336,7 +337,7 @@ export function ItemSplitSheet({
                   <TabsTrigger
                     key={entry}
                     value={entry}
-                    className="segmented-item h-12 text-[15px]"
+                    className="segmented-item"
                   >
                     {tabLabel[entry]}
                   </TabsTrigger>
@@ -344,7 +345,7 @@ export function ItemSplitSheet({
               </TabsList>
             </Tabs>
 
-            <ul className="mt-3 flex flex-col gap-2">
+            <ul className="group-list mt-3">
               {members.map((member) => {
                 const active =
                   tab === "EQUAL"
@@ -360,15 +361,11 @@ export function ItemSplitSheet({
                 return (
                   <li
                     key={member.id}
-                    className={
-                      active
-                        ? "flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-foreground bg-card px-2"
-                        : "flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-border bg-card px-2"
-                    }
+                    className="flex min-h-12 items-center justify-between gap-2 pr-2 pl-3"
                   >
                     <button
                       type="button"
-                      className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-pressed={
                         tab === "EQUAL" || tab === "PARTS" ? active : undefined
                       }
@@ -382,7 +379,7 @@ export function ItemSplitSheet({
                         }
                       }}
                     >
-                      <Avatar className="size-9">
+                      <Avatar className="size-8">
                         <AvatarFallback
                           className={
                             active
@@ -396,14 +393,14 @@ export function ItemSplitSheet({
                       <span
                         className={
                           active
-                            ? "truncate text-base font-semibold"
-                            : "truncate text-base text-muted-foreground"
+                            ? "truncate text-[15px] font-semibold"
+                            : "truncate text-[15px] text-muted-foreground"
                         }
                       >
                         {member.name}
                       </span>
                       {tab === "EQUAL" && active ? (
-                        <span className="ml-auto pr-2 text-base font-medium tabular-nums">
+                        <span className="ml-auto pr-2 text-[15px] font-medium tabular-nums">
                           {formatMoney(equalShareCents, currency)}
                         </span>
                       ) : null}
@@ -447,7 +444,7 @@ export function ItemSplitSheet({
                         onFocus={(event) => event.target.select()}
                         placeholder={formatAtmAmount("", fractionDigits)}
                         aria-label={`Amount for ${member.name}`}
-                        className="w-28 text-right tabular-nums"
+                        className="h-9 w-28 rounded-lg text-right tabular-nums"
                       />
                     ) : null}
                   </li>
@@ -458,8 +455,8 @@ export function ItemSplitSheet({
               <p
                 className={
                   qtyLeft === 0
-                    ? "mt-2 text-sm font-medium text-muted-foreground"
-                    : "mt-2 text-sm font-medium text-destructive"
+                    ? "mt-2 px-4 text-[13px] font-medium text-muted-foreground"
+                    : "mt-2 px-4 text-[13px] font-medium text-destructive"
                 }
               >
                 {qtyLeft === 0
@@ -468,7 +465,7 @@ export function ItemSplitSheet({
               </p>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {tab === "EQUAL" && members.length > 1 ? (
                 <button
                   type="button"
@@ -491,15 +488,15 @@ export function ItemSplitSheet({
               ) : null}
             </div>
 
-            <details className="group mt-5 rounded-2xl border border-border bg-card">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-base font-medium">
+            <details className="surface group mt-5">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-[15px] font-medium">
                 Edit item
-                <span className="text-sm text-muted-foreground group-open:hidden">
+                <span className="text-[13px] text-muted-foreground group-open:hidden">
                   Name, quantity, price
                 </span>
               </summary>
-              <div className="flex flex-col gap-4 px-4 pb-4">
-                <div className="grid gap-2">
+              <div className="flex flex-col gap-3.5 px-4 pb-4">
+                <div className="grid gap-1.5">
                   <Label htmlFor="item-name">Name</Label>
                   <Input
                     id="item-name"
@@ -507,12 +504,13 @@ export function ItemSplitSheet({
                     onChange={(event) => setName(event.target.value)}
                   />
                 </div>
-                <div className="grid grid-cols-[auto_1fr] items-end gap-3">
-                  <div className="grid gap-2">
+                <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
+                  <div className="grid gap-1.5">
                     <Label>Quantity</Label>
                     <Stepper
                       value={quantity}
                       min={1}
+                      tall
                       lessLabel="Fewer"
                       moreLabel="More"
                       onChange={setQuantity}
@@ -533,7 +531,7 @@ export function ItemSplitSheet({
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
+                <div className="grid gap-1.5">
                   <Label htmlFor="item-mods">Notes on the ticket</Label>
                   <Input
                     id="item-mods"
@@ -544,8 +542,8 @@ export function ItemSplitSheet({
                 </div>
                 <Button
                   type="button"
-                  variant="outline"
-                  className="w-full"
+                  variant="secondary"
+                  className="w-full bg-muted font-semibold text-primary"
                   onClick={() => {
                     onSplitLine(item)
                     onOpenChange(false)
@@ -557,7 +555,7 @@ export function ItemSplitSheet({
             </details>
           </div>
 
-          <SheetFooter className="pb-safe border-t border-border px-5 pt-3">
+          <SheetFooter className="pb-safe border-t border-border px-4 pt-3">
             <Button type="button" className="cta-lg" onClick={save}>
               Save item
             </Button>
@@ -571,37 +569,44 @@ export function ItemSplitSheet({
 function Stepper({
   value,
   min = 0,
+  tall = false,
   lessLabel,
   moreLabel,
   onChange,
 }: {
   value: number
   min?: number
+  tall?: boolean
   lessLabel: string
   moreLabel: string
   onChange: (next: number) => void
 }) {
   return (
-    <div className="flex shrink-0 items-center rounded-full border border-border bg-card">
+    <div
+      className={cn(
+        "flex shrink-0 items-center bg-muted",
+        tall ? "h-(--control-height) rounded-xl" : "h-8 rounded-lg"
+      )}
+    >
       <button
         type="button"
-        className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground disabled:opacity-40"
+        className="relative inline-flex h-full w-9 items-center justify-center rounded-l-[inherit] text-foreground after:absolute after:-inset-y-1.5 after:inset-x-0 disabled:opacity-30"
         aria-label={lessLabel}
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
       >
-        <HugeiconsIcon icon={MinusSignIcon} size={16} strokeWidth={2} />
+        <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2.2} />
       </button>
-      <span className="w-7 text-center text-base font-semibold tabular-nums">
+      <span className="w-6 text-center text-[15px] font-semibold tabular-nums">
         {value}
       </span>
       <button
         type="button"
-        className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground"
+        className="relative inline-flex h-full w-9 items-center justify-center rounded-r-[inherit] text-foreground after:absolute after:-inset-y-1.5 after:inset-x-0"
         aria-label={moreLabel}
         onClick={() => onChange(value + 1)}
       >
-        <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+        <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2.2} />
       </button>
     </div>
   )

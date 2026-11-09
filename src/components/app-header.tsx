@@ -51,7 +51,7 @@ export function AppHeader({
         className
       )}
     >
-      <div className="page-gutter mx-auto flex h-14 max-w-content items-center justify-between gap-3">
+      <div className="page-gutter mx-auto flex h-12 max-w-content items-center justify-between gap-3">
         <Link
           to="/"
           search={{ stay: true }}
