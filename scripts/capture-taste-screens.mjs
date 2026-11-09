@@ -4,7 +4,7 @@ import path from "node:path"
 
 const OUT =
   process.env.OUT ||
-  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v5"
+  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v6"
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3000"
 
 async function waitForHydration(page) {
@@ -95,6 +95,18 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(200)
 await shot(page, "dinner-check.png")
+await page.evaluate(() => {
+  const scroller = document.querySelector("[data-app-scroll]")
+  if (scroller) scroller.scrollTop = scroller.scrollHeight
+  else window.scrollTo(0, document.documentElement.scrollHeight)
+})
+await page.waitForTimeout(300)
+await shot(page, "dinner-check-scrolled.png")
+await page.evaluate(() => {
+  const scroller = document.querySelector("[data-app-scroll]")
+  if (scroller) scroller.scrollTop = 0
+  else window.scrollTo(0, 0)
+})
 
 await page.getByRole("button", { name: /Pizza Pepperoni/ }).click()
 const split = page.getByRole("dialog")
