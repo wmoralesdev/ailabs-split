@@ -4,7 +4,7 @@ import path from "node:path"
 
 const OUT =
   process.env.OUT ||
-  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v4"
+  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v5"
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3000"
 
 async function waitForHydration(page) {

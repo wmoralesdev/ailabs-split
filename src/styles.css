@@ -301,55 +301,22 @@
     height: env(safe-area-inset-bottom, 0px);
   }
 
-  /*
-    Dot size follows the grey ramp (soft dots + ramp, hardened by contrast()), so
-    the halftone shrinks to nothing by about half the viewport. The ramp must stay
-    light enough at the top that neighbouring dots never merge into a solid band.
-  */
+  /* Canvas ink comes from `color`; see HalftoneWash in split-atmosphere.tsx. */
   .halftone-wash {
     position: fixed;
     inset-inline: 0;
     top: 0;
     z-index: -1;
+    width: 100%;
     height: 52dvh;
-    overflow: hidden;
     pointer-events: none;
-    isolation: isolate;
-    mix-blend-mode: multiply;
-    opacity: 0.15;
-  }
-
-  .halftone-wash::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(closest-side, #777, #fff) 0 0 / 11px 11px,
-      linear-gradient(#8c8c8c, #fff 90%);
-    background-blend-mode: multiply;
-    filter: contrast(18);
-  }
-
-  .halftone-wash::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--brand-purple);
-    mix-blend-mode: screen;
+    color: var(--brand-purple);
+    opacity: 0.2;
   }
 
   .dark .halftone-wash {
-    mix-blend-mode: screen;
-    opacity: 0.28;
-  }
-
-  .dark .halftone-wash::before {
-    filter: contrast(18) invert(1);
-  }
-
-  .dark .halftone-wash::after {
-    background: var(--brand-purple-soft);
-    mix-blend-mode: multiply;
+    color: var(--brand-purple-soft);
+    opacity: 0.3;
   }
 
   .split-toast {
