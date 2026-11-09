@@ -2,7 +2,9 @@ import { chromium } from "@playwright/test"
 import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
 
-const OUT = "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste"
+const OUT =
+  process.env.OUT ||
+  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v2"
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3000"
 
 async function waitForHydration(page) {
@@ -36,57 +38,61 @@ await mkdir(OUT, { recursive: true })
 
 await page.goto(`${BASE}/?stay=true`, { waitUntil: "domcontentloaded" })
 await waitForHydration(page)
-const dinnerChip = page.getByRole("group", { name: "Mode" }).getByRole("button", {
-  name: "Dinner",
-})
+const dinnerChip = page
+  .getByRole("group", { name: "Mode" })
+  .getByRole("button", {
+    name: "Dinner",
+  })
 await dinnerChip.click()
 await page.getByRole("button", { name: "Create dinner" }).waitFor()
-await page.getByLabel("Dinner name").fill("Friday pizzas")
 await page.getByLabel("Your name").fill("Ana")
+const guests = page.getByLabel("Who else is at the table?")
+await guests.fill("Ben, Cam")
+await guests.press("Enter")
+await page.getByLabel("Dinner name").fill("Friday pizzas")
+await page.getByLabel("Dinner name").blur()
+await page.waitForTimeout(200)
 await shot(page, "dinner-landing.png")
 
-const dinnerName = `Friday pizzas ${Date.now()}`
+const dinnerName = `Friday pizzas ${String(Date.now()).slice(-4)}`
 await page.getByLabel("Dinner name").fill(dinnerName)
 await page.getByRole("button", { name: "Create dinner" }).click()
 const ready = page.getByRole("dialog")
 await ready.getByText("Dinner ready").waitFor()
-await page.waitForTimeout(350)
+await page.waitForTimeout(400)
 await shot(page, "dinner-created.png")
 
-await page.getByRole("button", { name: "Continue to dinner" }).click()
-await page.getByRole("heading", { name: dinnerName }).waitFor()
-await page.getByText("Dinner created").waitFor({ state: "hidden", timeout: 8_000 }).catch(() => {})
-
-await page.getByRole("button", { name: "Add people" }).click()
-const people = page.getByRole("dialog")
-await people.getByText("Add people").waitFor()
-for (const name of ["Ben", "Cam"]) {
-  await people.getByPlaceholder("Type a name").fill(name)
-  await people.getByRole("button", { name: "Add", exact: true }).click()
-}
-await people.getByRole("button", { name: "Save names" }).click()
-await people.waitFor({ state: "hidden" })
-
-await page.getByRole("link", { name: "Enter bill manually" }).click()
+await ready.getByRole("button", { name: "Add the bill" }).click()
 await waitForHydration(page)
-await page.getByRole("button", { name: "Enter bill manually" }).click()
 await page.getByLabel("Place").waitFor()
 await page.getByLabel("Place").fill("Pizza night")
-await page.getByPlaceholder("Item").fill("Pizza Margherita")
-await page.getByLabel("Quantity").fill("1")
-await page.getByLabel("Item amount").fill("24.00")
-await page.getByRole("button", { name: "Add item" }).click()
-await page.getByRole("button", { name: /Pizza Margherita/ }).waitFor()
-await page.getByText("Check confirmed").waitFor({ state: "hidden", timeout: 4_000 }).catch(() => {})
+for (const [name, price] of [
+  ["Pizza Margherita", "24.00"],
+  ["Pizza Pepperoni", "26.00"],
+  ["Lemonade", "4.50"],
+]) {
+  await page.getByLabel("Item", { exact: true }).fill(name)
+  await page.getByLabel("Price", { exact: true }).fill(price)
+  await page.getByRole("button", { name: "Add item" }).click()
+  await page.getByRole("button", { name: new RegExp(name) }).waitFor()
+}
+const card = (name) =>
+  page.getByRole("listitem").filter({
+    has: page.getByRole("button", { name: new RegExp(name) }),
+  })
+await card("Pizza Margherita").getByRole("button", { name: "Everyone" }).click()
+await card("Lemonade").getByRole("button", { name: "Cam", exact: true }).click()
+await page.evaluate(() => {
+  const scroller = document.querySelector("[data-app-scroll]")
+  if (scroller) scroller.scrollTop = 0
+})
+await page.waitForTimeout(200)
 await shot(page, "dinner-check.png")
 
-await page.getByRole("button", { name: /Pizza Margherita/ }).click()
+await page.getByRole("button", { name: /Pizza Pepperoni/ }).click()
 const split = page.getByRole("dialog")
 await split.getByText("Split item").waitFor()
-await page.waitForTimeout(400)
-await shot(page, "dinner-item-split.png")
-
-for (const person of ["Ana", "Ben", "Cam"]) {
+for (const person of ["Ana", "Ben"]) {
   await split
     .getByRole("listitem")
     .filter({ hasText: person })
@@ -94,14 +100,19 @@ for (const person of ["Ana", "Ben", "Cam"]) {
     .filter({ hasText: person })
     .click()
 }
+await page.waitForTimeout(400)
+await shot(page, "dinner-item-split.png")
 await split.getByRole("button", { name: "Save item" }).click()
 await split.waitFor({ state: "hidden" })
+
 const confirm = page.getByRole("button", { name: "Confirm check" })
-await confirm.scrollIntoViewIfNeeded()
 await confirm.click()
-await page.getByText("Confirmed").first().waitFor()
 await page.getByRole("heading", { name: dinnerName }).waitFor()
-await page.getByText("Check confirmed").waitFor({ state: "hidden", timeout: 8_000 }).catch(() => {})
+await page.getByText("Confirmed").first().waitFor()
+await page
+  .getByText("Check confirmed")
+  .waitFor({ state: "hidden", timeout: 8_000 })
+  .catch(() => {})
 await page.evaluate(() => {
   const scroller = document.querySelector("[data-app-scroll]")
   if (scroller) scroller.scrollTop = 0
@@ -115,13 +126,14 @@ await page
   .getByRole("link", { name: "Settle" })
   .click()
 await page.getByRole("heading", { name: "Settle up" }).waitFor()
-await page.waitForTimeout(200)
+await page.getByRole("button", { name: "Ben paid me" }).click()
+await page.getByText("Payment recorded").waitFor()
+await page
+  .getByText("Payment recorded")
+  .waitFor({ state: "hidden", timeout: 10_000 })
+  .catch(() => {})
+await page.waitForTimeout(300)
 await shot(page, "dinner-settle.png")
-
-const ref = path.join(OUT, "ailabs-sv-reference.png")
-const refInfo = await stat(ref)
-if (refInfo.size < 8_000) throw new Error("ailabs-sv-reference.png missing or empty")
-console.log("reference", ref, refInfo.size)
 
 await browser.close()
 console.log("taste screens done")

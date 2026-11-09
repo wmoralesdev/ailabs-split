@@ -9,17 +9,14 @@ type SplitAtmosphereProps = {
   className?: string
 }
 
-/**
- * Dotted paper shell (halftone screen on the brand ground).
- * Put interactive content in a `relative` child when stacking layers.
- */
+/** Flat paper ground shared by every screen. */
 export function SplitAtmosphere({
   as: Comp = "div",
   children,
   className,
 }: SplitAtmosphereProps) {
   return (
-    <Comp className={cn("split-hero-wash relative min-h-dvh", className)}>
+    <Comp className={cn("relative min-h-dvh bg-background", className)}>
       {children}
     </Comp>
   )

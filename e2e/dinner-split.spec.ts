@@ -6,6 +6,7 @@ import {
   addCheckItem,
   addPeople,
   assignEqual,
+  assignEqualInSheet,
   assignQuantities,
   confirmCheck,
   createDinner,
@@ -38,12 +39,16 @@ test.describe("dinner split", () => {
 
     await startManualCheck(page)
     await page.getByLabel("Place").fill("Pizza night")
-    await expect(page.getByRole("group", { name: "Paid by" })).toContainText("Ana")
+    await expect(page.getByRole("group", { name: "Paid by" })).toContainText(
+      "Ana"
+    )
 
     await addCheckItem(page, "Pizza Margherita", "24.00")
     await addCheckItem(page, "Pizza Pepperoni", "24.00")
 
-    await expect(page.getByRole("button", { name: "Confirm check" })).toBeDisabled()
+    await expect(
+      page.getByRole("button", { name: "Confirm check" })
+    ).toBeDisabled()
     await expect(page.getByRole("alert")).toContainText(
       "Assign every item before confirming"
     )
@@ -51,7 +56,8 @@ test.describe("dinner split", () => {
     await expect(page.getByRole("button", { name: "10%" })).toBeVisible()
 
     await assignEqual(page, "Pizza Margherita", ["Ana", "Ben", "Cam"])
-    await assignEqual(page, "Pizza Pepperoni", ["Ana", "Ben", "Cam"])
+    await expect(page.getByText("$8.00 each")).toBeVisible()
+    await assignEqualInSheet(page, "Pizza Pepperoni", ["Ana", "Ben", "Cam"])
 
     await expect(page.getByText("Total", { exact: true })).toBeVisible()
     await expect(page.locator("main")).toContainText("$48.00")
@@ -65,11 +71,16 @@ test.describe("dinner split", () => {
     await dinnerNav(page).getByRole("link", { name: "Settle" }).click()
     await expect(page.getByRole("heading", { name: "Settle up" })).toBeVisible()
     await expect(page.getByText("$16.00").first()).toBeVisible()
-    await expect(page.locator("main")).toContainText("Ana")
-    await expect(page.locator("main")).toContainText("Ben")
-    await expect(page.locator("main")).toContainText("Cam")
-    await page.getByRole("button", { name: "Record" }).first().click()
+    await expect(page.getByText("Ben pays you")).toBeVisible()
+    await expect(page.getByText("Cam pays you")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Yours" })).toBeVisible()
+    await page
+      .getByRole("button", { name: /paid me/ })
+      .first()
+      .click()
     await expect(page.getByText("Payment recorded")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Paid" })).toBeVisible()
+    await expect(page.getByRole("button", { name: /paid me/ })).toHaveCount(1)
 
     await dinnerNav(page).getByRole("link", { name: "Home" }).click()
     await startManualCheck(page)
@@ -88,22 +99,58 @@ test.describe("dinner split", () => {
     await guestPage.goto("/?stay=true&tab=join")
     await waitForHydration(guestPage)
     await guestPage.getByRole("tab", { name: "Join" }).click()
-    await guestPage.getByLabel("Trip code").fill(dinnerCode)
-    await guestPage.getByRole("button", { name: "Continue" }).click()
+    await guestPage.getByLabel("Code", { exact: true }).fill(dinnerCode)
     await expect(guestPage.getByText(dinnerName)).toBeVisible()
     await guestPage.getByRole("button", { name: /add my name/i }).click()
     await guestPage.getByLabel("Your name").fill("Dee")
     await guestPage.getByRole("button", { name: "Continue" }).click()
-    await expect(guestPage.getByRole("heading", { name: dinnerName })).toBeVisible()
+    await expect(
+      guestPage.getByRole("heading", { name: dinnerName })
+    ).toBeVisible()
     await expect(guestPage.getByText("You · Dee")).toBeVisible()
     await guest.close()
   })
 
+  test("dinner create seats people inline and remembers defaults", async ({
+    page,
+  }) => {
+    await openLanding(page)
+    const dinnerChip = page
+      .getByRole("group", { name: "Mode" })
+      .getByRole("button", { name: "Dinner" })
+    await dinnerChip.click()
+    await expect(dinnerChip).toHaveAttribute("aria-pressed", "true")
+    await page.getByLabel("Your name").fill("Ana")
+    const guests = page.getByLabel("Who else is at the table?")
+    await guests.fill("Ben, Cam")
+    await guests.press("Enter")
+    await expect(page.getByRole("button", { name: "Remove Cam" })).toBeVisible()
+    await page.getByRole("button", { name: "Create dinner" }).click()
+    await expect(page.getByText("Dinner ready")).toBeVisible()
+    await page.getByRole("button", { name: "Continue to dinner" }).click()
+    await expect(
+      page.getByRole("heading", { name: /(breakfast|lunch|dinner)$/ })
+    ).toBeVisible()
+    await expect(page.getByText("3 people")).toBeVisible()
+    await expect(page.getByText("You · Ana")).toBeVisible()
+
+    await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
+    await waitForHydration(page)
+    await expect(
+      page.getByRole("group", { name: "Mode" }).getByRole("button", {
+        name: "Dinner",
+      })
+    ).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByLabel("Your name")).toHaveValue("Ana")
+  })
+
   test("trip create still requires two members", async ({ page }) => {
     await openLanding(page)
-    const tripChip = page.getByRole("group", { name: "Mode" }).getByRole("button", {
-      name: "Trip",
-    })
+    const tripChip = page
+      .getByRole("group", { name: "Mode" })
+      .getByRole("button", {
+        name: "Trip",
+      })
     await tripChip.click()
     await expect(tripChip).toHaveAttribute("aria-pressed", "true")
     await page.getByLabel("Trip name").fill("Weekend")
@@ -129,5 +176,7 @@ test("OCR review when Mistral is configured", async ({ page }) => {
   await expect(page.getByText(/ONZ/i).first()).toBeVisible()
   await expect(page.getByRole("button", { name: "Tip" }).first()).toBeVisible()
   await page.getByRole("button", { name: "Continue to assign" }).click()
-  await expect(page.getByRole("button", { name: "Confirm check" })).toBeDisabled()
+  await expect(
+    page.getByRole("button", { name: "Confirm check" })
+  ).toBeDisabled()
 })

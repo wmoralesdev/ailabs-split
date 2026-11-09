@@ -56,18 +56,20 @@ export const Route = createFileRoute("/r/$code")({
     const offline =
       typeof navigator !== "undefined" && navigator.onLine === false
     return (
-      <PageShell
-        innerClassName="flex min-h-dvh flex-col justify-center"
-      >
+      <PageShell innerClassName="flex min-h-dvh flex-col justify-center">
         <h1 className="font-display text-3xl font-semibold">
           {offline ? "Unavailable offline" : "Trip not found"}
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="mt-2 text-muted-foreground">
           {offline
             ? "Open this trip once while online so it can be cached on this device."
             : error.message}
         </p>
-        <Link to="/" search={{ stay: true }} className="text-primary mt-6 underline">
+        <Link
+          to="/"
+          search={{ stay: true }}
+          className="mt-6 text-primary underline"
+        >
           Back to Split
         </Link>
       </PageShell>
@@ -110,6 +112,10 @@ function RoomLayout() {
         name={room.name}
         kind={room.kind}
         onContinue={dismissCreatedSheet}
+        onAddBill={() => {
+          setShowCreatedSheet(false)
+          void navigate({ to: "/r/$code/check", params: { code } })
+        }}
       />
     ) : null
 

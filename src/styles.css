@@ -74,10 +74,8 @@
 
 :root {
   /*
-      Print-shop tokens from ailabs.sv (paper #f5f4f8, ink #16131f, stamp #614afc).
-      Taste deal (cool-white-slate / Urbanist) fought the locked halftone language.
-      Taste brand CSS used Onest as the nearest software pairing; display/text are
-      Plus Jakarta Sans + DM Sans to match the client site. Radius: round (pills).
+      ailabs.sv tokens (paper #f5f4f8, ink #16131f, stamp #614afc) on a flat ground.
+      Display/text are Plus Jakarta Sans + DM Sans to match the client site.
     */
   --brand-purple: #614afc;
   --brand-purple-soft: #7a68ff;
@@ -303,46 +301,67 @@
     height: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Dotted paper screen — print-shop halftone, not a lavender wash. */
-  .split-hero-wash {
-    background-color: var(--background);
-    position: relative;
+  .tab-panel {
+    @apply rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background;
   }
 
-  .split-hero-wash::before {
+  .surface {
+    @apply rounded-3xl border border-border bg-card;
+  }
+
+  .eyebrow {
+    @apply text-[13px] font-medium text-muted-foreground;
+  }
+
+  .segmented {
+    @apply grid gap-1 rounded-full bg-muted p-1;
+  }
+
+  .segmented-item {
+    @apply inline-flex h-12 items-center justify-center gap-2 rounded-full text-base font-medium text-muted-foreground transition-[background-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    transition-timing-function: var(--ease-out);
+  }
+
+  .segmented-item[aria-pressed="true"],
+  .segmented-item[aria-selected="true"] {
+    @apply bg-card text-foreground shadow-[0_1px_2px_var(--shadow-color-strong)];
+  }
+
+  .person-chip {
+    @apply inline-flex h-12 min-w-12 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-4 text-[15px] font-medium text-foreground transition-[transform,background-color,border-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
+  }
+
+  .person-chip[aria-pressed="true"] {
+    @apply border-foreground bg-foreground text-background;
+  }
+
+  .person-chip-ghost {
+    @apply border-dashed bg-transparent text-muted-foreground;
+  }
+
+  .form-dock {
+    @apply sticky bottom-0 z-10 -mx-(--space-gutter) mt-2 bg-background px-(--space-gutter) pt-2;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+
+  .form-dock::before {
     content: "";
     position: absolute;
-    inset: 0;
+    inset-inline: 0;
+    bottom: 100%;
+    height: 1.5rem;
     pointer-events: none;
-    background-image: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--foreground) 16%, transparent) 0.6px,
-      transparent 0.75px
-    );
-    background-size: 4.5px 4.5px;
-    opacity: 0.42;
+    background: linear-gradient(to top, var(--background), transparent);
   }
 
-  .halftone-mark {
-    pointer-events: none;
-    user-select: none;
+  .cta-lg {
+    @apply h-14 w-full text-[17px] font-semibold;
   }
 
-  .halftone-layer {
-    position: absolute;
-    inset: 0;
-  }
-
-  .halftone-layer-ink {
-    background-color: var(--foreground);
-    -webkit-mask: url("/brand/halftone-ink.svg") center / contain no-repeat;
-    mask: url("/brand/halftone-ink.svg") center / contain no-repeat;
-  }
-
-  .halftone-layer-stamp {
-    background-color: var(--brand-purple);
-    -webkit-mask: url("/brand/halftone-stamp.svg") center / contain no-repeat;
-    mask: url("/brand/halftone-stamp.svg") center / contain no-repeat;
+  /* Sticky inside [data-app-scroll], whose pb-8 would otherwise lift the bar off the screen edge. */
+  .action-bar {
+    @apply sticky -bottom-8 z-20 -mb-8 border-t border-border bg-background pt-3;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
   }
 
   .animate-rise {
@@ -365,7 +384,7 @@
   }
 
   .landing-chip {
-    @apply inline-flex h-11 min-h-11 items-center justify-center rounded-full border px-3.5 text-sm font-medium transition-[transform,background-color,border-color,color] duration-200;
+    @apply inline-flex h-12 min-h-12 items-center justify-center rounded-full border px-4 text-[15px] font-medium transition-[transform,background-color,border-color,color] duration-200;
     transition-timing-function: var(--ease-out);
   }
 

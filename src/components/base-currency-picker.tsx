@@ -69,10 +69,10 @@ export function BaseCurrencyPicker({
               "landing-chip min-w-14 px-3 text-sm shadow-none",
               moreSelected ? "landing-chip-on" : "landing-chip-idle"
             )}
-            aria-label="More currencies"
+            aria-label="Other currencies"
           >
-            <SelectValue placeholder="More">
-              {moreSelected ? value : "More"}
+            <SelectValue placeholder="Other">
+              {moreSelected ? value : "Other"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent

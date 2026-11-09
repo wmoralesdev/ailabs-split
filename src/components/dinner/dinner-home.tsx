@@ -1,29 +1,37 @@
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Link } from "@tanstack/react-router"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
+  ArrowRight01Icon,
   Camera01Icon,
   Copy01Icon,
   Link01Icon,
-  ReceiptDollarIcon,
+  PencilEdit02Icon,
 } from "@hugeicons/core-free-icons"
+import { toast } from "sonner"
 
-import { AddPeopleSheet } from "@/components/dinner/add-people-sheet"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { copyText } from "@/lib/invite-link"
 import { initials } from "@/lib/dinner-labels"
 import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
+import { mergeNames } from "@/lib/landing-prefs"
 import { memberLink } from "@/lib/member-storage"
 import { useOnlineStatus } from "@/lib/online-status"
+import { roomKeys } from "@/lib/room-query"
 import {
   computeNetsWithSettlements,
   formatMoney,
   simplifyTransfers,
 } from "@/lib/settle"
+import { cn } from "@/lib/utils"
+import { addRoomMembers } from "@/server/rooms"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
 export function DinnerHome({
@@ -40,7 +48,6 @@ export function DinnerHome({
   const online = useOnlineStatus()
   const me = room.members.find((member) => member.id === memberId)
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
-  const [addPeopleOpen, setAddPeopleOpen] = useState(false)
 
   const nets = useMemo(() => {
     return computeNetsWithSettlements(
@@ -63,6 +70,10 @@ export function DinnerHome({
   }, [room])
 
   const transfers = useMemo(() => simplifyTransfers(nets), [nets])
+  const confirmedTotalCents = room.expenses.reduce(
+    (sum, expense) => sum + expense.amountCents,
+    0
+  )
 
   async function copyCode() {
     await copyText(room.code)
@@ -74,234 +85,306 @@ export function DinnerHome({
     if (!me) return
     await copyText(memberLink(room.code, me.name))
     setCopied("link")
+    toast.success("Your personal link is copied")
     window.setTimeout(() => setCopied(null), 1500)
   }
 
   return (
     <PullToRefresh disabled={!online} onRefresh={() => refetch()}>
-      <main className="page-gutter mx-auto max-w-content pt-4">
+      <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Dinner</span>
+            <span aria-hidden>·</span>
+            <span>{room.currency}</span>
+          </div>
+          <h1 className="mt-1 font-display text-[2rem] leading-tight font-semibold tracking-tight">
             {room.name}
           </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary">Dinner</Badge>
-            <button
-              type="button"
-              onClick={() => void copyCode()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
-            >
-              <span className="font-display tracking-widest text-foreground">
-                {room.code}
-              </span>
-              <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
-              {copied === "code" ? "Copied" : "Copy"}
-            </button>
-            <Badge variant="outline">{room.currency}</Badge>
-          </div>
         </header>
 
-        <section className="mt-4 border-y border-border/70 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <Avatar className="size-8 shrink-0">
-              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                {me ? initials(me.name) : "?"}
-              </AvatarFallback>
-            </Avatar>
-            <p className="min-w-0 flex-1 truncate text-sm font-medium">
-              You · {me?.name ?? "Unknown"}
-            </p>
-            <button
-              type="button"
-              onClick={() => void copyMyLink()}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
-              aria-label={
-                copied === "link"
-                  ? "Personal link copied"
-                  : "Copy my device link"
-              }
-            >
-              <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              onClick={switchIdentity}
-              className="shrink-0 text-sm font-medium text-primary"
-            >
-              Switch
-            </button>
-          </div>
-        </section>
+        <PositionCard
+          room={room}
+          memberId={memberId}
+          transfers={transfers}
+          confirmedTotalCents={confirmedTotalCents}
+        />
 
-        <section className="mt-6">
-          <div className="flex items-end justify-between gap-3">
-            <h2 className="font-display text-xl font-semibold">People</h2>
-            <button
-              type="button"
-              onClick={() => setAddPeopleOpen(true)}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary"
+        <section className="mt-8" aria-labelledby="people-heading">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2
+              id="people-heading"
+              className="font-display text-xl font-semibold"
             >
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-              Add people
-            </button>
+              People
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {room.members.length}{" "}
+              {room.members.length === 1 ? "person" : "people"}
+            </p>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {room.members.length}{" "}
-            {room.members.length === 1 ? "person" : "people"} · ticket headcount
-            is ignored
-          </p>
-          <ul className="mt-1">
+          <ul className="mt-3 flex flex-wrap gap-2">
             {room.members.map((member) => (
               <li
                 key={member.id}
-                className="flex items-center gap-3 border-b border-border/70 py-2.5"
+                className={cn(
+                  "person-chip pl-1.5",
+                  member.id === memberId && "border-foreground"
+                )}
               >
                 <Avatar className="size-8">
                   <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
                     {initials(member.name)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {member.name}
-                  {member.id === memberId ? (
-                    <span className="font-normal text-muted-foreground">
-                      {" "}
-                      (you)
-                    </span>
-                  ) : null}
-                </span>
+                {member.name}
               </li>
             ))}
           </ul>
+          <InlineAddPeople
+            code={room.code}
+            existing={room.members.map((member) => member.name)}
+          />
+          <div className="mt-4 flex items-center gap-1 rounded-full bg-muted py-1 pr-1 pl-4">
+            <p className="min-w-0 flex-1 truncate text-sm font-medium">
+              You · {me?.name ?? "Unknown"}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => void copyMyLink()}
+              aria-label={
+                copied === "link"
+                  ? "Personal link copied"
+                  : "Copy my device link"
+              }
+            >
+              <HugeiconsIcon icon={Link01Icon} size={18} strokeWidth={2} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={switchIdentity}
+            >
+              Not you?
+            </Button>
+          </div>
         </section>
 
-        {transfers.length > 0 || room.expenses.length > 0 ? (
-          <section className="mt-6">
-            <div className="flex items-end justify-between gap-3">
-              <h2 className="font-display text-xl font-semibold">Balances</h2>
-              {transfers.length > 0 ? (
-                <Link
-                  to="/r/$code/settle"
-                  params={{ code: room.code }}
-                  className="text-sm font-medium text-primary"
-                >
-                  Settle
-                </Link>
-              ) : null}
-            </div>
-            <ul className="mt-1">
-              {nets.map((line) => {
-                const owed = line.netCents > 0
-                const owes = line.netCents < 0
-                return (
-                  <li
-                    key={line.memberId}
-                    className="flex items-center gap-3 border-b border-border/70 py-3"
-                  >
-                    <Avatar className="size-8">
-                      <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
-                        {initials(line.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {line.name}
-                      {line.memberId === memberId ? (
-                        <span className="font-normal text-muted-foreground">
-                          {" "}
-                          (you)
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
-                      className={
-                        owed
-                          ? "text-sm font-semibold text-primary tabular-nums"
-                          : owes
-                            ? "text-sm font-semibold text-destructive tabular-nums"
-                            : "text-sm text-muted-foreground tabular-nums"
-                      }
-                    >
-                      {line.netCents === 0
-                        ? "settled"
-                        : `${owed ? "+" : "−"}${formatMoney(Math.abs(line.netCents), room.currency)}`}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        ) : null}
-
-        <section className="mt-6">
-          <h2 className="font-display text-xl font-semibold">Checks</h2>
-          {room.checks.length === 0 ? (
-            <div className="mt-3 flex flex-col items-center gap-3 border-y border-border/70 py-10 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                <HugeiconsIcon
-                  icon={ReceiptDollarIcon}
-                  size={24}
-                  strokeWidth={2}
-                />
+        <section className="mt-8" aria-labelledby="checks-heading">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2
+              id="checks-heading"
+              className="font-display text-xl font-semibold"
+            >
+              Checks
+            </h2>
+            <button
+              type="button"
+              onClick={() => void copyCode()}
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+              aria-label={`Copy dinner code ${room.code}`}
+            >
+              <span className="font-display tracking-widest text-foreground">
+                {room.code}
               </span>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  No checks yet
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Scan a ticket or enter the bill by hand.
-                </p>
-              </div>
-              <div className="flex w-full max-w-xs flex-col gap-2">
-                <Link
-                  to="/r/$code/check"
-                  params={{ code: room.code }}
-                  search={{ scan: true }}
-                  className="split-cta"
-                >
-                  <HugeiconsIcon
-                    icon={Camera01Icon}
-                    size={18}
-                    strokeWidth={2}
-                  />
-                  Scan ticket
-                </Link>
-                <Link
-                  to="/r/$code/check"
-                  params={{ code: room.code }}
-                  className="split-cta-outline"
-                >
-                  <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
-                  Enter bill manually
-                </Link>
-              </div>
-            </div>
+              <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+              {copied === "code" ? "Copied" : "Copy"}
+            </button>
+          </div>
+          {room.checks.length === 0 ? (
+            <p className="mt-2 text-base text-muted-foreground">
+              Nothing yet. Scan the ticket or type the items in.
+            </p>
           ) : (
-            <ul className="mt-1">
+            <ul className="mt-3 flex flex-col gap-2">
               {room.checks.map((check) => (
                 <CheckRow key={check.id} check={check} room={room} />
               ))}
             </ul>
           )}
           {room.checks.length > 0 ? (
-            <div className="mt-4">
-              <Link
-                to="/r/$code/check"
-                params={{ code: room.code }}
-                className="split-cta-outline w-full"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-                New check
-              </Link>
-            </div>
+            <Link
+              to="/r/$code/check"
+              params={{ code: room.code }}
+              className="split-cta-outline mt-3 w-full"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
+              New check
+            </Link>
           ) : null}
         </section>
       </main>
-      <AddPeopleSheet
-        code={room.code}
-        open={addPeopleOpen}
-        onOpenChange={setAddPeopleOpen}
-      />
     </PullToRefresh>
+  )
+}
+
+function PositionCard({
+  room,
+  memberId,
+  transfers,
+  confirmedTotalCents,
+}: {
+  room: RoomDto
+  memberId: string
+  transfers: ReturnType<typeof simplifyTransfers>
+  confirmedTotalCents: number
+}) {
+  if (room.checks.length === 0) {
+    return (
+      <section className="surface mt-5 p-5">
+        <p className="font-display text-xl font-semibold">Add the bill</p>
+        <p className="mt-1 text-base text-muted-foreground">
+          A photo of the ticket fills the items for you.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <Link
+            to="/r/$code/check"
+            params={{ code: room.code }}
+            search={{ scan: true }}
+            className="split-cta h-14"
+          >
+            <HugeiconsIcon icon={Camera01Icon} size={20} strokeWidth={2} />
+            Scan ticket
+          </Link>
+          <Link
+            to="/r/$code/check"
+            params={{ code: room.code }}
+            className="split-cta-outline h-14"
+          >
+            <HugeiconsIcon icon={PencilEdit02Icon} size={20} strokeWidth={2} />
+            Enter bill manually
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
+  const iOwe = transfers.filter((transfer) => transfer.fromId === memberId)
+  const owedToMe = transfers.filter((transfer) => transfer.toId === memberId)
+  const oweCents = iOwe.reduce((sum, t) => sum + t.amountCents, 0)
+  const owedCents = owedToMe.reduce((sum, t) => sum + t.amountCents, 0)
+  const confirmedCount = room.checks.filter(
+    (check) => check.status === "CONFIRMED"
+  ).length
+
+  let headline: string
+  let detail: string
+  if (oweCents > 0) {
+    headline = `You owe ${formatMoney(oweCents, room.currency)}`
+    detail =
+      iOwe.length === 1
+        ? `Pay ${iOwe[0].toName}`
+        : `To ${iOwe.map((t) => t.toName).join(" and ")}`
+  } else if (owedCents > 0) {
+    headline = `You get back ${formatMoney(owedCents, room.currency)}`
+    detail =
+      owedToMe.length === 1
+        ? `From ${owedToMe[0].fromName}`
+        : `From ${owedToMe.length} people`
+  } else if (transfers.length > 0) {
+    headline = "You're square"
+    detail = `${transfers.length} ${transfers.length === 1 ? "payment" : "payments"} left between others`
+  } else {
+    headline = confirmedCount > 0 ? "Everyone is square" : "Draft in progress"
+    detail =
+      confirmedCount > 0
+        ? "Nothing left to pay."
+        : "Confirm the check to see who owes what."
+  }
+
+  return (
+    <section className="surface mt-5 p-5" aria-label="Your balance">
+      <p className="eyebrow">
+        {formatMoney(confirmedTotalCents, room.currency)} confirmed ·{" "}
+        {confirmedCount} {confirmedCount === 1 ? "check" : "checks"}
+      </p>
+      <p className="mt-2 font-display text-[1.75rem] leading-tight font-semibold tracking-tight tabular-nums">
+        {headline}
+      </p>
+      <p className="mt-1 text-base text-muted-foreground">{detail}</p>
+      {transfers.length > 0 ? (
+        <Link
+          to="/r/$code/settle"
+          params={{ code: room.code }}
+          className="split-cta mt-4 h-14 w-full"
+        >
+          {oweCents > 0 ? "Pay and mark it done" : "See who owes what"}
+          <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
+        </Link>
+      ) : null}
+    </section>
+  )
+}
+
+function InlineAddPeople({
+  code,
+  existing,
+}: {
+  code: string
+  existing: string[]
+}) {
+  const queryClient = useQueryClient()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [draft, setDraft] = useState("")
+
+  const mutation = useMutation({
+    mutationFn: (names: string[]) => addRoomMembers({ data: { code, names } }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Could not add people"
+      )
+    },
+  })
+
+  function submit() {
+    const taken = new Set(existing.map((name) => name.toLowerCase()))
+    const names = mergeNames([], draft).filter(
+      (name) => !taken.has(name.toLowerCase())
+    )
+    setDraft("")
+    inputRef.current?.focus()
+    if (names.length === 0) return
+    mutation.mutate(names)
+  }
+
+  return (
+    <form
+      className="mt-3 flex flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        submit()
+      }}
+    >
+      <Label htmlFor="dinner-add-person" className="sr-only">
+        Add people
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          ref={inputRef}
+          id="dinner-add-person"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Add a name, then Enter"
+          autoComplete="off"
+          enterKeyHint="done"
+          className="flex-1"
+        />
+        <Button
+          type="submit"
+          variant="outline"
+          className="shrink-0 px-5"
+          disabled={!draft.trim() || mutation.isPending}
+        >
+          Add
+        </Button>
+      </div>
+    </form>
   )
 }
 
@@ -312,46 +395,43 @@ function CheckRow({ check, room }: { check: CheckDto; room: RoomDto }) {
     tip: check.payload.tip,
     notedTotalCents: check.payload.notedTotalCents,
   })
-  const tipLabel =
-    check.payload.tip.amountCents > 0
-      ? ` · tip ${formatMoney(check.payload.tip.amountCents, check.currency)}`
-      : ""
+  const confirmed = check.status === "CONFIRMED"
 
   return (
-    <li className="border-b border-border/70">
+    <li>
       <Link
         to="/r/$code/check/$checkId"
         params={{ code: room.code, checkId: check.id }}
-        className="flex w-full items-center justify-between gap-3.5 py-3.5 text-left transition-colors hover:bg-muted/30"
+        className="surface flex min-h-18 w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors active:bg-muted"
       >
-        <Avatar className="size-9 shrink-0">
-          <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+        <Avatar className="size-10 shrink-0">
+          <AvatarFallback className="bg-accent text-sm font-semibold text-accent-foreground">
             {initials(check.paidByName)}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <p className="truncate text-sm font-semibold">{check.merchant}</p>
-            <Badge
-              variant={check.status === "CONFIRMED" ? "secondary" : "outline"}
-              className="shrink-0"
-            >
-              {check.status === "CONFIRMED" ? "Confirmed" : "Draft"}
-            </Badge>
-            {check.isPrecuenta ? (
-              <Badge variant="outline" className="shrink-0">
-                Precuenta
-              </Badge>
-            ) : null}
-          </div>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            {check.paidByName} paid{tipLabel} ·{" "}
-            {formatRelativeTime(check.createdAt)}
+          <p className="truncate text-base font-semibold">{check.merchant}</p>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+            {check.paidByName} paid · {formatRelativeTime(check.createdAt)}
           </p>
         </div>
-        <p className="shrink-0 text-sm font-semibold tabular-nums">
-          {formatMoney(split.totalCents, check.currency)}
-        </p>
+        <div className="shrink-0 text-right">
+          <p className="text-base font-semibold tabular-nums">
+            {formatMoney(split.totalCents, check.currency)}
+          </p>
+          <p
+            className={cn(
+              "text-sm font-medium",
+              confirmed ? "text-muted-foreground" : "text-primary"
+            )}
+          >
+            {confirmed
+              ? "Confirmed"
+              : check.isPrecuenta
+                ? "Precuenta · draft"
+                : "Draft"}
+          </p>
+        </div>
       </Link>
     </li>
   )

@@ -34,26 +34,18 @@ export function MemberPicker({
 }: MemberPickerProps) {
   if (members.length < CHIP_THRESHOLD) {
     return (
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Paid by">
-        {members.map((member) => {
-          const selected = value === member.id
-          return (
-            <button
-              key={member.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(member.id)}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                selected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {member.name}
-            </button>
-          )
-        })}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Paid by">
+        {members.map((member) => (
+          <button
+            key={member.id}
+            type="button"
+            aria-pressed={value === member.id}
+            onClick={() => onChange(member.id)}
+            className="person-chip"
+          >
+            {member.name}
+          </button>
+        ))}
       </div>
     )
   }

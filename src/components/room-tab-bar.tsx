@@ -20,7 +20,14 @@ export function RoomTabBar({
   const matchRoute = useMatchRoute()
   const onHome = !!matchRoute({ to: "/r/$code", params: { code } })
   const onSettle = !!matchRoute({ to: "/r/$code/settle", params: { code } })
+  const onCheck = !!matchRoute({
+    to: "/r/$code/check",
+    params: { code },
+    fuzzy: true,
+  })
   const isDinner = kind === "DINNER"
+
+  if (onCheck) return null
 
   return (
     <nav

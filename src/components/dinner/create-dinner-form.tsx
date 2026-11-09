@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import type { useNavigate } from "@tanstack/react-router"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
@@ -6,6 +7,7 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
+import { NameListInput } from "@/components/name-list-input"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -17,14 +19,26 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import {
+  defaultDinnerName,
+  getLastCurrency,
+  getLastName,
+  mergeNames,
+  rememberCurrency,
+  rememberName,
+} from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
 import { markInstallEligible } from "@/lib/pwa-install"
 import { createRoom } from "@/server/rooms"
 
 const dinnerSchema = z.object({
-  name: z.string().trim().min(1, "Name your dinner").max(60, "Name is too long"),
+  name: z.string().trim().max(60, "Name is too long"),
   currency: z.string().min(3),
-  creatorName: z.string().trim().min(1, "Enter your name").max(40, "Name is too long"),
+  creatorName: z
+    .string()
+    .trim()
+    .min(1, "Write your name so the others know who paid")
+    .max(40, "Name is too long"),
 })
 type DinnerValues = z.infer<typeof dinnerSchema>
 
@@ -37,22 +51,46 @@ export function CreateDinnerForm({
     resolver: zodResolver(dinnerSchema),
     defaultValues: { name: "", currency: "USD", creatorName: "" },
   })
+  const [guests, setGuests] = useState<string[]>([])
+  const [guestDraft, setGuestDraft] = useState("")
+  const [editCurrency, setEditCurrency] = useState(false)
+  const [fallbackName, setFallbackName] = useState("Dinner")
+  const currency = form.watch("currency")
+  const creatorName = form.watch("creatorName")
+
+  useEffect(() => {
+    setFallbackName(defaultDinnerName())
+    const lastName = getLastName()
+    if (lastName && !form.getValues("creatorName")) {
+      form.setValue("creatorName", lastName)
+    }
+    const lastCurrency = getLastCurrency()
+    if (lastCurrency) form.setValue("currency", lastCurrency)
+  }, [form])
 
   const mutation = useMutation({
-    mutationFn: (data: DinnerValues) =>
+    mutationFn: (data: {
+      name: string
+      currency: string
+      memberNames: string[]
+    }) =>
       createRoom({
         data: {
-          name: data.name.trim(),
+          name: data.name,
           currency: data.currency,
           currencies: [data.currency],
-          memberNames: [data.creatorName.trim()],
+          memberNames: data.memberNames,
           kind: "DINNER",
         },
       }),
-    onSuccess: async (room) => {
-      rememberMember(room.code, room.members[0].id)
+    onSuccess: async (room, variables) => {
+      const creator =
+        room.members.find(
+          (member) =>
+            member.name.toLowerCase() === variables.memberNames[0].toLowerCase()
+        ) ?? room.members[0]
+      rememberMember(room.code, creator.id)
       markInstallEligible()
-      toast.success("Dinner created")
       await navigate({
         to: "/r/$code",
         params: { code: room.code },
@@ -66,12 +104,57 @@ export function CreateDinnerForm({
     },
   })
 
+  function onSubmit(values: DinnerValues) {
+    const creator = values.creatorName.trim()
+    const others = mergeNames(guests, guestDraft).filter(
+      (name) => name.toLowerCase() !== creator.toLowerCase()
+    )
+    rememberName(creator)
+    rememberCurrency(values.currency)
+    mutation.mutate({
+      name: values.name.trim() || fallbackName,
+      currency: values.currency,
+      memberNames: [creator, ...others],
+    })
+  }
+
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
-        className="flex flex-col gap-7"
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex flex-col gap-6"
       >
+        <FormField
+          control={form.control}
+          name="creatorName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Your name</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Ana"
+                  autoComplete="given-name"
+                  enterKeyHint="next"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <NameListInput
+          id="dinner-guests"
+          label="Who else is at the table?"
+          names={guests}
+          draft={guestDraft}
+          onNamesChange={setGuests}
+          onDraftChange={setGuestDraft}
+          placeholder="Ben, Cam…"
+          hint="Optional. Anyone can also join with the code."
+          fixed={creatorName.trim() ? [creatorName.trim()] : []}
+        />
+
         <FormField
           control={form.control}
           name="name"
@@ -79,8 +162,15 @@ export function CreateDinnerForm({
             <FormItem>
               <FormLabel>Dinner name</FormLabel>
               <FormControl>
-                <Input placeholder="Biblioteca Friday" {...field} />
+                <Input
+                  placeholder={fallbackName}
+                  enterKeyHint="done"
+                  {...field}
+                />
               </FormControl>
+              <FormDescription>
+                Optional. Leave it blank for “{fallbackName}”.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -91,44 +181,50 @@ export function CreateDinnerForm({
           name="currency"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Currency</FormLabel>
-              <FormControl>
-                <BaseCurrencyPicker
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              </FormControl>
-              <FormDescription>
-                One currency for this dinner. No FX.
-              </FormDescription>
+              {editCurrency ? (
+                <>
+                  <FormLabel>Currency</FormLabel>
+                  <FormControl>
+                    <BaseCurrencyPicker
+                      value={field.value}
+                      onChange={(next) => {
+                        field.onChange(next)
+                        setEditCurrency(false)
+                      }}
+                    />
+                  </FormControl>
+                </>
+              ) : (
+                <div className="flex min-h-11 items-center justify-between gap-3">
+                  <p className="text-base text-muted-foreground">
+                    Paying in{" "}
+                    <span className="font-semibold text-foreground">
+                      {currency}
+                    </span>
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditCurrency(true)}
+                  >
+                    Change currency
+                  </Button>
+                </div>
+              )}
             </FormItem>
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="creatorName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Your name</FormLabel>
-              <FormControl>
-                <Input placeholder="Ana" {...field} />
-              </FormControl>
-              <FormDescription>
-                You can add other people after, or they join with the code.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Button
-          type="submit"
-          disabled={mutation.isPending}
-          className="mt-1 w-full transition-transform duration-200 active:scale-[0.98]"
-        >
-          {mutation.isPending ? "Creating…" : "Create dinner"}
-        </Button>
+        <div className="form-dock">
+          <Button
+            type="submit"
+            disabled={mutation.isPending}
+            className="cta-lg"
+          >
+            {mutation.isPending ? "Creating…" : "Create dinner"}
+          </Button>
+        </div>
       </form>
     </Form>
   )
