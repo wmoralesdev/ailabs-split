@@ -10,12 +10,12 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowLeft01Icon,
-  Delete02Icon,
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { OcrReview } from "@/components/dinner/ocr-review"
+import { TipFeesSection } from "@/components/dinner/tip-fees-section"
 import { MemberPicker } from "@/components/member-picker"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
@@ -27,10 +27,8 @@ import {
   computedTotalWithoutPrintedForce,
   computeDinnerSplit,
   emptyCheckPayload,
-  manualTip,
   splitLineItem,
   splitLineItemShares,
-  tipCentsFromPercent,
   withForcedPrintedTotal,
 } from "@/lib/dinner-split"
 import type { CheckPayload, LineItem } from "@/lib/dinner-split"
@@ -92,10 +90,6 @@ export function CheckEditor({
   const [newName, setNewName] = useState("")
   const [newQty, setNewQty] = useState(1)
   const [newAmount, setNewAmount] = useState("")
-  const [customTip, setCustomTip] = useState("")
-  const [feeName, setFeeName] = useState("")
-  const [feeAmount, setFeeAmount] = useState("")
-  const [showFee, setShowFee] = useState(false)
 
   const nameById = useMemo(
     () => new Map(room.members.map((member) => [member.id, member.name])),
@@ -118,8 +112,6 @@ export function CheckEditor({
   )
   const previousItem =
     selectedIndex > 0 ? (payload.items[selectedIndex - 1] ?? null) : null
-
-  const showTipChips = payload.tip.amountCents === 0
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(room.code) })
@@ -280,44 +272,6 @@ export function CheckEditor({
         ? current.filter((id) => id !== memberId)
         : [...current, memberId]
     )
-  }
-
-  function applyTipPercent(percent: number) {
-    const amountCents = tipCentsFromPercent(split.itemSubtotalCents, percent)
-    setPayload((prev) => ({
-      ...prev,
-      tip: manualTip(amountCents, percent),
-    }))
-  }
-
-  function applyCustomTip() {
-    const amountCents = atmDigitsToCents(customTip, fd)
-    if (amountCents <= 0) return
-    setPayload((prev) => ({ ...prev, tip: manualTip(amountCents) }))
-    setCustomTip("")
-  }
-
-  function addFee() {
-    const amountCents = atmDigitsToCents(feeAmount, fd)
-    if (!feeName.trim() || amountCents === 0) return
-    setPayload((prev) => ({
-      ...prev,
-      adjustments: [
-        ...prev.adjustments,
-        {
-          id: crypto.randomUUID(),
-          kind: "FEE",
-          name: feeName.trim(),
-          amountCents,
-          allocate: "BY_ITEMS",
-          source: "MANUAL",
-          confidence: null,
-        },
-      ],
-    }))
-    setFeeName("")
-    setFeeAmount("")
-    setShowFee(false)
   }
 
   function forcePrintedTotal() {
@@ -556,171 +510,19 @@ export function CheckEditor({
           </form>
         </section>
 
-        <section
-          aria-labelledby="extras-heading"
-          className="flex flex-col gap-2.5"
-        >
-          <h2
-            id="extras-heading"
-            className="font-display text-lg font-semibold"
-          >
-            Tip and fees
-          </h2>
-          {payload.adjustments.length > 0 ? (
-            <ul className="group-list">
-              {payload.adjustments.map((adjustment) => (
-                <li
-                  key={adjustment.id}
-                  className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
-                >
-                  <span className="text-[15px]">{adjustment.name}</span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-[15px] tabular-nums">
-                      {formatMoney(adjustment.amountCents, room.currency)}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${adjustment.name}`}
-                      onClick={() =>
-                        setPayload((prev) => ({
-                          ...prev,
-                          adjustments: prev.adjustments.filter(
-                            (entry) => entry.id !== adjustment.id
-                          ),
-                        }))
-                      }
-                    >
-                      <HugeiconsIcon
-                        icon={Delete02Icon}
-                        size={16}
-                        strokeWidth={2}
-                      />
-                    </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {showTipChips ? (
-            <div className="flex flex-col gap-2">
-              <div>
-                <Label htmlFor="custom-tip">Add tip</Label>
-                <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-                  Only if you want one. Nothing is added unless the ticket
-                  prints it.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 items-center gap-2">
-                {[10, 15].map((percent) => (
-                  <button
-                    key={percent}
-                    type="button"
-                    className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-base font-medium text-foreground tabular-nums transition-[transform,background-color] duration-150 outline-none select-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
-                    onClick={() => applyTipPercent(percent)}
-                  >
-                    {percent}%
-                  </button>
-                ))}
-                <Input
-                  id="custom-tip"
-                  inputMode="numeric"
-                  value={formatAtmAmountInput(customTip, fd)}
-                  onChange={(event) =>
-                    setCustomTip(atmDigitsFromInput(event.target.value))
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault()
-                      applyCustomTip()
-                    }
-                  }}
-                  onBlur={applyCustomTip}
-                  placeholder="Other"
-                  aria-label="Custom tip amount"
-                  className="text-center tabular-nums"
-                />
-              </div>
-            </div>
-          ) : payload.tip.amountCents > 0 ? (
-            <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
-              <p className="text-[15px]">
-                Tip
-                <span className="text-muted-foreground">
-                  {payload.tip.source === "TICKET"
-                    ? " · on ticket"
-                    : " · added"}
-                </span>
-              </p>
-              <span className="flex items-center gap-1">
-                <span className="text-[15px] font-semibold tabular-nums">
-                  {formatMoney(payload.tip.amountCents, room.currency)}
-                </span>
-                {payload.tip.source === "TICKET" ? null : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove tip"
-                    onClick={() =>
-                      setPayload((prev) => ({ ...prev, tip: manualTip(0) }))
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={Delete02Icon}
-                      size={16}
-                      strokeWidth={2}
-                    />
-                  </Button>
-                )}
-              </span>
-            </div>
-          ) : null}
-
-          {showFee ? (
-            <form
-              className="flex flex-col gap-2"
-              onSubmit={(event) => {
-                event.preventDefault()
-                addFee()
-              }}
-            >
-              <Label htmlFor="fee-name">Add fee</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="fee-name"
-                  value={feeName}
-                  onChange={(event) => setFeeName(event.target.value)}
-                  placeholder="Service"
-                />
-                <Input
-                  inputMode="numeric"
-                  value={formatAtmAmountInput(feeAmount, fd)}
-                  onChange={(event) =>
-                    setFeeAmount(atmDigitsFromInput(event.target.value))
-                  }
-                  aria-label="Fee amount"
-                  className="w-28 text-right tabular-nums"
-                />
-              </div>
-              <Button type="submit" variant="secondary" className="w-full bg-card font-semibold text-primary">
-                Add fee
-              </Button>
-            </form>
-          ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              className="self-start px-0 text-primary hover:bg-transparent"
-              onClick={() => setShowFee(true)}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-              Add a fee or service charge
-            </Button>
-          )}
-        </section>
+        <TipFeesSection
+          tip={payload.tip}
+          adjustments={payload.adjustments}
+          itemSubtotalCents={split.itemSubtotalCents}
+          currency={room.currency}
+          fractionDigits={fd}
+          onChangeTip={(nextTip) =>
+            setPayload((prev) => ({ ...prev, tip: nextTip }))
+          }
+          onChangeAdjustments={(nextAdjustments) =>
+            setPayload((prev) => ({ ...prev, adjustments: nextAdjustments }))
+          }
+        />
 
         <Totals
           split={split}
