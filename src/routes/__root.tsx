@@ -70,10 +70,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           404
         </p>
-        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-foreground">
+        <h1 className="mt-3 font-display text-[34px] leading-tight font-bold tracking-tight text-foreground">
           Page not found
         </h1>
-        <p className="mt-3 text-lg text-muted-foreground">
+        <p className="mt-1 text-[15px] text-muted-foreground">
           That trip or page doesn&rsquo;t exist.
         </p>
         <Link to="/" search={{ stay: true }} className="split-cta mt-8 w-fit">

@@ -288,7 +288,7 @@ export function BankFxCalibrationSheet({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex flex-col gap-4 px-6 pb-2">
+          <div className="flex flex-col gap-4 px-4 pb-2">
             <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 text-xs font-medium text-muted-foreground">
               <span>App converted</span>
               <span>Bank charged</span>

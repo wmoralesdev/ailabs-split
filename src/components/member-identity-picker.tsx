@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -38,34 +40,40 @@ function MemberIdentityPicker({
   )
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {mode === "pick" && members.length > 0 ? (
         <>
-          <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+          <p className="group-label">
             I&rsquo;m already in this trip
           </p>
-          <ul className="flex flex-col gap-2">
+          <ul className="group-list">
             {members.map((member) => (
               <li key={member.id}>
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() => onPickExisting(member.id)}
-                  className="border-border bg-background/70 hover:bg-background shadow-soft flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 text-left transition-colors disabled:opacity-50"
+                  className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left transition-colors active:bg-muted disabled:opacity-50"
                 >
-                  <Avatar className="size-10">
-                    <AvatarFallback className="bg-accent text-accent-foreground text-sm font-semibold">
+                  <Avatar className="size-8">
+                    <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
                       {initials(member.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-base font-medium">{member.name}</span>
+                  <span className="flex-1 text-[15px] font-medium">{member.name}</span>
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    size={16}
+                    strokeWidth={2}
+                    className="text-muted-foreground/60"
+                  />
                 </button>
               </li>
             ))}
           </ul>
           <button
             type="button"
-            className="text-primary mt-2 text-left text-sm font-medium"
+            className="text-primary mt-1 min-h-11 text-left text-[15px] font-medium"
             onClick={() => setMode("new")}
           >
             I&rsquo;m new — add my name
@@ -81,7 +89,7 @@ function MemberIdentityPicker({
             onClaimName(trimmed)
           }}
         >
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="claim-name">Your name</Label>
             <Input
               id="claim-name"
@@ -91,7 +99,7 @@ function MemberIdentityPicker({
               required
               autoFocus
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-[13px] leading-snug">
               Matches an existing member (case-insensitive) or adds you.
             </p>
           </div>
@@ -101,7 +109,7 @@ function MemberIdentityPicker({
           {members.length > 0 ? (
             <button
               type="button"
-              className="text-primary text-left text-sm font-medium"
+              className="text-primary min-h-11 text-left text-[15px] font-medium"
               onClick={() => setMode("pick")}
             >
               Pick from the list instead
@@ -111,7 +119,7 @@ function MemberIdentityPicker({
       )}
 
       {error ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-destructive text-[13px]" role="alert">
           {error}
         </p>
       ) : null}
