@@ -23,6 +23,7 @@ const sampleRoom: RoomDto = {
   id: "room-1",
   code: "ABC123",
   name: "Trip",
+  kind: "TRIP",
   currency: "USD",
   currencies: ["USD"],
   fxRates: {},
@@ -32,6 +33,7 @@ const sampleRoom: RoomDto = {
   members: [{ id: "m1", name: "Ada" }],
   expenses: [],
   settlements: [],
+  checks: [],
 }
 
 describe("room-cache", () => {

@@ -22,10 +22,12 @@ export type ShareInviteResult = "shared" | "copied" | "cancelled"
 export async function shareOrCopyInvite(opts: {
   code: string
   name: string
+  kind?: "TRIP" | "DINNER"
 }): Promise<ShareInviteResult> {
   const url = inviteLink(opts.code)
   const title = opts.name
-  const text = `Join "${opts.name}" on Split — trip code ${opts.code}`
+  const noun = opts.kind === "DINNER" ? "dinner" : "trip"
+  const text = `Join "${opts.name}" on Split — ${noun} code ${opts.code}`
 
   if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
     try {

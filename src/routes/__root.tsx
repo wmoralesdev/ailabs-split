@@ -101,7 +101,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <PwaInstallPrompt />
           <PwaUpdatePrompt />
         </ThemeProvider>
-        {import.meta.env.DEV ? (
+        {import.meta.env.DEV && import.meta.env.VITE_E2E !== "1" ? (
           <TanStackDevtools
             config={{ position: "bottom-right" }}
             plugins={[

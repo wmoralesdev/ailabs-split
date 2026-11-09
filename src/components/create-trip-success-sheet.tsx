@@ -18,6 +18,7 @@ type CreateTripSuccessSheetProps = {
   open: boolean
   code: string
   name: string
+  kind?: "TRIP" | "DINNER"
   onContinue: () => void
 }
 
@@ -25,15 +26,17 @@ export function CreateTripSuccessSheet({
   open,
   code,
   name,
+  kind = "TRIP",
   onContinue,
 }: CreateTripSuccessSheetProps) {
+  const isDinner = kind === "DINNER"
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
 
   async function onCopyCode() {
     await copyText(code)
     setCopied(true)
-    toast.success("Trip code copied")
+    toast.success(isDinner ? "Dinner code copied" : "Trip code copied")
     window.setTimeout(() => setCopied(false), 1500)
   }
 
@@ -41,12 +44,12 @@ export function CreateTripSuccessSheet({
     if (busy) return
     setBusy(true)
     try {
-      const result = await shareOrCopyInvite({ code, name })
+      const result = await shareOrCopyInvite({ code, name, kind })
       if (result === "copied") {
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error("Could not share trip")
+      toast.error(isDinner ? "Could not share dinner" : "Could not share trip")
     } finally {
       setBusy(false)
     }
@@ -62,7 +65,7 @@ export function CreateTripSuccessSheet({
       <SheetContent side="bottom" className="gap-0 rounded-t-2xl px-5 pt-5 pb-safe">
         <SheetHeader className="gap-2 p-0 text-left">
           <SheetTitle className="font-display text-2xl font-semibold tracking-tight">
-            Trip ready
+            {isDinner ? "Dinner ready" : "Trip ready"}
           </SheetTitle>
           <SheetDescription className="text-base text-muted-foreground">
             Share this code so everyone can join — no accounts needed.
@@ -71,7 +74,7 @@ export function CreateTripSuccessSheet({
 
         <div className="mt-6 flex flex-col items-center rounded-xl border border-border bg-muted/40 px-4 py-6">
           <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-            Trip code
+            {isDinner ? "Dinner code" : "Trip code"}
           </p>
           <p className="mt-2 font-display text-4xl font-semibold tracking-[0.22em] text-foreground">
             {code}
@@ -104,7 +107,7 @@ export function CreateTripSuccessSheet({
             className="w-full"
             onClick={onContinue}
           >
-            Continue to trip
+            {isDinner ? "Continue to dinner" : "Continue to trip"}
           </Button>
         </SheetFooter>
       </SheetContent>

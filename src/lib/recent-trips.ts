@@ -1,7 +1,10 @@
+export type RoomKindLabel = "TRIP" | "DINNER"
+
 export type RecentTrip = {
   code: string
   name: string
   updatedAt: number
+  kind?: RoomKindLabel
 }
 
 const STORAGE_KEY = "split:recent-trips"
@@ -10,12 +13,14 @@ const MAX_RECENT = 10
 function isRecentTrip(value: unknown): value is RecentTrip {
   if (typeof value !== "object" || value === null) return false
   const trip = value as Record<string, unknown>
+  const kind = trip.kind
   return (
     typeof trip.code === "string" &&
     trip.code.length > 0 &&
     typeof trip.name === "string" &&
     typeof trip.updatedAt === "number" &&
-    Number.isFinite(trip.updatedAt)
+    Number.isFinite(trip.updatedAt) &&
+    (kind === undefined || kind === "TRIP" || kind === "DINNER")
   )
 }
 
@@ -49,6 +54,7 @@ export function listRecentTrips(): RecentTrip[] {
 export function rememberRecentTrip(input: {
   code: string
   name: string
+  kind?: RoomKindLabel
 }): void {
   if (typeof window === "undefined") return
   const code = input.code.trim().toUpperCase()
@@ -59,6 +65,7 @@ export function rememberRecentTrip(input: {
     code,
     name,
     updatedAt: Date.now(),
+    kind: input.kind === "DINNER" ? "DINNER" : "TRIP",
   }
   const without = readTrips().filter(
     (trip) => trip.code.toUpperCase() !== code

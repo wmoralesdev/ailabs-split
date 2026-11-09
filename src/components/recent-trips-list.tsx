@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
@@ -11,7 +11,11 @@ import {
 
 export function RecentTripsList() {
   const navigate = useNavigate()
-  const [trips, setTrips] = useState(() => listRecentTrips())
+  const [trips, setTrips] = useState<ReturnType<typeof listRecentTrips>>([])
+
+  useEffect(() => {
+    setTrips(listRecentTrips())
+  }, [])
 
   const refresh = useCallback(() => {
     setTrips(listRecentTrips())
@@ -22,7 +26,7 @@ export function RecentTripsList() {
   return (
     <section className="animate-rise-delay mt-8" aria-label="Recent trips">
       <h2 className="text-muted-foreground text-xs font-medium tracking-[0.14em] uppercase">
-        Recent trips
+        Recent
       </h2>
       <ul className="mt-3 flex flex-col">
         {trips.map((trip, index) => (
@@ -51,6 +55,8 @@ export function RecentTripsList() {
                 <span className="font-display tracking-[0.18em] uppercase">
                   {trip.code}
                 </span>
+                <span aria-hidden>·</span>
+                <span>{trip.kind === "DINNER" ? "Dinner" : "Trip"}</span>
                 <span aria-hidden>·</span>
                 <span>{formatRecentTripOpened(trip.updatedAt)}</span>
               </span>

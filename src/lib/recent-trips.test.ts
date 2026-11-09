@@ -51,6 +51,11 @@ describe("recent-trips", () => {
     expect(trips[0]?.name).toBe("Alpha Renamed")
   })
 
+  it("stores a Dinner kind badge", () => {
+    rememberRecentTrip({ code: "dddddd", name: "Biblioteca", kind: "DINNER" })
+    expect(listRecentTrips()[0]?.kind).toBe("DINNER")
+  })
+
   it("caps at 10 trips", () => {
     for (let i = 0; i < 12; i++) {
       vi.setSystemTime(new Date(Date.UTC(2026, 6, 15, 12, i)))

@@ -14,6 +14,9 @@ import { Route as RCodeRouteImport } from './routes/r.$code'
 import { Route as RCodeIndexRouteImport } from './routes/r.$code/index'
 import { Route as RCodeSettleRouteImport } from './routes/r.$code/settle'
 import { Route as RCodeNewRouteImport } from './routes/r.$code/new'
+import { Route as RCodeCheckRouteImport } from './routes/r.$code/check'
+import { Route as RCodeCheckIndexRouteImport } from './routes/r.$code/check.index'
+import { Route as RCodeCheckCheckIdRouteImport } from './routes/r.$code/check.$checkId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,40 +43,80 @@ const RCodeNewRoute = RCodeNewRouteImport.update({
   path: '/new',
   getParentRoute: () => RCodeRoute,
 } as any)
+const RCodeCheckRoute = RCodeCheckRouteImport.update({
+  id: '/check',
+  path: '/check',
+  getParentRoute: () => RCodeRoute,
+} as any)
+const RCodeCheckIndexRoute = RCodeCheckIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RCodeCheckRoute,
+} as any)
+const RCodeCheckCheckIdRoute = RCodeCheckCheckIdRouteImport.update({
+  id: '/$checkId',
+  path: '/$checkId',
+  getParentRoute: () => RCodeCheckRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/r/$code': typeof RCodeRouteWithChildren
+  '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code/': typeof RCodeIndexRoute
+  '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
+  '/r/$code/check/': typeof RCodeCheckIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code': typeof RCodeIndexRoute
+  '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
+  '/r/$code/check': typeof RCodeCheckIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/r/$code': typeof RCodeRouteWithChildren
+  '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code/': typeof RCodeIndexRoute
+  '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
+  '/r/$code/check/': typeof RCodeCheckIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/r/$code' | '/r/$code/new' | '/r/$code/settle' | '/r/$code/'
+  fullPaths:
+    | '/'
+    | '/r/$code'
+    | '/r/$code/check'
+    | '/r/$code/new'
+    | '/r/$code/settle'
+    | '/r/$code/'
+    | '/r/$code/check/$checkId'
+    | '/r/$code/check/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/r/$code/new' | '/r/$code/settle' | '/r/$code'
+  to:
+    | '/'
+    | '/r/$code/new'
+    | '/r/$code/settle'
+    | '/r/$code'
+    | '/r/$code/check/$checkId'
+    | '/r/$code/check'
   id:
     | '__root__'
     | '/'
     | '/r/$code'
+    | '/r/$code/check'
     | '/r/$code/new'
     | '/r/$code/settle'
     | '/r/$code/'
+    | '/r/$code/check/$checkId'
+    | '/r/$code/check/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -118,16 +161,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RCodeNewRouteImport
       parentRoute: typeof RCodeRoute
     }
+    '/r/$code/check': {
+      id: '/r/$code/check'
+      path: '/check'
+      fullPath: '/r/$code/check'
+      preLoaderRoute: typeof RCodeCheckRouteImport
+      parentRoute: typeof RCodeRoute
+    }
+    '/r/$code/check/': {
+      id: '/r/$code/check/'
+      path: '/'
+      fullPath: '/r/$code/check/'
+      preLoaderRoute: typeof RCodeCheckIndexRouteImport
+      parentRoute: typeof RCodeCheckRoute
+    }
+    '/r/$code/check/$checkId': {
+      id: '/r/$code/check/$checkId'
+      path: '/$checkId'
+      fullPath: '/r/$code/check/$checkId'
+      preLoaderRoute: typeof RCodeCheckCheckIdRouteImport
+      parentRoute: typeof RCodeCheckRoute
+    }
   }
 }
 
+interface RCodeCheckRouteChildren {
+  RCodeCheckCheckIdRoute: typeof RCodeCheckCheckIdRoute
+  RCodeCheckIndexRoute: typeof RCodeCheckIndexRoute
+}
+
+const RCodeCheckRouteChildren: RCodeCheckRouteChildren = {
+  RCodeCheckCheckIdRoute: RCodeCheckCheckIdRoute,
+  RCodeCheckIndexRoute: RCodeCheckIndexRoute,
+}
+
+const RCodeCheckRouteWithChildren = RCodeCheckRoute._addFileChildren(
+  RCodeCheckRouteChildren,
+)
+
 interface RCodeRouteChildren {
+  RCodeCheckRoute: typeof RCodeCheckRouteWithChildren
   RCodeNewRoute: typeof RCodeNewRoute
   RCodeSettleRoute: typeof RCodeSettleRoute
   RCodeIndexRoute: typeof RCodeIndexRoute
 }
 
 const RCodeRouteChildren: RCodeRouteChildren = {
+  RCodeCheckRoute: RCodeCheckRouteWithChildren,
   RCodeNewRoute: RCodeNewRoute,
   RCodeSettleRoute: RCodeSettleRoute,
   RCodeIndexRoute: RCodeIndexRoute,

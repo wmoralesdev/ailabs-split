@@ -1,0 +1,133 @@
+import { expect, test } from "@playwright/test"
+import { existsSync } from "node:fs"
+import path from "node:path"
+
+import {
+  addCheckItem,
+  addPeople,
+  assignEqual,
+  assignQuantities,
+  confirmCheck,
+  createDinner,
+  dinnerNav,
+  openLanding,
+  startManualCheck,
+  waitForHydration,
+} from "./dinner-helpers"
+
+const TICKET_PATH = path.resolve(
+  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/docs/tickets/biblioteca-cafe.jpg"
+)
+
+test.describe.configure({ mode: "serial" })
+
+test.describe("dinner split", () => {
+  let dinnerCode = ""
+  const dinnerName = `Friday pizzas ${Date.now()}`
+
+  test("create dinner, add people, two pizzas, confirm, settle, join", async ({
+    page,
+    browser,
+  }) => {
+    dinnerCode = await createDinner(page, dinnerName, "Ana")
+    await expect(page.getByText("You · Ana")).toBeVisible()
+    await expect(page.getByText(/1 person/)).toBeVisible()
+
+    await addPeople(page, ["Ben", "Cam"])
+    await expect(page.getByText("3 people")).toBeVisible()
+
+    await startManualCheck(page)
+    await page.getByLabel("Place").fill("Pizza night")
+    await expect(page.getByRole("group", { name: "Paid by" })).toContainText("Ana")
+
+    await addCheckItem(page, "Pizza Margherita", "24.00")
+    await addCheckItem(page, "Pizza Pepperoni", "24.00")
+
+    await expect(page.getByRole("button", { name: "Confirm check" })).toBeDisabled()
+    await expect(page.getByRole("alert")).toContainText(
+      "Assign every item before confirming"
+    )
+    await expect(page.getByText("Add tip")).toBeVisible()
+    await expect(page.getByRole("button", { name: "10%" })).toBeVisible()
+
+    await assignEqual(page, "Pizza Margherita", ["Ana", "Ben", "Cam"])
+    await assignEqual(page, "Pizza Pepperoni", ["Ana", "Ben", "Cam"])
+
+    await expect(page.getByText("Total", { exact: true })).toBeVisible()
+    await expect(page.locator("main")).toContainText("$48.00")
+    await expect(page.getByText("Add tip")).toBeVisible()
+
+    await confirmCheck(page)
+    await expect(page.getByRole("heading", { name: dinnerName })).toBeVisible()
+    await expect(page.getByText("Pizza night")).toBeVisible()
+    await expect(page.getByText("$48.00").first()).toBeVisible()
+
+    await dinnerNav(page).getByRole("link", { name: "Settle" }).click()
+    await expect(page.getByRole("heading", { name: "Settle up" })).toBeVisible()
+    await expect(page.getByText("$16.00").first()).toBeVisible()
+    await expect(page.locator("main")).toContainText("Ana")
+    await expect(page.locator("main")).toContainText("Ben")
+    await expect(page.locator("main")).toContainText("Cam")
+    await page.getByRole("button", { name: "Record" }).first().click()
+    await expect(page.getByText("Payment recorded")).toBeVisible()
+
+    await dinnerNav(page).getByRole("link", { name: "Home" }).click()
+    await startManualCheck(page)
+    await page.getByLabel("Place").fill("Panchimalco")
+    await addCheckItem(page, "Pupusa Frijol", "6.75", 3)
+    await assignQuantities(page, "Pupusa Frijol", {
+      Ana: 1,
+      Ben: 1,
+      Cam: 1,
+    })
+    await confirmCheck(page)
+    await expect(page.getByText("Panchimalco")).toBeVisible()
+
+    const guest = await browser.newContext()
+    const guestPage = await guest.newPage()
+    await guestPage.goto("/?stay=true&tab=join")
+    await waitForHydration(guestPage)
+    await guestPage.getByRole("tab", { name: "Join" }).click()
+    await guestPage.getByLabel("Trip code").fill(dinnerCode)
+    await guestPage.getByRole("button", { name: "Continue" }).click()
+    await expect(guestPage.getByText(dinnerName)).toBeVisible()
+    await guestPage.getByRole("button", { name: /add my name/i }).click()
+    await guestPage.getByLabel("Your name").fill("Dee")
+    await guestPage.getByRole("button", { name: "Continue" }).click()
+    await expect(guestPage.getByRole("heading", { name: dinnerName })).toBeVisible()
+    await expect(guestPage.getByText("You · Dee")).toBeVisible()
+    await guest.close()
+  })
+
+  test("trip create still requires two members", async ({ page }) => {
+    await openLanding(page)
+    const tripChip = page.getByRole("group", { name: "Mode" }).getByRole("button", {
+      name: "Trip",
+    })
+    await tripChip.click()
+    await expect(tripChip).toHaveAttribute("aria-pressed", "true")
+    await page.getByLabel("Trip name").fill("Weekend")
+    await page.getByRole("button", { name: "Create trip" }).click()
+    await expect(page.getByText("Add at least two members")).toBeVisible()
+  })
+})
+
+test("OCR review when Mistral is configured", async ({ page }) => {
+  test.skip(
+    !process.env.MISTRAL_API_KEY || !existsSync(TICKET_PATH),
+    "MISTRAL_API_KEY or ticket fixture is missing"
+  )
+
+  const name = `Biblioteca OCR ${Date.now()}`
+  await createDinner(page, name, "Ana")
+  await page.getByRole("link", { name: "Scan ticket" }).click()
+  await page.locator('input[type="file"]').setInputFiles(TICKET_PATH)
+  await expect(page.getByText("Continue to assign")).toBeVisible({
+    timeout: 40_000,
+  })
+  await expect(page.getByText(/POLLO CHIPOTLE/i).first()).toBeVisible()
+  await expect(page.getByText(/ONZ/i).first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "Tip" }).first()).toBeVisible()
+  await page.getByRole("button", { name: "Continue to assign" }).click()
+  await expect(page.getByRole("button", { name: "Confirm check" })).toBeDisabled()
+})

@@ -15,7 +15,7 @@ const nitroPublicDir =
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
-    devtools(),
+    ...(process.env.E2E ? [] : [devtools()]),
     tailwindcss(),
     tanstackStart(),
     // Nitro targets Vercel on CI (`VERCEL=1`); local builds use node-server.

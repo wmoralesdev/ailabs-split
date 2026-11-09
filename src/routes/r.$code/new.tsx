@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { Navigate, createFileRoute, useNavigate } from "@tanstack/react-router"
 import { onlineManager, useMutation, useQuery } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -133,6 +133,9 @@ function AddExpensePage() {
 
   if (!room) {
     return isPending ? <AddExpenseSkeleton /> : null
+  }
+  if (room.kind === "DINNER") {
+    return <Navigate to="/r/$code/check" params={{ code }} />
   }
   return (
     <AddExpenseForm

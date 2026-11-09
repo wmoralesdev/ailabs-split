@@ -242,7 +242,7 @@ function SettlePage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Amounts in {room.currency}
           </p>
-          {hasForeignExpenses ? (
+          {room.kind !== "DINNER" && hasForeignExpenses ? (
             <p className="mt-1.5 text-xs text-muted-foreground">
               {hasBankMatch ? (
                 <>
@@ -332,7 +332,9 @@ function SettlePage() {
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {room.expenses.length === 0
-                ? "Add an expense to get started."
+                ? room.kind === "DINNER"
+                  ? "Confirm a check to get started."
+                  : "Add an expense to get started."
                 : "Everyone is even. Nice."}
             </p>
           </div>
@@ -404,11 +406,13 @@ function SettlePage() {
         </ul>
       )}
 
-      <BankFxCalibrationSheet
-        room={room}
-        open={calibrationOpen}
-        onOpenChange={setCalibrationOpen}
-      />
+      {room.kind !== "DINNER" ? (
+        <BankFxCalibrationSheet
+          room={room}
+          open={calibrationOpen}
+          onOpenChange={setCalibrationOpen}
+        />
+      ) : null}
 
       {room.settlements.length > 0 ? (
         <section className="mt-8">

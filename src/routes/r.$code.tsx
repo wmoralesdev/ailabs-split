@@ -108,14 +108,19 @@ function RoomLayout() {
         open={showCreatedSheet}
         code={room.code}
         name={room.name}
+        kind={room.kind}
         onContinue={dismissCreatedSheet}
       />
     ) : null
 
   useEffect(() => {
     if (!room) return
-    rememberRecentTrip({ code: room.code, name: room.name })
-  }, [room?.code, room?.name])
+    rememberRecentTrip({
+      code: room.code,
+      name: room.name,
+      kind: room.kind,
+    })
+  }, [room?.code, room?.name, room?.kind])
 
   useEffect(() => {
     if (!members) return
@@ -254,10 +259,14 @@ function RoomLayout() {
         headerRight={
           <>
             <SyncStatus />
-            <ShareTripButton code={room.code} name={room.name} />
+            <ShareTripButton
+              code={room.code}
+              name={room.name}
+              kind={room.kind}
+            />
           </>
         }
-        footer={<RoomTabBar code={code} />}
+        footer={<RoomTabBar code={code} kind={room.kind} />}
       >
         <Outlet />
       </RoomShell>

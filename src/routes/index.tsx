@@ -8,6 +8,7 @@ import { z } from "zod"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
+import { CreateDinnerForm } from "@/components/dinner/create-dinner-form"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { RecentTripsList } from "@/components/recent-trips-list"
 import { PageShell } from "@/components/page-shell"
@@ -84,6 +85,7 @@ function LandingPage() {
   const navigate = useNavigate()
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
+  const [kind, setKind] = useState<"TRIP" | "DINNER">("TRIP")
   const [resuming, setResuming] = useState(() => {
     if (typeof window === "undefined") return false
     if (stay || tab === "join" || joinCode) return false
@@ -144,18 +146,48 @@ function LandingPage() {
           Split
         </h1>
         <p className="mt-4 max-w-[32ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
-          Share a trip code. Split costs. No accounts.
+          {kind === "DINNER"
+            ? "Split the bill. Scan the ticket. No accounts."
+            : "Share a trip code. Split costs. No accounts."}
         </p>
       </div>
 
       <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
+        <div className="mb-4 flex gap-1.5" role="group" aria-label="Mode">
+          <button
+            type="button"
+            className={cn(
+              "landing-chip",
+              kind === "TRIP" ? "landing-chip-on" : "landing-chip-idle"
+            )}
+            aria-pressed={kind === "TRIP"}
+            onClick={() => setKind("TRIP")}
+          >
+            Trip
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "landing-chip",
+              kind === "DINNER" ? "landing-chip-on" : "landing-chip-idle"
+            )}
+            aria-pressed={kind === "DINNER"}
+            onClick={() => setKind("DINNER")}
+          >
+            Dinner
+          </button>
+        </div>
         <Tabs defaultValue={defaultTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="create">Create</TabsTrigger>
             <TabsTrigger value="join">Join</TabsTrigger>
           </TabsList>
           <TabsContent value="create" className="mt-6 text-base">
-            <CreateForm navigate={navigate} />
+            {kind === "DINNER" ? (
+              <CreateDinnerForm navigate={navigate} />
+            ) : (
+              <CreateForm navigate={navigate} />
+            )}
           </TabsContent>
           <TabsContent value="join" className="mt-6 text-base">
             <JoinForm navigate={navigate} initialCode={joinCode} />
@@ -558,7 +590,7 @@ function JoinForm({
     mutationFn: (code: string) => getRoomByCode({ data: { code } }),
     onSuccess: (found) => {
       if (!found) {
-        toast.error("Trip not found")
+        toast.error("Room not found")
         return
       }
       setError(null)

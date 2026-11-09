@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner"
 
 import { BankFxCalibrationSheet } from "@/components/bank-fx-calibration-sheet"
+import { DinnerHome } from "@/components/dinner/dinner-home"
 import { CategoryChips } from "@/components/category-chips"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -363,6 +364,17 @@ function RoomHomePage() {
 
   if (!room) {
     return isPending ? <RoomHomeSkeleton /> : null
+  }
+
+  if (room.kind === "DINNER") {
+    return (
+      <DinnerHome
+        room={room}
+        memberId={memberId}
+        switchIdentity={switchIdentity}
+        refetch={refetch}
+      />
+    )
   }
 
   const selectedExpense =

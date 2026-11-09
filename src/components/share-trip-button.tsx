@@ -10,9 +10,11 @@ import { shareOrCopyInvite } from "@/lib/invite-link"
 export function ShareTripButton({
   code,
   name,
+  kind = "TRIP",
 }: {
   code: string
   name: string
+  kind?: "TRIP" | "DINNER"
 }) {
   const [busy, setBusy] = useState(false)
 
@@ -20,12 +22,12 @@ export function ShareTripButton({
     if (busy) return
     setBusy(true)
     try {
-      const result = await shareOrCopyInvite({ code, name })
+      const result = await shareOrCopyInvite({ code, name, kind })
       if (result === "copied") {
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error("Could not share trip")
+      toast.error(kind === "DINNER" ? "Could not share dinner" : "Could not share trip")
     } finally {
       setBusy(false)
     }
@@ -38,7 +40,7 @@ export function ShareTripButton({
       size="icon-lg"
       onClick={() => void onShare()}
       disabled={busy}
-      aria-label="Share trip"
+      aria-label={kind === "DINNER" ? "Share dinner" : "Share trip"}
     >
       <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
     </Button>

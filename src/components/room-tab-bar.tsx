@@ -10,14 +10,21 @@ import type { IconSvgElement } from "@hugeicons/react"
 import { cn } from "@/lib/utils"
 
 /** Fixed bottom navigation for a trip: Home · Add · Settle. */
-export function RoomTabBar({ code }: { code: string }) {
+export function RoomTabBar({
+  code,
+  kind = "TRIP",
+}: {
+  code: string
+  kind?: "TRIP" | "DINNER"
+}) {
   const matchRoute = useMatchRoute()
   const onHome = !!matchRoute({ to: "/r/$code", params: { code } })
   const onSettle = !!matchRoute({ to: "/r/$code/settle", params: { code } })
+  const isDinner = kind === "DINNER"
 
   return (
     <nav
-      aria-label="Trip navigation"
+      aria-label={isDinner ? "Dinner navigation" : "Trip navigation"}
       className="border-border/60 bg-background pb-safe relative z-30 shrink-0 border-t"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-2">
@@ -29,14 +36,25 @@ export function RoomTabBar({ code }: { code: string }) {
           active={onHome}
         />
         <div className="flex justify-center">
-          <Link
-            to="/r/$code/new"
-            params={{ code }}
-            aria-label="Add expense"
-            className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
-          >
-            <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
-          </Link>
+          {isDinner ? (
+            <Link
+              to="/r/$code/check"
+              params={{ code }}
+              aria-label="Add check"
+              className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
+            </Link>
+          ) : (
+            <Link
+              to="/r/$code/new"
+              params={{ code }}
+              aria-label="Add expense"
+              className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
+            </Link>
+          )}
         </div>
         <TabLink
           to="/r/$code/settle"
