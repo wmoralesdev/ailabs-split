@@ -43,9 +43,7 @@ function MemberIdentityPicker({
     <div className="flex flex-col gap-2">
       {mode === "pick" && members.length > 0 ? (
         <>
-          <p className="group-label">
-            I&rsquo;m already in this trip
-          </p>
+          <p className="group-label">I&rsquo;m already in this trip</p>
           <ul className="group-list">
             {members.map((member) => (
               <li key={member.id}>
@@ -53,14 +51,16 @@ function MemberIdentityPicker({
                   type="button"
                   disabled={pending}
                   onClick={() => onPickExisting(member.id)}
-                  className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left transition-colors active:bg-muted disabled:opacity-50"
+                  className="group-row-hit w-full text-left disabled:opacity-50"
                 >
                   <Avatar className="size-8">
-                    <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+                    <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                       {initials(member.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="flex-1 text-[15px] font-medium">{member.name}</span>
+                  <span className="flex-1 text-[15px] font-medium">
+                    {member.name}
+                  </span>
                   <HugeiconsIcon
                     icon={ArrowRight01Icon}
                     size={16}
@@ -73,7 +73,7 @@ function MemberIdentityPicker({
           </ul>
           <button
             type="button"
-            className="text-primary mt-1 min-h-11 text-left text-[15px] font-medium"
+            className="mt-1 min-h-11 text-left text-[15px] font-medium text-primary"
             onClick={() => setMode("new")}
           >
             I&rsquo;m new — add my name
@@ -99,7 +99,7 @@ function MemberIdentityPicker({
               required
               autoFocus
             />
-            <p className="text-muted-foreground text-[13px] leading-snug">
+            <p className="text-[13px] leading-snug text-muted-foreground">
               Matches an existing member (case-insensitive) or adds you.
             </p>
           </div>
@@ -109,7 +109,7 @@ function MemberIdentityPicker({
           {members.length > 0 ? (
             <button
               type="button"
-              className="text-primary min-h-11 text-left text-[15px] font-medium"
+              className="min-h-11 text-left text-[15px] font-medium text-primary"
               onClick={() => setMode("pick")}
             >
               Pick from the list instead
@@ -119,7 +119,7 @@ function MemberIdentityPicker({
       )}
 
       {error ? (
-        <p className="text-destructive text-[13px]" role="alert">
+        <p className="text-[13px] text-destructive" role="alert">
           {error}
         </p>
       ) : null}

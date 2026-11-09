@@ -28,52 +28,63 @@ export function RecentTripsList() {
       <h2 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
         Recent
       </h2>
-      <ul className="mt-3 flex flex-col">
-        {trips.map((trip, index) => (
-          <li
-            key={trip.code}
-            className="flex items-center gap-2 border-t border-border/70 py-1"
-          >
-            <button
-              type="button"
-              className={
-                index === 0
-                  ? "flex min-w-0 flex-1 flex-col rounded-2xl bg-muted/50 py-3.5 pr-2 pl-2.5 text-left transition-colors hover:bg-muted/50"
-                  : "flex min-w-0 flex-1 flex-col rounded-2xl py-3 pr-2 text-left transition-colors hover:bg-muted/40"
-              }
-              onClick={() =>
-                void navigate({
-                  to: "/r/$code",
-                  params: { code: trip.code },
-                })
-              }
-            >
-              <span className="truncate font-medium text-foreground">
-                {index === 0 ? `Continue ${trip.name}` : trip.name}
-              </span>
-              <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-display tracking-[0.18em] uppercase">
-                  {trip.code}
+      <ul className="group-list mt-2">
+        {trips.map((trip, index) => {
+          const kind = trip.kind === "DINNER" ? "Dinner" : "Trip"
+          const isContinue = index === 0
+          return (
+            <li key={trip.code} className="flex items-stretch">
+              <button
+                type="button"
+                className="group-row-hit min-w-0 flex-1 text-left"
+                aria-label={
+                  isContinue ? `Continue ${trip.name}` : `Open ${trip.name}`
+                }
+                onClick={() =>
+                  void navigate({
+                    to: "/r/$code",
+                    params: { code: trip.code },
+                  })
+                }
+              >
+                <span className="min-w-0 flex-1">
+                  {isContinue ? (
+                    <span
+                      className="block text-[13px] font-medium text-primary"
+                      aria-hidden
+                    >
+                      Continue
+                    </span>
+                  ) : null}
+                  <span className="block truncate font-medium text-foreground">
+                    {trip.name}
+                  </span>
+                  <span className="mt-0.5 flex min-w-0 items-baseline gap-2 text-[13px] text-muted-foreground">
+                    <span className="font-display tracking-[0.18em] uppercase">
+                      {trip.code}
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span>{kind}</span>
+                  </span>
                 </span>
-                <span aria-hidden>·</span>
-                <span>{trip.kind === "DINNER" ? "Dinner" : "Trip"}</span>
-                <span aria-hidden>·</span>
-                <span>{formatRecentTripOpened(trip.updatedAt)}</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-              aria-label={`Remove ${trip.name} from recent trips`}
-              onClick={() => {
-                forgetRecentTrip(trip.code)
-                refresh()
-              }}
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-            </button>
-          </li>
-        ))}
+                <span className="shrink-0 self-center text-[13px] text-muted-foreground tabular-nums">
+                  {formatRecentTripOpened(trip.updatedAt)}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="inline-flex size-11 shrink-0 items-center justify-center self-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label={`Remove ${trip.name} from recent trips`}
+                onClick={() => {
+                  forgetRecentTrip(trip.code)
+                  refresh()
+                }}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

@@ -423,7 +423,7 @@ function RoomHomePage() {
         </header>
 
         <section className="group-list mt-4">
-          <div className="flex min-h-11 items-center gap-2.5 py-1.5 pr-2 pl-3">
+          <div className={cn("group-row", "gap-2.5 py-1.5 pr-2")}>
             <Avatar className="size-7 shrink-0">
               <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
                 {me ? initials(me.name) : "?"}
@@ -482,10 +482,7 @@ function RoomHomePage() {
               const owed = line.netCents > 0
               const owes = line.netCents < 0
               return (
-                <li
-                  key={line.memberId}
-                  className="flex min-h-12 items-center gap-3 py-2 pr-4 pl-3"
-                >
+                <li key={line.memberId} className="group-row">
                   <Avatar className="size-8">
                     <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
                       {initials(line.name)}
@@ -737,7 +734,7 @@ function ExpenseRow({
     <li>
       <button
         type="button"
-        className="flex min-h-14 w-full items-center justify-between gap-3 py-2.5 pr-4 pl-3 text-left transition-colors active:bg-muted"
+        className="group-row-hit w-full justify-between text-left"
         onClick={onOpen}
       >
         <ExpenseRowContent expense={expense} room={room} pending={pending} />
@@ -774,7 +771,7 @@ function SortableExpenseRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex min-h-14 items-center gap-3 bg-card py-2.5 pr-4 pl-3",
+        "group-row min-h-14 bg-card",
         isDragging && "relative z-10 opacity-90 shadow-lg",
         pending && "opacity-80"
       )}
