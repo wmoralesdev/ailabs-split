@@ -1,3 +1,4 @@
+import { asRoomKind } from "@/lib/room-kind"
 import type { RoomDto } from "@/server/rooms"
 
 const STORAGE_PREFIX = "split:room-cache:"
@@ -23,7 +24,7 @@ function isRoomDto(value: unknown): value is RoomDto {
 function normalizeRoomDto(room: RoomDto): RoomDto {
   return {
     ...room,
-    kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+    kind: asRoomKind(room.kind),
     fxAdjustmentBps: Number.isFinite(room.fxAdjustmentBps)
       ? room.fxAdjustmentBps
       : 0,

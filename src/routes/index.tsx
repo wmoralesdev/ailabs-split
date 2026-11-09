@@ -38,6 +38,7 @@ import {
   mergeNames,
   rememberKind,
 } from "@/lib/landing-prefs"
+import { isMealKind, mealNoun } from "@/lib/room-kind"
 import type { RoomKind } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
 import { isStandaloneDisplay, markInstallEligible } from "@/lib/pwa-install"
@@ -172,7 +173,7 @@ function LandingPage() {
           Split
         </h1>
         <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
-          {kind === "DINNER"
+          {isMealKind(kind)
             ? "Tap who had what. Everyone sees what they owe."
             : "One code for the whole trip. Settle up at the end."}
         </p>
@@ -197,7 +198,7 @@ function LandingPage() {
           <div
             className="mb-5 grid grid-cols-2 gap-2.5"
             role="group"
-            aria-label="Mode"
+            aria-label="What are you splitting"
           >
             <ModeButton
               label="Dinner"
@@ -207,6 +208,20 @@ function LandingPage() {
               onClick={() => pickKind("DINNER")}
             />
             <ModeButton
+              label="Lunch"
+              detail="One bill, midday"
+              icon={Restaurant01Icon}
+              active={kind === "LUNCH"}
+              onClick={() => pickKind("LUNCH")}
+            />
+            <ModeButton
+              label="Outing"
+              detail="A night out"
+              icon={Restaurant01Icon}
+              active={kind === "OUTING"}
+              onClick={() => pickKind("OUTING")}
+            />
+            <ModeButton
               label="Trip"
               detail="Many costs, days"
               icon={Airplane01Icon}
@@ -214,8 +229,8 @@ function LandingPage() {
               onClick={() => pickKind("TRIP")}
             />
           </div>
-          {kind === "DINNER" ? (
-            <CreateDinnerForm navigate={navigate} />
+          {isMealKind(kind) ? (
+            <CreateDinnerForm navigate={navigate} kind={kind} />
           ) : (
             <CreateForm navigate={navigate} />
           )}
@@ -671,9 +686,7 @@ function JoinForm({
     return (
       <div className="flex flex-col gap-5">
         <div className="surface p-4">
-          <p className="eyebrow">
-            Joining {room.kind === "DINNER" ? "dinner" : "trip"}
-          </p>
+          <p className="eyebrow">Joining {mealNoun(room.kind)}</p>
           <p className="mt-0.5 font-display text-xl font-semibold tracking-tight text-foreground">
             {room.name}
           </p>

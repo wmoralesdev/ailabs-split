@@ -21,6 +21,7 @@ import { formatRelativeTime } from "@/lib/format-relative-time"
 import { copyText } from "@/lib/invite-link"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
+import { isMealKind } from "@/lib/room-kind"
 import {
   buildTripSummary,
   computeNetsWithSettlements,
@@ -281,7 +282,7 @@ function SettlePage() {
         </div>
       ) : null}
 
-      {room.kind !== "DINNER" && hasForeignExpenses ? (
+      {!isMealKind(room.kind) && hasForeignExpenses ? (
         <p className="mt-3 text-sm text-muted-foreground">
           {hasBankMatch ? (
             <>
@@ -324,7 +325,7 @@ function SettlePage() {
             </p>
             <p className="mt-0.5 text-[15px] text-muted-foreground">
               {room.expenses.length === 0
-                ? room.kind === "DINNER"
+                ? isMealKind(room.kind)
                   ? "Confirm a check to see who owes what."
                   : "Add an expense to get started."
                 : "Everyone is square."}
@@ -378,7 +379,7 @@ function SettlePage() {
         </section>
       ) : null}
 
-      {room.kind !== "DINNER" ? (
+      {!isMealKind(room.kind) ? (
         <BankFxCalibrationSheet
           room={room}
           open={calibrationOpen}

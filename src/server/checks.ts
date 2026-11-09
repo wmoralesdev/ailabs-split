@@ -2,11 +2,9 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
-import {
-  computeDinnerSplit,
-  expenseSharesFromDinner,
-} from "@/lib/dinner-split"
+import { computeDinnerSplit, expenseSharesFromDinner } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
+import { isMealKind } from "@/lib/room-kind"
 import { assertRateLimit } from "@/lib/rate-limit"
 import {
   checkPayloadSchema,
@@ -49,8 +47,8 @@ async function requireDinnerRoom(code: string) {
     include: { members: true },
   })
   if (!room) throw new Error("Room not found")
-  if (room.kind !== "DINNER") {
-    throw new Error("Checks are only for dinners")
+  if (!isMealKind(room.kind)) {
+    throw new Error("Checks are only for a meal or outing")
   }
   return room
 }
@@ -77,7 +75,9 @@ async function materializeExpense(input: {
 
   if (input.expenseId) {
     const expense = await prisma.$transaction(async (tx) => {
-      await tx.expenseShare.deleteMany({ where: { expenseId: input.expenseId! } })
+      await tx.expenseShare.deleteMany({
+        where: { expenseId: input.expenseId! },
+      })
       return await tx.expense.update({
         where: { id: input.expenseId! },
         data: {
@@ -314,4 +314,3 @@ export const deleteCheck = createServerFn({ method: "POST" })
     }
     return { checkId: data.checkId }
   })
-

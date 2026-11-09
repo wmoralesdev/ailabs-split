@@ -17,12 +17,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { copyText, shareOrCopyInvite } from "@/lib/invite-link"
+import { isMealKind, mealLabel, mealNoun, type RoomKind } from "@/lib/room-kind"
 
 type CreateTripSuccessSheetProps = {
   open: boolean
   code: string
   name: string
-  kind?: "TRIP" | "DINNER"
+  kind?: RoomKind
   onContinue: () => void
   onAddBill?: () => void
 }
@@ -35,14 +36,16 @@ export function CreateTripSuccessSheet({
   onContinue,
   onAddBill,
 }: CreateTripSuccessSheetProps) {
-  const isDinner = kind === "DINNER"
+  const isMeal = isMealKind(kind)
+  const noun = mealNoun(kind)
+  const label = mealLabel(kind)
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
 
   async function onCopyCode() {
     await copyText(code)
     setCopied(true)
-    toast.success(isDinner ? "Dinner code copied" : "Trip code copied")
+    toast.success(`${label} code copied`)
     window.setTimeout(() => setCopied(false), 1500)
   }
 
@@ -55,7 +58,7 @@ export function CreateTripSuccessSheet({
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error(isDinner ? "Could not share dinner" : "Could not share trip")
+      toast.error(`Could not share ${noun}`)
     } finally {
       setBusy(false)
     }
@@ -74,10 +77,10 @@ export function CreateTripSuccessSheet({
       >
         <SheetHeader className="gap-1 p-0 text-left">
           <SheetTitle className="font-display text-[22px] font-bold tracking-tight">
-            {isDinner ? "Dinner ready" : "Trip ready"}
+            {isMeal ? `${label} ready` : "Trip ready"}
           </SheetTitle>
           <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
-            {isDinner
+            {isMeal
               ? "Add the bill now. Send the code whenever, people join from the link."
               : "Send the code so everyone can join. No accounts."}
           </SheetDescription>
@@ -105,7 +108,7 @@ export function CreateTripSuccessSheet({
         </button>
 
         <SheetFooter className="mt-4 flex-col gap-2 p-0 sm:flex-col">
-          {isDinner && onAddBill ? (
+          {isMeal && onAddBill ? (
             <Button type="button" className="cta-lg" onClick={onAddBill}>
               <HugeiconsIcon
                 icon={ReceiptDollarIcon}
@@ -117,9 +120,9 @@ export function CreateTripSuccessSheet({
           ) : null}
           <Button
             type="button"
-            variant={isDinner ? "secondary" : "default"}
+            variant={isMeal ? "secondary" : "default"}
             className={
-              isDinner ? "w-full bg-muted font-semibold text-primary" : "cta-lg"
+              isMeal ? "w-full bg-muted font-semibold text-primary" : "cta-lg"
             }
             onClick={() => void onShare()}
             disabled={busy}
@@ -133,7 +136,7 @@ export function CreateTripSuccessSheet({
             className="w-full"
             onClick={onContinue}
           >
-            {isDinner ? "Continue to dinner" : "Continue to trip"}
+            {isMeal ? `Continue to ${noun}` : "Continue to trip"}
           </Button>
         </SheetFooter>
       </SheetContent>

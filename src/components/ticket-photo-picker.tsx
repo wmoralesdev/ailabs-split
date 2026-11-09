@@ -11,6 +11,8 @@ type TicketPhotoPickerProps = {
   pendingLabel?: string
   title?: string
   hint?: string
+  cameraTestId?: string
+  galleryTestId?: string
 }
 
 export function TicketPhotoPicker({
@@ -19,6 +21,8 @@ export function TicketPhotoPicker({
   pendingLabel = "Reading ticket…",
   title = "Add the ticket",
   hint = "Take a photo or pick one from your gallery. Or type the items in below.",
+  cameraTestId = "ticket-camera-input",
+  galleryTestId = "ticket-gallery-input",
 }: TicketPhotoPickerProps) {
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -62,7 +66,7 @@ export function TicketPhotoPicker({
         capture="environment"
         className="sr-only"
         disabled={pending}
-        data-testid="ticket-camera-input"
+        data-testid={cameraTestId}
         onChange={onPick}
       />
       <input
@@ -71,7 +75,7 @@ export function TicketPhotoPicker({
         accept={GALLERY_ACCEPT}
         className="sr-only"
         disabled={pending}
-        data-testid="ticket-gallery-input"
+        data-testid={galleryTestId}
         onChange={onPick}
       />
     </div>

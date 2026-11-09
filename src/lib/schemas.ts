@@ -27,7 +27,7 @@ export const memberNameSchema = z
 export const splitModeSchema = z.enum(["EQUAL", "PARTS", "AMOUNT"])
 export type SplitMode = z.infer<typeof splitModeSchema>
 
-export const roomKindSchema = z.enum(["TRIP", "DINNER"])
+export const roomKindSchema = z.enum(["TRIP", "DINNER", "LUNCH", "OUTING"])
 export type RoomKind = z.infer<typeof roomKindSchema>
 
 export const checkStatusSchema = z.enum(["DRAFT", "CONFIRMED"])
@@ -93,6 +93,8 @@ export const adjustmentSchema = z.object({
   kind: adjustmentKindSchema,
   name: z.string().trim().min(1).max(80),
   amountCents: z.number().int(),
+  /** Basis points of the item subtotal. Omit or null for a fixed amount. */
+  rateBps: z.number().int().min(0).max(10_000).nullable().optional(),
   allocate: z.literal("BY_ITEMS"),
   source: z.enum(["OCR", "MANUAL"]),
   confidence: z.number().min(0).max(1).nullable(),
@@ -125,7 +127,11 @@ export const expenseCategorySchema = z
 
 export const createRoomSchema = z
   .object({
-    name: z.string().trim().min(1, "Give it a name").max(60, "Name is too long"),
+    name: z
+      .string()
+      .trim()
+      .min(1, "Give it a name")
+      .max(60, "Name is too long"),
     currency: currencyCodeSchema,
     currencies: z.array(currencyCodeSchema).optional().default([]),
     fxRates: z.record(currencyCodeSchema, z.number().positive()).optional(),

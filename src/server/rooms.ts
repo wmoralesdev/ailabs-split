@@ -6,6 +6,7 @@ import { emptyCheckPayload } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
+import { asRoomKind, isMealKind, type RoomKind } from "@/lib/room-kind"
 import {
   addExpenseSchema,
   addRoomMembersSchema,
@@ -86,7 +87,7 @@ export type RoomDto = {
   id: string
   code: string
   name: string
-  kind: "TRIP" | "DINNER"
+  kind: RoomKind
   /** Base / settlement currency. */
   currency: string
   /** Allowed currencies for expenses (always includes the base currency). */
@@ -390,7 +391,7 @@ async function loadRoomByCode(
     id: room.id,
     code: room.code,
     name: room.name,
-    kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+    kind: asRoomKind(room.kind),
     currency: room.currency,
     currencies,
     fxRates: toFxRates(room.fxRates),
@@ -415,12 +416,12 @@ export const createRoom = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(createRoomSchema, data))
   .handler(async ({ data }): Promise<RoomDto> => {
     limitWrites("create-room")
-    const kind = data.kind === "DINNER" ? "DINNER" : "TRIP"
-    const currencies =
-      kind === "DINNER"
-        ? [data.currency]
-        : Array.from(new Set([data.currency, ...data.currencies]))
-    const fxRates = kind === "DINNER" ? {} : (data.fxRates ?? {})
+    const kind = asRoomKind(data.kind)
+    const meal = isMealKind(kind)
+    const currencies = meal
+      ? [data.currency]
+      : Array.from(new Set([data.currency, ...data.currencies]))
+    const fxRates = meal ? {} : (data.fxRates ?? {})
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = generateRoomCode(7)
@@ -551,8 +552,8 @@ export const addExpense = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Dinner charges are added from a check")
+    if (isMealKind(room.kind)) {
+      throw new Error("Add charges from the check")
     }
 
     const memberIds = new Set(room.members.map((member) => member.id))
@@ -621,8 +622,8 @@ export const updateExpense = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Dinner charges are edited from the check")
+    if (isMealKind(room.kind)) {
+      throw new Error("Edit charges from the check")
     }
 
     const existing = await prisma.expense.findFirst({
@@ -692,8 +693,8 @@ export const deleteExpense = createServerFn({ method: "POST" })
       select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Dinner charges are deleted from the check")
+    if (isMealKind(room.kind)) {
+      throw new Error("Delete charges from the check")
     }
 
     const existing = await prisma.expense.findFirst({
@@ -716,8 +717,8 @@ export const reorderExpenses = createServerFn({ method: "POST" })
       select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Dinner rooms do not reorder trip expenses")
+    if (isMealKind(room.kind)) {
+      throw new Error("Meal rooms do not reorder trip expenses")
     }
 
     const roomExpenses = await prisma.expense.findMany({

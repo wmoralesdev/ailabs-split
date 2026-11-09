@@ -25,7 +25,13 @@ export type Adjustment = {
   id: string
   kind: AdjustmentKind
   name: string
+  /** Fixed cents. Ignored when rateBps is set. */
   amountCents: number
+  /**
+   * Percent of the current item subtotal, in basis points (1300 = 13%).
+   * Recomputed as items change. Null or omitted means a fixed amount.
+   */
+  rateBps?: number | null
   allocate: "BY_ITEMS"
   source: "OCR" | "MANUAL"
   confidence: number | null
@@ -115,6 +121,31 @@ export function tipCentsFromPercent(
   return Math.round((subtotalCents * percent) / 100)
 }
 
+/** 1300 → "13%", 1350 → "13.5%". */
+export function formatRateBps(bps: number): string {
+  const percent = bps / 100
+  const text = Number.isInteger(percent)
+    ? String(percent)
+    : percent.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
+  return `${text}%`
+}
+
+/**
+ * Fixed extras use amountCents. Percent extras (rateBps) follow the current
+ * item subtotal, so IVA stays correct as dishes are added or removed.
+ */
+export function adjustmentAmountCents(
+  adjustment: Pick<Adjustment, "amountCents" | "rateBps">,
+  itemSubtotalCents: number
+): number {
+  const rate = adjustment.rateBps
+  if (rate != null && rate > 0) {
+    if (itemSubtotalCents <= 0) return 0
+    return Math.round((itemSubtotalCents * rate) / 10_000)
+  }
+  return adjustment.amountCents
+}
+
 export function emptyCheckPayload(): CheckPayload {
   return {
     items: [],
@@ -184,7 +215,10 @@ export function splitLineItemShares(item: LineItem): LineSplitResult {
     }
     case "QUANTITY": {
       const assigned = item.split.shares.filter((share) => share.quantity > 0)
-      const assignedQty = assigned.reduce((sum, share) => sum + share.quantity, 0)
+      const assignedQty = assigned.reduce(
+        (sum, share) => sum + share.quantity,
+        0
+      )
       if (assigned.length === 0 || assignedQty <= 0) {
         return {
           shares: new Map(),
@@ -298,18 +332,19 @@ export function computeDinnerSplit(input: {
     0
   )
   const adjustmentTotalCents = input.adjustments.reduce(
-    (sum, adjustment) => sum + adjustment.amountCents,
+    (sum, adjustment) =>
+      sum + adjustmentAmountCents(adjustment, itemSubtotalCents),
     0
   )
   const tipCents = input.tip.amountCents > 0 ? input.tip.amountCents : 0
-  const computedTotalCents =
-    itemSubtotalCents + adjustmentTotalCents + tipCents
+  const computedTotalCents = itemSubtotalCents + adjustmentTotalCents + tipCents
 
   const adjustmentCents = new Map<string, number>()
   let feesNeedItems = false
   for (const adjustment of input.adjustments) {
-    if (adjustment.amountCents === 0) continue
-    const allocated = allocateByItems(adjustment.amountCents, itemCents)
+    const amountCents = adjustmentAmountCents(adjustment, itemSubtotalCents)
+    if (amountCents === 0) continue
+    const allocated = allocateByItems(amountCents, itemCents)
     if (!allocated) {
       feesNeedItems = true
       continue
@@ -403,8 +438,10 @@ export function splitLineItem(
       { memberId: "a", weight: qtyA },
       { memberId: "b", weight: qtyB },
     ])
-    const amountA = parts.find((part) => part.memberId === "a")?.amountCents ?? 0
-    const amountB = parts.find((part) => part.memberId === "b")?.amountCents ?? 0
+    const amountA =
+      parts.find((part) => part.memberId === "a")?.amountCents ?? 0
+    const amountB =
+      parts.find((part) => part.memberId === "b")?.amountCents ?? 0
     return [
       {
         ...item,
@@ -634,7 +671,9 @@ export function itemSplitMemberIds(split: ItemSplit): string[] {
     case "EQUAL":
       return [...split.memberIds]
     case "PARTS":
-      return split.parts.filter((part) => part.weight > 0).map((part) => part.memberId)
+      return split.parts
+        .filter((part) => part.weight > 0)
+        .map((part) => part.memberId)
     case "QUANTITY":
       return split.shares
         .filter((share) => share.quantity > 0)

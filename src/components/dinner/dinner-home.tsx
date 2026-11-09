@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label"
 import { copyText } from "@/lib/invite-link"
 import { initials } from "@/lib/dinner-labels"
 import { computeDinnerSplit } from "@/lib/dinner-split"
+import { mealLabel } from "@/lib/room-kind"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { mergeNames } from "@/lib/landing-prefs"
 import { memberLink } from "@/lib/member-storage"
@@ -94,7 +95,9 @@ export function DinnerHome({
       <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
           <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-            <span className="font-medium text-foreground">Dinner</span>
+            <span className="font-medium text-foreground">
+              {mealLabel(room.kind)}
+            </span>
             <span aria-hidden>·</span>
             <span>{room.currency}</span>
           </div>
@@ -186,7 +189,7 @@ export function DinnerHome({
           </div>
           {room.checks.length === 0 ? (
             <p className="mt-1 text-[15px] text-muted-foreground">
-              Nothing yet. Scan the ticket or type the items in.
+              Nothing yet. Photograph the menu or ticket, or type the items in.
             </p>
           ) : (
             <ul className="group-list mt-1">
@@ -227,13 +230,23 @@ function PositionCard({
       <section className="surface mt-4 p-4">
         <p className="font-display text-lg font-semibold">Add the bill</p>
         <p className="mt-0.5 text-[15px] text-muted-foreground">
-          Take a photo or pick one from your gallery.
+          A menu photo, a ticket photo, or type each item. Nothing is an expense
+          until you confirm the check.
         </p>
         <div className="mt-3.5 flex flex-col gap-2">
           <Link
             to="/r/$code/check"
             params={{ code: room.code }}
-            search={{ scan: true }}
+            search={{ scan: true, source: "menu" }}
+            className="split-cta"
+          >
+            <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
+            Photo of the menu
+          </Link>
+          <Link
+            to="/r/$code/check"
+            params={{ code: room.code }}
+            search={{ scan: true, source: "ticket" }}
             className="split-cta"
           >
             <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />

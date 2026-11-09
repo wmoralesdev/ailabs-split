@@ -20,13 +20,18 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
-  defaultDinnerName,
   getLastCurrency,
   getLastName,
   mergeNames,
   rememberCurrency,
   rememberName,
 } from "@/lib/landing-prefs"
+import {
+  defaultMealName,
+  mealLabel,
+  mealNoun,
+  type MealKind,
+} from "@/lib/room-kind"
 import { rememberMember } from "@/lib/member-storage"
 import { markInstallEligible } from "@/lib/pwa-install"
 import { createRoom } from "@/server/rooms"
@@ -44,8 +49,10 @@ type DinnerValues = z.infer<typeof dinnerSchema>
 
 export function CreateDinnerForm({
   navigate,
+  kind,
 }: {
   navigate: ReturnType<typeof useNavigate>
+  kind: MealKind
 }) {
   const form = useForm<DinnerValues>({
     resolver: zodResolver(dinnerSchema),
@@ -59,14 +66,14 @@ export function CreateDinnerForm({
   const creatorName = form.watch("creatorName")
 
   useEffect(() => {
-    setFallbackName(defaultDinnerName())
+    setFallbackName(defaultMealName(kind))
     const lastName = getLastName()
     if (lastName && !form.getValues("creatorName")) {
       form.setValue("creatorName", lastName)
     }
     const lastCurrency = getLastCurrency()
     if (lastCurrency) form.setValue("currency", lastCurrency)
-  }, [form])
+  }, [form, kind])
 
   const mutation = useMutation({
     mutationFn: (data: {
@@ -80,7 +87,7 @@ export function CreateDinnerForm({
           currency: data.currency,
           currencies: [data.currency],
           memberNames: data.memberNames,
-          kind: "DINNER",
+          kind,
         },
       }),
     onSuccess: async (room, variables) => {
@@ -99,7 +106,9 @@ export function CreateDinnerForm({
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Could not create dinner"
+        error instanceof Error
+          ? error.message
+          : `Could not create ${mealNoun(kind)}`
       )
     },
   })
@@ -160,7 +169,7 @@ export function CreateDinnerForm({
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Dinner name</FormLabel>
+              <FormLabel>{mealLabel(kind)} name</FormLabel>
               <FormControl>
                 <Input
                   placeholder={fallbackName}
@@ -223,7 +232,7 @@ export function CreateDinnerForm({
             disabled={mutation.isPending}
             className="cta-lg"
           >
-            {mutation.isPending ? "Creating…" : "Create dinner"}
+            {mutation.isPending ? "Creating…" : `Create ${mealNoun(kind)}`}
           </Button>
         </div>
       </form>

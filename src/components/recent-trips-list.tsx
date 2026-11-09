@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
+import { mealLabel } from "@/lib/room-kind"
 import {
   forgetRecentTrip,
   formatRecentTripOpened,
@@ -56,7 +57,7 @@ export function RecentTripsList() {
                   {trip.code}
                 </span>
                 <span aria-hidden>·</span>
-                <span>{trip.kind === "DINNER" ? "Dinner" : "Trip"}</span>
+                <span>{mealLabel(trip.kind)}</span>
                 <span aria-hidden>·</span>
                 <span>{formatRecentTripOpened(trip.updatedAt)}</span>
               </span>

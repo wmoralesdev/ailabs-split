@@ -1,4 +1,6 @@
-export type RoomKindLabel = "TRIP" | "DINNER"
+import { asRoomKind, type RoomKind } from "@/lib/room-kind"
+
+export type RoomKindLabel = RoomKind
 
 export type RecentTrip = {
   code: string
@@ -20,7 +22,11 @@ function isRecentTrip(value: unknown): value is RecentTrip {
     typeof trip.name === "string" &&
     typeof trip.updatedAt === "number" &&
     Number.isFinite(trip.updatedAt) &&
-    (kind === undefined || kind === "TRIP" || kind === "DINNER")
+    (kind === undefined ||
+      kind === "TRIP" ||
+      kind === "DINNER" ||
+      kind === "LUNCH" ||
+      kind === "OUTING")
   )
 }
 
@@ -65,11 +71,9 @@ export function rememberRecentTrip(input: {
     code,
     name,
     updatedAt: Date.now(),
-    kind: input.kind === "DINNER" ? "DINNER" : "TRIP",
+    kind: asRoomKind(input.kind),
   }
-  const without = readTrips().filter(
-    (trip) => trip.code.toUpperCase() !== code
-  )
+  const without = readTrips().filter((trip) => trip.code.toUpperCase() !== code)
   writeTrips([next, ...without].slice(0, MAX_RECENT))
 }
 
@@ -82,7 +86,10 @@ export function forgetRecentTrip(code: string): void {
 }
 
 /** Short relative label for last opened (e.g. "Just now", "3d ago"). */
-export function formatRecentTripOpened(updatedAt: number, now = Date.now()): string {
+export function formatRecentTripOpened(
+  updatedAt: number,
+  now = Date.now()
+): string {
   const diffMs = Math.max(0, now - updatedAt)
   const mins = Math.floor(diffMs / 60_000)
   if (mins < 1) return "Just now"

@@ -22,6 +22,7 @@ import {
 } from "@/lib/member-storage"
 import { markInstallEligible } from "@/lib/pwa-install"
 import { rememberRecentTrip } from "@/lib/recent-trips"
+import { mealNoun } from "@/lib/room-kind"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import { RoomIdentityContext } from "@/lib/room-identity"
 import { claimMemberById, joinRoom } from "@/server/rooms"
@@ -255,6 +256,7 @@ function RoomLayout() {
           error={error}
           onPickExisting={(id) => void pickExisting(id)}
           onClaimName={(name) => void claimName(name)}
+          placeLabel={mealNoun(room.kind)}
         />
         {createdSheet}
       </>

@@ -5,6 +5,7 @@ import { CheckEditor } from "@/components/dinner/check-editor"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { roomQueryOptions } from "@/lib/room-query"
+import { isMealKind } from "@/lib/room-kind"
 
 const checkLayoutRoute = getRouteApi("/r/$code/check")
 
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/r/$code/check/")({
 
 function NewCheckPage() {
   const { code } = Route.useParams()
-  const { scan } = checkLayoutRoute.useSearch()
+  const { scan, source } = checkLayoutRoute.useSearch()
   const { memberId } = useRoomIdentity()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
 
@@ -27,7 +28,7 @@ function NewCheckPage() {
     ) : null
   }
 
-  if (room.kind !== "DINNER") {
+  if (!isMealKind(room.kind)) {
     return <Navigate to="/r/$code/new" params={{ code }} />
   }
 
@@ -37,6 +38,7 @@ function NewCheckPage() {
       selfMemberId={memberId}
       check={null}
       startWithScan={scan}
+      initialPhoto={source ?? "ticket"}
     />
   )
 }

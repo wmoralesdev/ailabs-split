@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons"
 import type { IconSvgElement } from "@hugeicons/react"
 
+import { isMealKind, mealLabel, type RoomKind } from "@/lib/room-kind"
 import { cn } from "@/lib/utils"
 
 /** Fixed bottom navigation for a trip: Home · Add · Settle. */
@@ -15,7 +16,7 @@ export function RoomTabBar({
   kind = "TRIP",
 }: {
   code: string
-  kind?: "TRIP" | "DINNER"
+  kind?: RoomKind
 }) {
   const matchRoute = useMatchRoute()
   const onHome = !!matchRoute({ to: "/r/$code", params: { code } })
@@ -25,13 +26,13 @@ export function RoomTabBar({
     params: { code },
     fuzzy: true,
   })
-  const isDinner = kind === "DINNER"
+  const isMeal = isMealKind(kind)
 
   if (onCheck) return null
 
   return (
     <nav
-      aria-label={isDinner ? "Dinner navigation" : "Trip navigation"}
+      aria-label={isMeal ? `${mealLabel(kind)} navigation` : "Trip navigation"}
       className="pb-safe relative z-30 shrink-0 border-t border-border bg-background"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-1">
@@ -43,7 +44,7 @@ export function RoomTabBar({
           active={onHome}
         />
         <div className="flex justify-center">
-          {isDinner ? (
+          {isMeal ? (
             <Link
               to="/r/$code/check"
               params={{ code }}

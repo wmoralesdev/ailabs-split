@@ -13,7 +13,7 @@ model Room {
   id          String       @id @default(cuid())
   code        String       @unique
   name        String
-  // TRIP (default) or DINNER — dinner is a one-time room, not a trip.
+  // TRIP (default), or a one-time meal: DINNER, LUNCH, OUTING.
   kind        String       @default("TRIP")
   // Base/settlement currency for the room (e.g. the members' home currency).
   currency    String

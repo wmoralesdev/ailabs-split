@@ -52,6 +52,7 @@ import { useOnlineStatus } from "@/lib/online-status"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { roomQueryOptions } from "@/lib/room-query"
+import { isMealKind } from "@/lib/room-kind"
 import { redistributeAmounts } from "@/lib/amount-split"
 import { equalSplitCents, formatMoney, partsSplitCents } from "@/lib/settle"
 import type { SplitMode } from "@/lib/schemas"
@@ -134,7 +135,7 @@ function AddExpensePage() {
   if (!room) {
     return isPending ? <AddExpenseSkeleton /> : null
   }
-  if (room.kind === "DINNER") {
+  if (isMealKind(room.kind)) {
     return <Navigate to="/r/$code/check" params={{ code }} />
   }
   return (
@@ -846,7 +847,11 @@ function AddExpenseForm({
             </div>
           )}
 
-          <Button type="submit" className="cta-lg" disabled={mutation.isPending}>
+          <Button
+            type="submit"
+            className="cta-lg"
+            disabled={mutation.isPending}
+          >
             {mutation.isPending ? "Saving…" : "Save expense"}
           </Button>
         </form>

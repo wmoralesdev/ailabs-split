@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  adjustmentAmountCents,
   adjustmentToItem,
   assignRestToMember,
   computeDinnerSplit,
@@ -16,7 +17,9 @@ import {
 } from "./dinner-split"
 import type { LineItem, TipConfig } from "./dinner-split"
 
-function item(partial: Partial<LineItem> & Pick<LineItem, "id" | "name" | "amountCents">): LineItem {
+function item(
+  partial: Partial<LineItem> & Pick<LineItem, "id" | "name" | "amountCents">
+): LineItem {
   return {
     quantity: 1,
     unitPriceCents: partial.amountCents,
@@ -114,6 +117,75 @@ describe("BY_ITEMS fees and ticket-only tip", () => {
     }
   })
 
+  it("splits IVA as a percent of the current subtotal and late night as a fixed amount", () => {
+    const salad = item({
+      id: "salad",
+      name: "Caesar salad",
+      amountCents: 2000,
+      split: { mode: "EQUAL", memberIds: ["ana"] },
+    })
+    const steak = item({
+      id: "steak",
+      name: "Steak",
+      amountCents: 3000,
+      split: { mode: "EQUAL", memberIds: ["ben"] },
+    })
+    const result = computeDinnerSplit({
+      items: [salad, steak],
+      adjustments: [
+        {
+          id: "iva",
+          kind: "TAX",
+          name: "IVA",
+          amountCents: 0,
+          rateBps: 1000,
+          allocate: "BY_ITEMS",
+          source: "MANUAL",
+          confidence: null,
+        },
+        {
+          id: "late",
+          kind: "FEE",
+          name: "Late night",
+          amountCents: 1000,
+          rateBps: null,
+          allocate: "BY_ITEMS",
+          source: "MANUAL",
+          confidence: null,
+        },
+      ],
+      tip: emptyTip(),
+    })
+
+    expect(result.itemSubtotalCents).toBe(5000)
+    expect(result.adjustmentTotalCents).toBe(1500)
+    expect(result.totalCents).toBe(6500)
+    const ana = result.shares.find((share) => share.memberId === "ana")
+    const ben = result.shares.find((share) => share.memberId === "ben")
+    expect(ana).toMatchObject({
+      itemCents: 2000,
+      adjustmentCents: 600,
+      totalCents: 2600,
+    })
+    expect(ben).toMatchObject({
+      itemCents: 3000,
+      adjustmentCents: 900,
+      totalCents: 3900,
+    })
+  })
+
+  it("follows a changed subtotal for a percent extra", () => {
+    expect(adjustmentAmountCents({ amountCents: 0, rateBps: 1000 }, 2000)).toBe(
+      200
+    )
+    expect(adjustmentAmountCents({ amountCents: 999, rateBps: 1000 }, 0)).toBe(
+      0
+    )
+    expect(
+      adjustmentAmountCents({ amountCents: 1000, rateBps: null }, 5000)
+    ).toBe(1000)
+  })
+
   it("does not invent 10% when the ticket printed no tip", () => {
     const result = computeDinnerSplit({
       items: [pizzaA, pizzaB],
@@ -207,7 +279,10 @@ describe("BY_ITEMS fees and ticket-only tip", () => {
     expect(celeste.itemSubtotalCents).toBe(4440)
     expect(celeste.tipCents).toBe(444)
     expect(celeste.totalCents).toBe(4884)
-    const tipSum = celeste.shares.reduce((sum, share) => sum + share.tipCents, 0)
+    const tipSum = celeste.shares.reduce(
+      (sum, share) => sum + share.tipCents,
+      0
+    )
     expect(tipSum).toBe(444)
   })
 
@@ -322,7 +397,10 @@ describe("split line, assign rest, reclassify, force total", () => {
   })
 
   it("copies the previous item’s people onto the next line", () => {
-    const copied = copyItemSplit(pizzaA, item({ id: "next", name: "Coke", amountCents: 200 }))
+    const copied = copyItemSplit(
+      pizzaA,
+      item({ id: "next", name: "Coke", amountCents: 200 })
+    )
     expect(copied.split).toEqual({
       mode: "EQUAL",
       memberIds: ["ana", "ben", "cara", "dan"],
@@ -355,9 +433,9 @@ describe("split line, assign rest, reclassify, force total", () => {
     })
     expect(result.totalCents).toBe(5000)
     expect(result.ocrDeltaCents).toBe(0)
-    expect(result.shares.reduce((sum, share) => sum + share.totalCents, 0)).toBe(
-      5000
-    )
+    expect(
+      result.shares.reduce((sum, share) => sum + share.totalCents, 0)
+    ).toBe(5000)
   })
 
   it("uses largest-remainder so a 1¢ tip still sums", () => {

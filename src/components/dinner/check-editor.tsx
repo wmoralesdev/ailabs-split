@@ -23,25 +23,30 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { itemSplitSummary } from "@/lib/dinner-labels"
 import {
+  adjustmentAmountCents,
   assignRestToMember,
   computedTotalWithoutPrintedForce,
   computeDinnerSplit,
   emptyCheckPayload,
+  emptyTip,
+  formatRateBps,
   manualTip,
   splitLineItem,
   splitLineItemShares,
   tipCentsFromPercent,
   withForcedPrintedTotal,
 } from "@/lib/dinner-split"
-import type { CheckPayload, LineItem } from "@/lib/dinner-split"
+import type { Adjustment, CheckPayload, LineItem } from "@/lib/dinner-split"
 import {
   atmDigitsFromInput,
   atmDigitsToCents,
+  centsToAtmDigits,
   currencyFractionDigits,
   formatAtmAmount,
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
+import { mealLabel } from "@/lib/room-kind"
 import { useOnlineStatus } from "@/lib/online-status"
 import { checkPayloadFromOcr } from "@/lib/receipt-ocr"
 import { roomKeys } from "@/lib/room-query"
@@ -58,15 +63,49 @@ import type { CheckDto, RoomDto } from "@/server/rooms"
 
 type Phase = "review" | "assign"
 
+type ExtraDraft = {
+  id: string | null
+  name: string
+  mode: "PERCENT" | "FIXED"
+  percent: string
+  amount: string
+  kind: "TAX" | "FEE"
+}
+
+function withLiveExtraAmounts(
+  payload: CheckPayload,
+  itemSubtotalCents: number
+): CheckPayload {
+  return {
+    ...payload,
+    adjustments: payload.adjustments.map((adjustment) => ({
+      ...adjustment,
+      amountCents: adjustmentAmountCents(adjustment, itemSubtotalCents),
+    })),
+  }
+}
+
+function parsePercentBps(raw: string): number | null {
+  const cleaned = raw.trim().replace("%", "").replace(",", ".")
+  if (!cleaned) return null
+  const value = Number.parseFloat(cleaned)
+  if (!Number.isFinite(value) || value <= 0 || value > 100) return null
+  const bps = Math.round(value * 100)
+  if (bps <= 0 || bps > 10_000) return null
+  return bps
+}
+
 export function CheckEditor({
   room,
   selfMemberId,
   check,
+  initialPhoto = "ticket",
 }: {
   room: RoomDto
   selfMemberId: string
   check: CheckDto | null
   startWithScan?: boolean
+  initialPhoto?: "menu" | "ticket"
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -87,7 +126,6 @@ export function CheckEditor({
   )
   const [phase, setPhase] = useState<Phase>("assign")
   const itemNameRef = useRef<HTMLInputElement>(null)
-  const [ocrPending, setOcrPending] = useState(false)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [newName, setNewName] = useState("")
   const [newQty, setNewQty] = useState(1)
@@ -96,6 +134,15 @@ export function CheckEditor({
   const [feeName, setFeeName] = useState("")
   const [feeAmount, setFeeAmount] = useState("")
   const [showFee, setShowFee] = useState(false)
+  const [photoSource, setPhotoSource] = useState<"menu" | "ticket">(
+    initialPhoto
+  )
+  const [photoMode, setPhotoMode] = useState<"menu" | "ticket">(initialPhoto)
+  const [scanningSource, setScanningSource] = useState<
+    "menu" | "ticket" | null
+  >(null)
+  const [extraDraft, setExtraDraft] = useState<ExtraDraft | null>(null)
+  const [extraError, setExtraError] = useState<string | null>(null)
 
   const nameById = useMemo(
     () => new Map(room.members.map((member) => [member.id, member.name])),
@@ -130,10 +177,10 @@ export function CheckEditor({
         data: {
           code: room.code,
           checkId: checkId ?? undefined,
-          merchant: merchant.trim() || "Dinner",
+          merchant: merchant.trim() || mealLabel(room.kind),
           paidById,
           isPrecuenta,
-          payload,
+          payload: withLiveExtraAmounts(payload, split.itemSubtotalCents),
         },
       })
       setCheckId(saved.id)
@@ -191,13 +238,14 @@ export function CheckEditor({
     },
   })
 
-  async function onScan(file: File | null) {
+  async function onScan(file: File | null, source: "menu" | "ticket") {
     if (!file) return
     if (!onlineManager.isOnline()) {
       toast.error("Scanning needs a connection")
       return
     }
-    setOcrPending(true)
+    setPhotoSource(source)
+    setScanningSource(source)
     try {
       const compressed = await compressImageForOcr(file)
       const draft = await scanReceipt({
@@ -222,7 +270,7 @@ export function CheckEditor({
         error instanceof Error ? error.message : "Could not read ticket"
       )
     } finally {
-      setOcrPending(false)
+      setScanningSource(null)
     }
   }
 
@@ -320,6 +368,146 @@ export function CheckEditor({
     setShowFee(false)
   }
 
+  function openExtraPreset(preset: "late" | "iva" | "custom") {
+    setExtraError(null)
+    if (preset === "late") {
+      setExtraDraft({
+        id: null,
+        name: "Late night",
+        mode: "FIXED",
+        percent: "",
+        amount: "",
+        kind: "FEE",
+      })
+      return
+    }
+    if (preset === "iva") {
+      setExtraDraft({
+        id: null,
+        name: "IVA",
+        mode: "PERCENT",
+        percent: "",
+        amount: "",
+        kind: "TAX",
+      })
+      return
+    }
+    setExtraDraft({
+      id: null,
+      name: "",
+      mode: "PERCENT",
+      percent: "",
+      amount: "",
+      kind: "FEE",
+    })
+  }
+
+  function openExtra(adjustment: Adjustment) {
+    setExtraError(null)
+    const percent = adjustment.rateBps != null && adjustment.rateBps > 0
+    setExtraDraft({
+      id: adjustment.id,
+      name: adjustment.name,
+      mode: percent ? "PERCENT" : "FIXED",
+      percent: percent
+        ? formatRateBps(adjustment.rateBps ?? 0).replace("%", "")
+        : "",
+      amount: percent
+        ? ""
+        : centsToAtmDigits(Math.abs(adjustment.amountCents), fd),
+      kind: adjustment.kind === "TAX" ? "TAX" : "FEE",
+    })
+  }
+
+  function saveExtra() {
+    if (!extraDraft) return
+    const name = extraDraft.name.trim()
+    if (!name) {
+      setExtraError("Name this charge")
+      return
+    }
+    const rateBps =
+      extraDraft.mode === "PERCENT" ? parsePercentBps(extraDraft.percent) : null
+    const fixedCents =
+      extraDraft.mode === "FIXED" ? atmDigitsToCents(extraDraft.amount, fd) : 0
+    if (extraDraft.mode === "PERCENT" && rateBps == null) {
+      setExtraError("Enter a percent")
+      return
+    }
+    if (extraDraft.mode === "FIXED" && fixedCents <= 0) {
+      setExtraError("Enter an amount")
+      return
+    }
+    const next: Adjustment = {
+      id: extraDraft.id ?? crypto.randomUUID(),
+      kind: extraDraft.kind,
+      name,
+      amountCents:
+        extraDraft.mode === "PERCENT"
+          ? adjustmentAmountCents(
+              { amountCents: 0, rateBps },
+              split.itemSubtotalCents
+            )
+          : fixedCents,
+      rateBps,
+      allocate: "BY_ITEMS",
+      source: "MANUAL",
+      confidence: null,
+    }
+    setPayload((prev) => ({
+      ...prev,
+      adjustments: extraDraft.id
+        ? prev.adjustments.map((entry) =>
+            entry.id === extraDraft.id ? next : entry
+          )
+        : [...prev.adjustments, next],
+    }))
+    setExtraDraft(null)
+    setExtraError(null)
+  }
+
+  const extraPreview = (() => {
+    if (!extraDraft) return null
+    const rateBps =
+      extraDraft.mode === "PERCENT" ? parsePercentBps(extraDraft.percent) : null
+    const fixedCents =
+      extraDraft.mode === "FIXED" ? atmDigitsToCents(extraDraft.amount, fd) : 0
+    if (extraDraft.mode === "PERCENT" && rateBps == null) return null
+    if (extraDraft.mode === "FIXED" && fixedCents <= 0) return null
+    const amountCents = adjustmentAmountCents(
+      {
+        amountCents: fixedCents,
+        rateBps: extraDraft.mode === "PERCENT" ? rateBps : null,
+      },
+      split.itemSubtotalCents
+    )
+    const preview = computeDinnerSplit({
+      items: payload.items,
+      adjustments: [
+        {
+          id: "preview",
+          kind: extraDraft.kind,
+          name: extraDraft.name || "Charge",
+          amountCents,
+          rateBps: extraDraft.mode === "PERCENT" ? rateBps : null,
+          allocate: "BY_ITEMS",
+          source: "MANUAL",
+          confidence: null,
+        },
+      ],
+      tip: emptyTip(),
+    })
+    return {
+      amountCents,
+      shares: preview.shares
+        .filter((share) => share.adjustmentCents > 0)
+        .map((share) => ({
+          memberId: share.memberId,
+          amountCents: share.adjustmentCents,
+        })),
+    }
+  })()
+
   function forcePrintedTotal() {
     const without = computedTotalWithoutPrintedForce(payload)
     setPayload((prev) => ({
@@ -342,7 +530,17 @@ export function CheckEditor({
   if (phase === "review") {
     return (
       <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
-        <EditorHeader title="Check the ticket" onBack={backHome} />
+        <EditorHeader
+          title={
+            photoSource === "menu" ? "Confirm the menu" : "Check the ticket"
+          }
+          onBack={backHome}
+        />
+        <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+          {photoSource === "menu"
+            ? "Keep what you ordered and fix any price. Nothing is an expense until you confirm the check."
+            : "Check the lines, then assign who had each one. Nothing is an expense until you confirm the check."}
+        </p>
         <div className="mt-5 flex flex-col gap-5">
           <div className="grid gap-2">
             <Label htmlFor="merchant">Place</Label>
@@ -383,10 +581,53 @@ export function CheckEditor({
 
       <div className="mt-3 flex flex-col gap-6 pb-6">
         {payload.items.length === 0 && isOnline ? (
-          <TicketPhotoPicker
-            pending={ocrPending}
-            onFile={(file) => void onScan(file)}
-          />
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-(--control-height) items-center justify-center rounded-xl text-sm font-medium",
+                  photoMode === "menu"
+                    ? "bg-foreground text-background"
+                    : "bg-card"
+                )}
+                onClick={() => setPhotoMode("menu")}
+              >
+                Menu photo
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-(--control-height) items-center justify-center rounded-xl text-sm font-medium",
+                  photoMode === "ticket"
+                    ? "bg-foreground text-background"
+                    : "bg-card"
+                )}
+                onClick={() => setPhotoMode("ticket")}
+              >
+                Ticket photo
+              </button>
+            </div>
+            {photoMode === "menu" ? (
+              <TicketPhotoPicker
+                pending={scanningSource === "menu"}
+                pendingLabel="Reading menu…"
+                title="Photo of the menu"
+                hint="We read the dishes and prices. You choose what you ordered, then confirm."
+                cameraTestId="menu-camera-input"
+                galleryTestId="menu-gallery-input"
+                onFile={(file) => void onScan(file, "menu")}
+              />
+            ) : (
+              <TicketPhotoPicker
+                pending={scanningSource === "ticket"}
+                pendingLabel="Reading ticket…"
+                title="Photo of the ticket"
+                hint="We read the lines. Assign who had each one, then confirm."
+                onFile={(file) => void onScan(file, "ticket")}
+              />
+            )}
+          </div>
         ) : null}
         {payload.items.length === 0 && !isOnline ? (
           <p className="text-[15px] text-muted-foreground">
@@ -568,41 +809,199 @@ export function CheckEditor({
           </h2>
           {payload.adjustments.length > 0 ? (
             <ul className="group-list">
-              {payload.adjustments.map((adjustment) => (
-                <li
-                  key={adjustment.id}
-                  className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
-                >
-                  <span className="text-[15px]">{adjustment.name}</span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-[15px] tabular-nums">
-                      {formatMoney(adjustment.amountCents, room.currency)}
-                    </span>
-                    <Button
+              {payload.adjustments.map((adjustment) => {
+                const shown = adjustmentAmountCents(
+                  adjustment,
+                  split.itemSubtotalCents
+                )
+                return (
+                  <li
+                    key={adjustment.id}
+                    className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
+                  >
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${adjustment.name}`}
-                      onClick={() =>
-                        setPayload((prev) => ({
-                          ...prev,
-                          adjustments: prev.adjustments.filter(
-                            (entry) => entry.id !== adjustment.id
-                          ),
-                        }))
-                      }
+                      className="min-w-0 flex-1 py-2 text-left"
+                      onClick={() => openExtra(adjustment)}
                     >
-                      <HugeiconsIcon
-                        icon={Delete02Icon}
-                        size={16}
-                        strokeWidth={2}
-                      />
-                    </Button>
-                  </span>
-                </li>
-              ))}
+                      <span className="block text-[15px]">
+                        {adjustment.name}
+                        {adjustment.rateBps
+                          ? ` · ${formatRateBps(adjustment.rateBps)}`
+                          : ""}
+                      </span>
+                    </button>
+                    <span className="flex items-center gap-1">
+                      <span className="text-[15px] tabular-nums">
+                        {formatMoney(shown, room.currency)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove ${adjustment.name}`}
+                        onClick={() =>
+                          setPayload((prev) => ({
+                            ...prev,
+                            adjustments: prev.adjustments.filter(
+                              (entry) => entry.id !== adjustment.id
+                            ),
+                          }))
+                        }
+                      >
+                        <HugeiconsIcon
+                          icon={Delete02Icon}
+                          size={16}
+                          strokeWidth={2}
+                        />
+                      </Button>
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           ) : null}
+
+          <div className="flex flex-col gap-2">
+            <p className="text-[13px] leading-snug text-muted-foreground">
+              Late night, tax, and other charges. A percent follows the current
+              subtotal. A fixed amount stays put. Both split by what each person
+              ordered.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-sm font-medium"
+                onClick={() => openExtraPreset("late")}
+              >
+                Late night
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-sm font-medium"
+                onClick={() => openExtraPreset("iva")}
+              >
+                IVA
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-sm font-medium"
+                onClick={() => openExtraPreset("custom")}
+              >
+                Custom
+              </button>
+            </div>
+            {extraDraft ? (
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  saveExtra()
+                }}
+              >
+                <Label htmlFor="extra-name">Name</Label>
+                <Input
+                  id="extra-name"
+                  value={extraDraft.name}
+                  onChange={(event) =>
+                    setExtraDraft({ ...extraDraft, name: event.target.value })
+                  }
+                  placeholder="Cover charge"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["PERCENT", "Percent"],
+                      ["FIXED", "Fixed amount"],
+                    ] as const
+                  ).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={cn(
+                        "inline-flex h-(--control-height) items-center justify-center rounded-xl text-sm font-medium",
+                        extraDraft.mode === mode
+                          ? "bg-foreground text-background"
+                          : "bg-card"
+                      )}
+                      onClick={() => setExtraDraft({ ...extraDraft, mode })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {extraDraft.mode === "PERCENT" ? (
+                  <Input
+                    inputMode="decimal"
+                    value={extraDraft.percent}
+                    onChange={(event) =>
+                      setExtraDraft({
+                        ...extraDraft,
+                        percent: event.target.value,
+                      })
+                    }
+                    placeholder="13"
+                    aria-label="Percent of the subtotal"
+                  />
+                ) : (
+                  <Input
+                    inputMode="numeric"
+                    value={formatAtmAmountInput(extraDraft.amount, fd)}
+                    onChange={(event) =>
+                      setExtraDraft({
+                        ...extraDraft,
+                        amount: atmDigitsFromInput(event.target.value),
+                      })
+                    }
+                    placeholder={formatAtmAmount("", fd)}
+                    aria-label="Charge amount"
+                    className="text-right tabular-nums"
+                  />
+                )}
+                {extraPreview ? (
+                  <p className="text-[13px] leading-snug text-muted-foreground">
+                    Group subtotal{" "}
+                    {formatMoney(split.itemSubtotalCents, room.currency)}
+                    {" · "}
+                    this charge{" "}
+                    {formatMoney(extraPreview.amountCents, room.currency)}
+                    {extraPreview.shares.length > 0
+                      ? `. ${extraPreview.shares
+                          .map(
+                            (share) =>
+                              `${nameById.get(share.memberId) ?? "Someone"} ${formatMoney(share.amountCents, room.currency)}`
+                          )
+                          .join(", ")}`
+                      : ". Add items first. This charge applies once someone is on the bill."}
+                  </p>
+                ) : (
+                  <p className="text-[13px] text-muted-foreground">
+                    Enter an amount to see how it splits.
+                  </p>
+                )}
+                {extraError ? (
+                  <p className="text-[13px] text-destructive" role="alert">
+                    {extraError}
+                  </p>
+                ) : null}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="submit" variant="secondary">
+                    {extraDraft.id ? "Save charge" : "Add charge"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setExtraDraft(null)
+                      setExtraError(null)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : null}
+          </div>
 
           {showTipChips ? (
             <div className="flex flex-col gap-2">
@@ -705,7 +1104,11 @@ export function CheckEditor({
                   className="w-28 text-right tabular-nums"
                 />
               </div>
-              <Button type="submit" variant="secondary" className="w-full bg-card font-semibold text-primary">
+              <Button
+                type="submit"
+                variant="secondary"
+                className="w-full bg-card font-semibold text-primary"
+              >
                 Add fee
               </Button>
             </form>

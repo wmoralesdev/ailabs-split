@@ -5,6 +5,7 @@ import { CheckEditor } from "@/components/dinner/check-editor"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { roomQueryOptions } from "@/lib/room-query"
+import { isMealKind } from "@/lib/room-kind"
 
 export const Route = createFileRoute("/r/$code/check/$checkId")({
   loader: async ({ params, context }) => {
@@ -30,7 +31,7 @@ function EditCheckPage() {
     ) : null
   }
 
-  if (room.kind !== "DINNER") {
+  if (!isMealKind(room.kind)) {
     return <Navigate to="/r/$code/new" params={{ code }} />
   }
 
@@ -39,7 +40,5 @@ function EditCheckPage() {
     return <Navigate to="/r/$code/check" params={{ code }} />
   }
 
-  return (
-    <CheckEditor room={room} selfMemberId={memberId} check={check} />
-  )
+  return <CheckEditor room={room} selfMemberId={memberId} check={check} />
 }

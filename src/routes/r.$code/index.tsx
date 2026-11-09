@@ -71,6 +71,7 @@ import { formatRelativeTime } from "@/lib/format-relative-time"
 import { copyText } from "@/lib/invite-link"
 import { memberLink } from "@/lib/member-storage"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
+import { isMealKind } from "@/lib/room-kind"
 import { useRoomIdentity } from "@/lib/room-identity"
 import {
   computeNetsWithSettlements,
@@ -366,7 +367,7 @@ function RoomHomePage() {
     return isPending ? <RoomHomeSkeleton /> : null
   }
 
-  if (room.kind === "DINNER") {
+  if (isMealKind(room.kind)) {
     return (
       <DinnerHome
         room={room}
