@@ -34,26 +34,18 @@ export function MemberPicker({
 }: MemberPickerProps) {
   if (members.length < CHIP_THRESHOLD) {
     return (
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Paid by">
-        {members.map((member) => {
-          const selected = value === member.id
-          return (
-            <button
-              key={member.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onChange(member.id)}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                selected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {member.name}
-            </button>
-          )
-        })}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Paid by">
+        {members.map((member) => (
+          <button
+            key={member.id}
+            type="button"
+            aria-pressed={value === member.id}
+            onClick={() => onChange(member.id)}
+            className="person-chip"
+          >
+            {member.name}
+          </button>
+        ))}
       </div>
     )
   }
@@ -151,8 +143,8 @@ function SearchableMemberSelect({
         aria-controls={listId}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "border-input bg-input/30 dark:bg-input/40 flex h-(--control-height) w-full items-center justify-between gap-2 rounded-md border px-3 text-left text-base transition-colors",
-          "focus-visible:border-ring focus-visible:ring-ring/40 outline-none focus-visible:ring-2"
+          "flex h-(--control-height) w-full items-center justify-between gap-2 rounded-full border border-input bg-background px-3 text-left text-base transition-colors dark:bg-input/40",
+          "outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
         )}
       >
         <span
@@ -167,13 +159,13 @@ function SearchableMemberSelect({
           icon={ArrowDown01Icon}
           size={16}
           strokeWidth={2}
-          className="text-muted-foreground shrink-0"
+          className="shrink-0 text-muted-foreground"
         />
       </button>
 
       {open ? (
-        <div className="border-border bg-popover text-popover-foreground absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 overflow-hidden rounded-lg border shadow-md ring-1 ring-foreground/10">
-          <div className="border-border border-b p-2">
+        <div className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+          <div className="border-b border-border p-2">
             <Input
               autoFocus
               value={query}
@@ -191,7 +183,7 @@ function SearchableMemberSelect({
             className="max-h-56 overflow-y-auto p-1"
           >
             {filtered.length === 0 ? (
-              <li className="text-muted-foreground px-2 py-3 text-sm">
+              <li className="px-2 py-3 text-sm text-muted-foreground">
                 No matches
               </li>
             ) : (

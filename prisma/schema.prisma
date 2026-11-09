@@ -13,6 +13,8 @@ model Room {
   id          String       @id @default(cuid())
   code        String       @unique
   name        String
+  // TRIP (default) or DINNER — dinner is a one-time room, not a trip.
+  kind        String       @default("TRIP")
   // Base/settlement currency for the room (e.g. the members' home currency).
   currency    String
   // Allowed currencies for expenses (includes the base currency).
@@ -27,6 +29,7 @@ model Room {
   members     Member[]
   expenses    Expense[]
   settlements Settlement[]
+  checks      Check[]
 }
 
 model Member {
@@ -35,6 +38,7 @@ model Member {
   name                       String
   room                       Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
   paidExpenses               Expense[]      @relation("ExpensePaidBy")
+  paidChecks                 Check[]        @relation("CheckPaidBy")
   shares                     ExpenseShare[]
   settlementPaymentsSent     Settlement[]   @relation("SettlementFrom")
   settlementPaymentsReceived Settlement[]   @relation("SettlementTo")
@@ -62,6 +66,7 @@ model Expense {
   room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
   paidBy      Member         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
   shares      ExpenseShare[]
+  check       Check?
 
   @@index([roomId])
   @@index([paidById])
@@ -80,6 +85,26 @@ model ExpenseShare {
 
   @@index([expenseId])
   @@index([memberId])
+}
+
+model Check {
+  id          String   @id @default(cuid())
+  roomId      String
+  expenseId   String?  @unique
+  merchant    String
+  currency    String
+  paidById    String
+  status      String   @default("DRAFT")
+  isPrecuenta Boolean  @default(false)
+  payload     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  expense     Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  paidBy      Member   @relation("CheckPaidBy", fields: [paidById], references: [id], onDelete: Restrict)
+
+  @@index([roomId])
+  @@index([paidById])
 }
 
 model Settlement {

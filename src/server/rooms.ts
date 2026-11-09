@@ -2,12 +2,15 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
+import { emptyCheckPayload } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
 import {
   addExpenseSchema,
+  addRoomMembersSchema,
   calibrateRoomFxSchema,
+  checkPayloadSchema,
   claimMemberSchema,
   createRoomSchema,
   deleteExpenseSchema,
@@ -18,6 +21,7 @@ import {
   reorderExpensesSchema,
   updateExpenseSchema,
 } from "@/lib/schemas"
+import type { CheckPayloadInput } from "@/lib/schemas"
 import {
   computeFxAdjustmentBps,
   equalSplitCents,
@@ -64,10 +68,25 @@ export type SettlementDto = {
   createdAt: string
 }
 
+export type CheckDto = {
+  id: string
+  merchant: string
+  currency: string
+  paidById: string
+  paidByName: string
+  status: "DRAFT" | "CONFIRMED"
+  isPrecuenta: boolean
+  expenseId: string | null
+  payload: CheckPayloadInput
+  createdAt: string
+  updatedAt: string
+}
+
 export type RoomDto = {
   id: string
   code: string
   name: string
+  kind: "TRIP" | "DINNER"
   /** Base / settlement currency. */
   currency: string
   /** Allowed currencies for expenses (always includes the base currency). */
@@ -82,6 +101,7 @@ export type RoomDto = {
   members: RoomMemberDto[]
   expenses: ExpenseDto[]
   settlements: SettlementDto[]
+  checks: CheckDto[]
 }
 
 /** Parse with Zod but surface the first friendly message instead of a ZodError blob. */
@@ -204,6 +224,35 @@ function expenseToDto(
   }
 }
 
+export function checkToDto(check: {
+  id: string
+  merchant: string
+  currency: string
+  paidById: string
+  paidBy: { name: string }
+  status: string
+  isPrecuenta: boolean
+  expenseId: string | null
+  payload: unknown
+  createdAt: Date
+  updatedAt: Date
+}): CheckDto {
+  const parsed = checkPayloadSchema.safeParse(check.payload)
+  return {
+    id: check.id,
+    merchant: check.merchant,
+    currency: check.currency,
+    paidById: check.paidById,
+    paidByName: check.paidBy.name,
+    status: check.status === "CONFIRMED" ? "CONFIRMED" : "DRAFT",
+    isPrecuenta: check.isPrecuenta,
+    expenseId: check.expenseId,
+    payload: parsed.success ? parsed.data : emptyCheckPayload(),
+    createdAt: check.createdAt.toISOString(),
+    updatedAt: check.updatedAt.toISOString(),
+  }
+}
+
 function settlementToDto(settlement: {
   id: string
   fromMemberId: string
@@ -323,6 +372,10 @@ async function loadRoomByCode(
           toMember: true,
         },
       },
+      checks: {
+        orderBy: { createdAt: "desc" },
+        include: { paidBy: true },
+      },
     },
   })
 
@@ -337,6 +390,7 @@ async function loadRoomByCode(
     id: room.id,
     code: room.code,
     name: room.name,
+    kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
     currency: room.currency,
     currencies,
     fxRates: toFxRates(room.fxRates),
@@ -353,6 +407,7 @@ async function loadRoomByCode(
       expenseToDto(expense, room.currency, viewerMemberId)
     ),
     settlements: room.settlements.map(settlementToDto),
+    checks: room.checks.map(checkToDto),
   }
 }
 
@@ -360,8 +415,12 @@ export const createRoom = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(createRoomSchema, data))
   .handler(async ({ data }): Promise<RoomDto> => {
     limitWrites("create-room")
-    const currencies = Array.from(new Set([data.currency, ...data.currencies]))
-    const fxRates = data.fxRates ?? {}
+    const kind = data.kind === "DINNER" ? "DINNER" : "TRIP"
+    const currencies =
+      kind === "DINNER"
+        ? [data.currency]
+        : Array.from(new Set([data.currency, ...data.currencies]))
+    const fxRates = kind === "DINNER" ? {} : (data.fxRates ?? {})
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = generateRoomCode(7)
@@ -370,6 +429,7 @@ export const createRoom = createServerFn({ method: "POST" })
           data: {
             code,
             name: data.name,
+            kind,
             currency: data.currency,
             currencies,
             fxRates,
@@ -381,7 +441,7 @@ export const createRoom = createServerFn({ method: "POST" })
           },
         })
         const loaded = await loadRoomByCode(room.code)
-        if (!loaded) throw new Error("Failed to load trip")
+        if (!loaded) throw new Error("Failed to load room")
         return loaded
       } catch (error) {
         const isUnique =
@@ -392,7 +452,7 @@ export const createRoom = createServerFn({ method: "POST" })
         if (!isUnique) throw error
       }
     }
-    throw new Error("Could not allocate a trip code")
+    throw new Error("Could not allocate a room code")
   })
 
 export const getRoomByCode = createServerFn({ method: "GET" })
@@ -437,7 +497,38 @@ export const joinRoom = createServerFn({ method: "POST" })
     return { room, memberId: created.id }
   })
 
-/** Pick an existing member id in a room (cross-device reclaim). */
+/** Add people to a room by name. Used by dinner hosts before guests join. */
+export const addRoomMembers = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(addRoomMembersSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("add-members")
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      include: { members: true },
+    })
+    if (!room) throw new Error("Room not found")
+
+    const existing = new Set(
+      room.members.map((member) => member.name.toLowerCase())
+    )
+    const toCreate: string[] = []
+    for (const name of data.names) {
+      const key = name.toLowerCase()
+      if (existing.has(key)) continue
+      existing.add(key)
+      toCreate.push(name)
+    }
+    if (toCreate.length > 0) {
+      await prisma.member.createMany({
+        data: toCreate.map((name) => ({ roomId: room.id, name })),
+      })
+    }
+
+    const loaded = await loadRoomByCode(data.code)
+    if (!loaded) throw new Error("Room not found")
+    return loaded
+  })
+
 export const claimMemberById = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(claimMemberSchema, data))
   .handler(async ({ data }): Promise<{ memberId: string; name: string }> => {
@@ -460,6 +551,9 @@ export const addExpense = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
+    if (room.kind === "DINNER") {
+      throw new Error("Dinner charges are added from a check")
+    }
 
     const memberIds = new Set(room.members.map((member) => member.id))
     if (!memberIds.has(data.paidById)) {
@@ -527,6 +621,9 @@ export const updateExpense = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
+    if (room.kind === "DINNER") {
+      throw new Error("Dinner charges are edited from the check")
+    }
 
     const existing = await prisma.expense.findFirst({
       where: { id: data.expenseId, roomId: room.id },
@@ -592,9 +689,12 @@ export const deleteExpense = createServerFn({ method: "POST" })
     limitWrites("delete-expense")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
-      select: { id: true },
+      select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
+    if (room.kind === "DINNER") {
+      throw new Error("Dinner charges are deleted from the check")
+    }
 
     const existing = await prisma.expense.findFirst({
       where: { id: data.expenseId, roomId: room.id },
@@ -613,9 +713,12 @@ export const reorderExpenses = createServerFn({ method: "POST" })
     limitWrites("reorder-expenses")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
-      select: { id: true },
+      select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
+    if (room.kind === "DINNER") {
+      throw new Error("Dinner rooms do not reorder trip expenses")
+    }
 
     const roomExpenses = await prisma.expense.findMany({
       where: { roomId: room.id },

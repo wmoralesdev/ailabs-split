@@ -21,3 +21,14 @@ dev-dist
 
 # Prisma client (generated via postinstall / build)
 /src/generated
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Taste Skill kit and local Chrome profiles (do not ship)
+.agents/
+.taste-skill/
+skills-lock.json

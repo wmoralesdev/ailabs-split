@@ -27,6 +27,95 @@ export const memberNameSchema = z
 export const splitModeSchema = z.enum(["EQUAL", "PARTS", "AMOUNT"])
 export type SplitMode = z.infer<typeof splitModeSchema>
 
+export const roomKindSchema = z.enum(["TRIP", "DINNER"])
+export type RoomKind = z.infer<typeof roomKindSchema>
+
+export const checkStatusSchema = z.enum(["DRAFT", "CONFIRMED"])
+export type CheckStatus = z.infer<typeof checkStatusSchema>
+
+export const itemSplitSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("UNASSIGNED") }),
+  z.object({
+    mode: z.literal("EQUAL"),
+    memberIds: z.array(z.string().min(1)).min(1),
+  }),
+  z.object({
+    mode: z.literal("PARTS"),
+    parts: z
+      .array(
+        z.object({
+          memberId: z.string().min(1),
+          weight: z.number().int().min(0),
+        })
+      )
+      .min(1),
+  }),
+  z.object({
+    mode: z.literal("QUANTITY"),
+    shares: z
+      .array(
+        z.object({
+          memberId: z.string().min(1),
+          quantity: z.number().positive(),
+        })
+      )
+      .min(1),
+  }),
+  z.object({
+    mode: z.literal("AMOUNT"),
+    shares: z
+      .array(
+        z.object({
+          memberId: z.string().min(1),
+          amountCents: z.number().int().min(0),
+        })
+      )
+      .min(1),
+  }),
+])
+
+export const lineItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1).max(120),
+  quantity: z.number().positive(),
+  unitPriceCents: z.number().int().min(0),
+  amountCents: z.number().int().min(0),
+  modifiers: z.array(z.string().max(80)).max(12),
+  source: z.enum(["OCR", "MANUAL"]),
+  confidence: z.number().min(0).max(1).nullable(),
+  split: itemSplitSchema,
+})
+
+export const adjustmentKindSchema = z.enum(["TAX", "FEE", "DISCOUNT", "TIP"])
+
+export const adjustmentSchema = z.object({
+  id: z.string().min(1),
+  kind: adjustmentKindSchema,
+  name: z.string().trim().min(1).max(80),
+  amountCents: z.number().int(),
+  allocate: z.literal("BY_ITEMS"),
+  source: z.enum(["OCR", "MANUAL"]),
+  confidence: z.number().min(0).max(1).nullable(),
+})
+
+export const tipConfigSchema = z.object({
+  percent: z.number().nullable(),
+  source: z.enum(["TICKET", "MANUAL", "NONE"]),
+  printedCents: z.number().int().nullable(),
+  amountCents: z.number().int().min(0),
+})
+
+export const checkPayloadSchema = z.object({
+  items: z.array(lineItemSchema),
+  adjustments: z.array(adjustmentSchema),
+  tip: tipConfigSchema,
+  notedSubtotalCents: z.number().int().nullable(),
+  notedTotalCents: z.number().int().nullable(),
+  rawText: z.string().max(20_000).optional(),
+})
+
+export type CheckPayloadInput = z.infer<typeof checkPayloadSchema>
+
 export const expenseCategorySchema = z
   .string()
   .trim()
@@ -34,12 +123,52 @@ export const expenseCategorySchema = z
   .optional()
   .transform((value) => (value ? value : undefined))
 
-export const createRoomSchema = z.object({
-  name: z.string().trim().min(1, "Name your trip").max(60, "Name is too long"),
-  currency: currencyCodeSchema,
-  currencies: z.array(currencyCodeSchema).optional().default([]),
-  fxRates: z.record(currencyCodeSchema, z.number().positive()).optional(),
-  memberNames: z.array(memberNameSchema).min(2, "Add at least two members"),
+export const createRoomSchema = z
+  .object({
+    name: z.string().trim().min(1, "Give it a name").max(60, "Name is too long"),
+    currency: currencyCodeSchema,
+    currencies: z.array(currencyCodeSchema).optional().default([]),
+    fxRates: z.record(currencyCodeSchema, z.number().positive()).optional(),
+    memberNames: z.array(memberNameSchema).min(1, "Add your name"),
+    kind: roomKindSchema.optional().default("TRIP"),
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === "TRIP" && value.memberNames.length < 2) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Add at least two members",
+        path: ["memberNames"],
+      })
+    }
+  })
+
+export const addRoomMembersSchema = z.object({
+  code: roomCodeSchema,
+  names: z.array(memberNameSchema).min(1, "Add at least one name"),
+})
+
+export const upsertCheckSchema = z.object({
+  code: roomCodeSchema,
+  checkId: z.string().min(1).optional(),
+  merchant: z.string().trim().min(1, "Name the place").max(80),
+  paidById: z.string().min(1, "Pick who paid"),
+  isPrecuenta: z.boolean().default(false),
+  payload: checkPayloadSchema,
+})
+
+export const confirmCheckSchema = z.object({
+  code: roomCodeSchema,
+  checkId: z.string().min(1, "Missing check"),
+})
+
+export const deleteCheckSchema = z.object({
+  code: roomCodeSchema,
+  checkId: z.string().min(1, "Missing check"),
+})
+
+export const revertCheckSchema = z.object({
+  code: roomCodeSchema,
+  checkId: z.string().min(1, "Missing check"),
 })
 
 export const joinRoomSchema = z.object({
@@ -181,6 +310,11 @@ export const calibrateRoomFxSchema = z.object({
 })
 
 export type CreateRoomInput = z.input<typeof createRoomSchema>
+export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
+export type UpsertCheckInput = z.input<typeof upsertCheckSchema>
+export type ConfirmCheckInput = z.input<typeof confirmCheckSchema>
+export type DeleteCheckInput = z.input<typeof deleteCheckSchema>
+export type RevertCheckInput = z.input<typeof revertCheckSchema>
 export type JoinRoomInput = z.input<typeof joinRoomSchema>
 export type AddExpenseInput = z.input<typeof addExpenseSchema>
 export type UpdateExpenseInput = z.input<typeof updateExpenseSchema>

@@ -15,7 +15,7 @@ const nitroPublicDir =
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
-    devtools(),
+    ...(process.env.E2E ? [] : [devtools()]),
     tailwindcss(),
     tanstackStart(),
     // Nitro targets Vercel on CI (`VERCEL=1`); local builds use node-server.
@@ -32,8 +32,8 @@ const config = defineConfig({
         name: "Split",
         short_name: "Split",
         description: "Split trip costs. No accounts.",
-        theme_color: "#ede4ff",
-        background_color: "#ede4ff",
+        theme_color: "#f5f4f8",
+        background_color: "#f5f4f8",
         display: "standalone",
         start_url: "/",
         icons: [

@@ -6,9 +6,12 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { z } from "zod"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Cancel01Icon } from "@hugeicons/core-free-icons"
+import type { IconSvgElement } from "@hugeicons/react"
+import { Airplane01Icon, Restaurant01Icon } from "@hugeicons/core-free-icons"
 
+import { CreateDinnerForm } from "@/components/dinner/create-dinner-form"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
+import { NameListInput } from "@/components/name-list-input"
 import { RecentTripsList } from "@/components/recent-trips-list"
 import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
@@ -28,9 +31,20 @@ import { Label } from "@/components/ui/label"
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
+import {
+  getLastCurrency,
+  getLastKind,
+  rememberCurrency,
+  mergeNames,
+  rememberKind,
+} from "@/lib/landing-prefs"
+import type { RoomKind } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
 import { isStandaloneDisplay, markInstallEligible } from "@/lib/pwa-install"
-import { resolveMostRecentTripCode, getMostRecentTripCode } from "@/lib/resume-trip"
+import {
+  resolveMostRecentTripCode,
+  getMostRecentTripCode,
+} from "@/lib/resume-trip"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
 import { fetchFxRates } from "@/server/fx"
@@ -50,15 +64,19 @@ type LandingSearch = {
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): LandingSearch => {
-    const tabRaw = typeof search.tab === "string" ? search.tab.toLowerCase() : ""
+    const tabRaw =
+      typeof search.tab === "string" ? search.tab.toLowerCase() : ""
     const codeRaw =
       typeof search.code === "string" ? search.code.trim().toUpperCase() : ""
     return {
       stay:
-        search.stay === "1" ||
-        search.stay === true ||
-        search.stay === "true",
-      tab: tabRaw === "join" || codeRaw ? "join" : tabRaw === "create" ? "create" : undefined,
+        search.stay === "1" || search.stay === true || search.stay === "true",
+      tab:
+        tabRaw === "join" || codeRaw
+          ? "join"
+          : tabRaw === "create"
+            ? "create"
+            : undefined,
       code: codeRaw || undefined,
     }
   },
@@ -75,8 +93,8 @@ const joinCodeSchema = z.object({
   code: z
     .string()
     .trim()
-    .min(6, "Trip code is 6–8 characters")
-    .max(8, "Trip code is 6–8 characters"),
+    .min(6, "Codes are 6–8 characters")
+    .max(8, "Codes are 6–8 characters"),
 })
 type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
@@ -84,6 +102,11 @@ function LandingPage() {
   const navigate = useNavigate()
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
+  const [kind, setKind] = useState<RoomKind>("TRIP")
+  useEffect(() => {
+    const last = getLastKind()
+    if (last) setKind(last)
+  }, [])
   const [resuming, setResuming] = useState(() => {
     if (typeof window === "undefined") return false
     if (stay || tab === "join" || joinCode) return false
@@ -124,46 +147,137 @@ function LandingPage() {
         innerClassName="flex min-h-dvh flex-col items-center justify-center pb-12 pt-5"
       >
         <SiteLogo showWordmark={false} markClassName="size-8" />
-        <p className="text-muted-foreground mt-6 text-sm">Opening your trip…</p>
+        <p className="mt-6 text-sm text-muted-foreground">Opening your trip…</p>
       </PageShell>
     )
   }
 
+  function pickKind(next: RoomKind) {
+    setKind(next)
+    rememberKind(next)
+  }
+
   return (
-    <PageShell
-      className="overflow-hidden"
-      innerClassName="flex min-h-dvh flex-col pt-5 pb-12"
-    >
-      <header className="animate-rise flex items-center justify-between">
-        <SiteLogo showWordmark={false} markClassName="size-8" />
+    <PageShell innerClassName="flex min-h-dvh flex-col pt-2">
+      <header className="flex h-11 items-center justify-between">
+        <SiteLogo showWordmark={false} markClassName="size-7" />
         <ThemeToggle />
       </header>
 
-      <div className="animate-rise-delay mt-14 sm:mt-16">
-        <h1 className="font-display text-5xl leading-none font-semibold tracking-tighter text-foreground sm:text-6xl md:text-7xl">
+      <div className="animate-rise mt-3">
+        <h1
+          data-enter
+          className="font-display text-[34px] leading-tight font-bold tracking-tight text-foreground"
+        >
           Split
         </h1>
-        <p className="mt-4 max-w-[32ch] text-base leading-relaxed text-muted-foreground sm:max-w-sm sm:text-lg">
-          Share a trip code. Split costs. No accounts.
+        <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
+          {kind === "DINNER"
+            ? "Tap who had what. Everyone sees what they owe."
+            : "One code for the whole trip. Settle up at the end."}
         </p>
       </div>
 
-      <div className="animate-rise-delay-2 pb-safe mt-10 flex-1">
-        <Tabs defaultValue={defaultTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="create">Create</TabsTrigger>
-            <TabsTrigger value="join">Join</TabsTrigger>
-          </TabsList>
-          <TabsContent value="create" className="mt-6 text-base">
+      <Tabs
+        defaultValue={defaultTab}
+        className="animate-rise-delay mt-5 flex-1"
+      >
+        <TabsList className="segmented w-full grid-cols-2 group-data-horizontal/tabs:h-9">
+          <TabsTrigger value="create" className="segmented-item">
+            Create
+          </TabsTrigger>
+          <TabsTrigger value="join" className="segmented-item">
+            Join
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent
+          value="create"
+          className="tab-panel mt-4 flex flex-col text-base"
+        >
+          <div
+            className="mb-5 grid grid-cols-2 gap-2.5"
+            role="group"
+            aria-label="Mode"
+          >
+            <ModeButton
+              label="Dinner"
+              detail="One bill, tonight"
+              icon={Restaurant01Icon}
+              active={kind === "DINNER"}
+              onClick={() => pickKind("DINNER")}
+            />
+            <ModeButton
+              label="Trip"
+              detail="Many costs, days"
+              icon={Airplane01Icon}
+              active={kind === "TRIP"}
+              onClick={() => pickKind("TRIP")}
+            />
+          </div>
+          {kind === "DINNER" ? (
+            <CreateDinnerForm navigate={navigate} />
+          ) : (
             <CreateForm navigate={navigate} />
-          </TabsContent>
-          <TabsContent value="join" className="mt-6 text-base">
-            <JoinForm navigate={navigate} initialCode={joinCode} />
-          </TabsContent>
-        </Tabs>
+          )}
+        </TabsContent>
+        <TabsContent value="join" className="tab-panel mt-6 text-base">
+          <JoinForm navigate={navigate} initialCode={joinCode} />
+        </TabsContent>
+      </Tabs>
+      <div className="pb-safe pb-10">
         <RecentTripsList />
       </div>
     </PageShell>
+  )
+}
+
+function ModeButton({
+  label,
+  detail,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string
+  detail: string
+  icon: IconSvgElement
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-start gap-3 rounded-2xl border px-4 pt-4 pb-3.5 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
+        active
+          ? "border-foreground bg-foreground text-background"
+          : "border-transparent bg-card text-foreground"
+      )}
+    >
+      <span
+        className={cn(
+          "inline-flex size-8 items-center justify-center rounded-lg",
+          active ? "bg-background/15" : "bg-muted"
+        )}
+      >
+        <HugeiconsIcon icon={icon} size={18} strokeWidth={1.8} />
+      </span>
+      <span>
+        <span className="block text-[15px] leading-tight font-semibold">
+          {label}
+        </span>
+        <span
+          className={cn(
+            "mt-0.5 block text-[13px]",
+            active ? "text-background/70" : "text-muted-foreground"
+          )}
+        >
+          {detail}
+        </span>
+      </span>
+    </button>
   )
 }
 
@@ -176,6 +290,10 @@ function CreateForm({
     resolver: zodResolver(createSchema),
     defaultValues: { name: "", baseCurrency: "USD" },
   })
+  useEffect(() => {
+    const last = getLastCurrency()
+    if (last) form.setValue("baseCurrency", last)
+  }, [form])
   const baseCurrency = form.watch("baseCurrency")
 
   const [members, setMembers] = useState<string[]>([])
@@ -250,29 +368,6 @@ function CreateForm({
     }
   }, [baseCurrency, extras])
 
-  function commitDraft() {
-    const parts = memberDraft
-      .split(/[\n,]/)
-      .map((name) => name.trim())
-      .filter(Boolean)
-    if (parts.length === 0) return
-    setMembers((prev) => {
-      const next = [...prev]
-      for (const part of parts) {
-        if (!next.some((m) => m.toLowerCase() === part.toLowerCase())) {
-          next.push(part)
-        }
-      }
-      return next
-    })
-    setMemberDraft("")
-    setMembersError(null)
-  }
-
-  function removeMember(name: string) {
-    setMembers((prev) => prev.filter((m) => m !== name))
-  }
-
   function toggleExtra(code: string) {
     setShowExtras(true)
     setExtras((prev) => {
@@ -299,18 +394,7 @@ function CreateForm({
   }
 
   function onSubmit(values: CreateValues) {
-    const names = memberDraft.trim()
-      ? [
-          ...members,
-          ...memberDraft
-            .split(/[\n,]/)
-            .map((n) => n.trim())
-            .filter(Boolean),
-        ]
-      : members
-    const unique = Array.from(
-      new Set(names.map((n) => n.trim()).filter(Boolean))
-    )
+    const unique = mergeNames(members, memberDraft)
     if (unique.length < 2) {
       setMembersError("Add at least two members")
       return
@@ -327,6 +411,7 @@ function CreateForm({
       }
     }
 
+    rememberCurrency(values.baseCurrency)
     mutation.mutate({
       name: values.name.trim(),
       currency: values.baseCurrency,
@@ -343,9 +428,9 @@ function CreateForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-7"
+        className="flex flex-col gap-5"
       >
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           <FormField
             control={form.control}
             name="name"
@@ -380,73 +465,27 @@ function CreateForm({
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label>Members</Label>
-          {members.length > 0 ? (
-            <div className="mb-1 flex flex-wrap gap-2">
-              {members.map((name, index) => (
-                <span
-                  key={name}
-                  className="landing-member-chip animate-rise"
-                  style={{ animationDelay: `${index * 40}ms` }}
-                >
-                  {name}
-                  <button
-                    type="button"
-                    onClick={() => removeMember(name)}
-                    className="inline-flex size-5 items-center justify-center rounded-sm transition-colors hover:bg-background/70"
-                    aria-label={`Remove ${name}`}
-                  >
-                    <HugeiconsIcon
-                      icon={Cancel01Icon}
-                      size={12}
-                      strokeWidth={2}
-                    />
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <div className="flex gap-2">
-            <Input
-              value={memberDraft}
-              onChange={(e) => setMemberDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === ",") {
-                  e.preventDefault()
-                  commitDraft()
-                }
-              }}
-              onBlur={commitDraft}
-              placeholder="Type a name"
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 px-4"
-              onClick={commitDraft}
-              disabled={!memberDraft.trim()}
-            >
-              Add
-            </Button>
-          </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            At least two people. Add, Enter, or comma.
-          </p>
-          {membersError ? (
-            <p className="text-xs text-destructive" role="alert">
-              {membersError}
-            </p>
-          ) : null}
-        </div>
+        <NameListInput
+          id="trip-members"
+          label="Members"
+          names={members}
+          draft={memberDraft}
+          onNamesChange={(next) => {
+            setMembers(next)
+            setMembersError(null)
+          }}
+          onDraftChange={setMemberDraft}
+          placeholder="Type a name"
+          hint="At least two people, you included."
+          error={membersError}
+        />
 
-        <div className="flex flex-col gap-3 border-t border-border/60 pt-5">
+        <div className="flex flex-col gap-3">
           {!extrasOpen ? (
             <button
               type="button"
               onClick={() => setShowExtras(true)}
-              className="text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex min-h-11 items-center text-left text-[15px] font-medium text-primary transition-colors hover:text-foreground"
             >
               Add other currencies
             </button>
@@ -525,13 +564,15 @@ function CreateForm({
           )}
         </div>
 
-        <Button
-          type="submit"
-          disabled={mutation.isPending}
-          className="mt-1 w-full transition-transform duration-200 active:scale-[0.98]"
-        >
-          {mutation.isPending ? "Creating…" : "Create trip"}
-        </Button>
+        <div className="form-dock">
+          <Button
+            type="submit"
+            disabled={mutation.isPending}
+            className="cta-lg"
+          >
+            {mutation.isPending ? "Creating…" : "Create trip"}
+          </Button>
+        </div>
       </form>
     </Form>
   )
@@ -558,7 +599,7 @@ function JoinForm({
     mutationFn: (code: string) => getRoomByCode({ data: { code } }),
     onSuccess: (found) => {
       if (!found) {
-        toast.error("Trip not found")
+        toast.error("Room not found")
         return
       }
       setError(null)
@@ -628,15 +669,15 @@ function JoinForm({
 
   if (room) {
     return (
-      <div className="flex flex-col gap-6">
-        <div>
-          <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-            Joining
+      <div className="flex flex-col gap-5">
+        <div className="surface p-4">
+          <p className="eyebrow">
+            Joining {room.kind === "DINNER" ? "dinner" : "trip"}
           </p>
-          <p className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground">
+          <p className="mt-0.5 font-display text-xl font-semibold tracking-tight text-foreground">
             {room.name}
           </p>
-          <p className="mt-1 font-display tracking-[0.22em] text-muted-foreground">
+          <p className="mt-0.5 font-display text-sm tracking-[0.22em] text-muted-foreground">
             {room.code}
           </p>
         </div>
@@ -651,11 +692,11 @@ function JoinForm({
 
         <button
           type="button"
-          className="text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="min-h-11 text-left text-[15px] font-medium text-primary transition-colors hover:text-foreground"
           onClick={goBackToCode}
           disabled={pending}
         >
-          Different trip code
+          Use a different code
         </button>
       </div>
     )
@@ -665,40 +706,49 @@ function JoinForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onCodeSubmit)}
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-5"
       >
         <FormField
           control={form.control}
           name="code"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Trip code</FormLabel>
-              <div className="flex items-center gap-2">
-                <FormControl>
-                  <Input
-                    placeholder="7-character code"
-                    maxLength={8}
-                    className="text-center font-display text-2xl tracking-[0.2em] uppercase"
-                    {...field}
-                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                  />
-                </FormControl>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={lookupMutation.isPending}
-                  className="shrink-0 transition-transform duration-200 active:scale-[0.98]"
-                >
-                  {lookupMutation.isPending ? "Looking up…" : "Continue"}
-                </Button>
-              </div>
+              <FormLabel>Code</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="ABC1234"
+                  maxLength={8}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
+                  className="h-14 rounded-2xl text-center font-display text-2xl tracking-[0.24em] uppercase placeholder:text-muted-foreground/40"
+                  {...field}
+                  onChange={(e) => {
+                    const next = e.target.value.toUpperCase().replace(/\s/g, "")
+                    field.onChange(next)
+                    if (next.length === 7 && !lookupMutation.isPending) {
+                      lookupMutation.mutate(next)
+                    }
+                  }}
+                />
+              </FormControl>
               <FormDescription>
-                Enter the shared code, then pick who you are.
+                From whoever started the trip or dinner. You pick your name
+                next.
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
+        <Button
+          type="submit"
+          disabled={lookupMutation.isPending}
+          className="cta-lg"
+        >
+          {lookupMutation.isPending ? "Looking up…" : "Continue"}
+        </Button>
       </form>
     </Form>
   )

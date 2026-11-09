@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { Navigate, createFileRoute, useNavigate } from "@tanstack/react-router"
 import { onlineManager, useMutation, useQuery } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -133,6 +133,9 @@ function AddExpensePage() {
 
   if (!room) {
     return isPending ? <AddExpenseSkeleton /> : null
+  }
+  if (room.kind === "DINNER") {
+    return <Navigate to="/r/$code/check" params={{ code }} />
   }
   return (
     <AddExpenseForm
@@ -519,19 +522,19 @@ function AddExpenseForm({
   }))
 
   return (
-    <main className="page-gutter mx-auto max-w-content pt-6">
-      <div className="flex items-center gap-2">
+    <main className="page-gutter mx-auto max-w-content pt-2 pb-6">
+      <div className="flex items-center gap-1">
         <Button
           type="button"
           variant="ghost"
           size="icon-lg"
-          className="-ml-2"
+          className="-ml-3"
           onClick={() => navigate({ to: "/r/$code", params: { code } })}
           aria-label="Back to trip"
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
         </Button>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">
+        <h1 className="font-display text-[22px] font-bold tracking-tight">
           Add expense
         </h1>
       </div>
@@ -539,9 +542,9 @@ function AddExpenseForm({
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="mt-6 flex flex-col gap-6"
+          className="mt-3 flex flex-col gap-5"
         >
-          <div className="grid grid-cols-[1fr_auto] gap-3">
+          <div className="grid grid-cols-[1fr_auto] gap-2.5">
             <FormField
               control={form.control}
               name="amount"
@@ -553,7 +556,7 @@ function AddExpenseForm({
                       inputMode="numeric"
                       autoComplete="off"
                       placeholder={formatAtmAmount("", fractionDigits)}
-                      className="font-display text-right text-xl tabular-nums tracking-tight"
+                      className="text-right font-display text-xl tracking-tight tabular-nums"
                       name={field.name}
                       ref={field.ref}
                       onBlur={field.onBlur}
@@ -621,7 +624,10 @@ function AddExpenseForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category (optional)</FormLabel>
-                <CategoryChips value={field.value ?? ""} onChange={field.onChange} />
+                <CategoryChips
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                />
                 <FormControl>
                   <Input placeholder="Custom category…" {...field} />
                 </FormControl>
@@ -633,8 +639,8 @@ function AddExpenseForm({
           {isOnline ? (
             <div className="flex flex-col gap-2">
               <FormLabelStatic>Scan ticket (optional)</FormLabelStatic>
-              <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
-                <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
+              <label className="split-cta-tinted cursor-pointer">
+                <HugeiconsIcon icon={Camera01Icon} size={16} strokeWidth={2} />
                 {ocrPending ? "Reading receipt…" : "Scan receipt"}
                 <input
                   type="file"
@@ -647,14 +653,14 @@ function AddExpenseForm({
             </div>
           ) : null}
 
-          <label className="flex cursor-pointer items-center gap-3 py-1">
+          <label className="surface flex min-h-12 cursor-pointer items-center gap-3 px-4 py-2.5">
             <Checkbox
               checked={isPersonal}
               onCheckedChange={(checked) => setPersonalMode(checked === true)}
             />
             <span className="min-w-0">
-              <span className="block text-sm font-medium">Personal</span>
-              <span className="block text-xs text-muted-foreground">
+              <span className="block text-[15px] font-medium">Personal</span>
+              <span className="block text-[13px] text-muted-foreground">
                 Only you see this · won’t change balances
               </span>
             </span>
@@ -681,19 +687,25 @@ function AddExpenseForm({
           )}
 
           {isPersonal ? null : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2">
                 <FormLabelStatic>Split between</FormLabelStatic>
                 <Tabs value={splitMode} onValueChange={onSplitModeChange}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="EQUAL">Equal</TabsTrigger>
-                    <TabsTrigger value="PARTS">Parts</TabsTrigger>
-                    <TabsTrigger value="AMOUNT">Amounts</TabsTrigger>
+                  <TabsList className="segmented w-full grid-cols-3 group-data-horizontal/tabs:h-9">
+                    <TabsTrigger value="EQUAL" className="segmented-item">
+                      Equal
+                    </TabsTrigger>
+                    <TabsTrigger value="PARTS" className="segmented-item">
+                      Parts
+                    </TabsTrigger>
+                    <TabsTrigger value="AMOUNT" className="segmented-item">
+                      Amounts
+                    </TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
 
-              <ul className="divide-y divide-border/60">
+              <ul className="group-list">
                 {room.members.map((member) => {
                   const isParts = splitMode === "PARTS"
                   const weight = weights[member.id] ?? 0
@@ -702,7 +714,7 @@ function AddExpenseForm({
                   return (
                     <li
                       key={member.id}
-                      className="flex items-center justify-between gap-3 py-2.5"
+                      className="flex min-h-12 items-center justify-between gap-3 py-2 pr-3 pl-3"
                     >
                       <button
                         type="button"
@@ -711,11 +723,11 @@ function AddExpenseForm({
                             ? setWeight(member.id, weight > 0 ? 0 : 1)
                             : toggleMember(member.id)
                         }
-                        className="flex min-w-0 items-center gap-3 text-left"
+                        className="flex min-h-10 min-w-0 flex-1 items-center gap-3 text-left text-[15px]"
                       >
                         <Avatar
                           className={
-                            active ? "size-9" : "size-9 opacity-40 grayscale"
+                            active ? "size-8" : "size-8 opacity-40 grayscale"
                           }
                         >
                           <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
@@ -767,7 +779,7 @@ function AddExpenseForm({
                               strokeWidth={2}
                             />
                           </Button>
-                          <span className="w-16 text-right text-xs text-muted-foreground tabular-nums">
+                          <span className="w-16 text-right text-[13px] text-muted-foreground tabular-nums">
                             {formatMoney(active ? shareCents : 0, currency)}
                           </span>
                         </div>
@@ -792,16 +804,16 @@ function AddExpenseForm({
                             className="w-28 text-right tabular-nums"
                           />
                         ) : (
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-[13px] text-muted-foreground">
                             Not included
                           </span>
                         )
                       ) : active ? (
-                        <span className="text-sm font-medium tabular-nums">
+                        <span className="text-[15px] font-medium tabular-nums">
                           {formatMoney(shareCents, currency)}
                         </span>
                       ) : (
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-[13px] text-muted-foreground">
                           Not included
                         </span>
                       )}
@@ -810,7 +822,7 @@ function AddExpenseForm({
                 })}
               </ul>
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center justify-between px-4 text-[13px] text-muted-foreground">
                 <span>
                   {activeMemberIds.length} of {room.members.length} people
                 </span>
@@ -834,14 +846,14 @@ function AddExpenseForm({
               </div>
 
               {splitError ? (
-                <p className="text-xs text-destructive" role="alert">
+                <p className="px-4 text-[13px] text-destructive" role="alert">
                   {splitError}
                 </p>
               ) : null}
             </div>
           )}
 
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" className="cta-lg" disabled={mutation.isPending}>
             {mutation.isPending ? "Saving…" : "Save expense"}
           </Button>
         </form>
@@ -852,7 +864,7 @@ function AddExpenseForm({
 
 function FormLabelStatic({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-2 text-sm leading-none font-medium text-foreground">
+    <span className="flex items-center gap-2 text-[13px] leading-none font-medium text-muted-foreground">
       {children}
     </span>
   )
