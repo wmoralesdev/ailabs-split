@@ -10,14 +10,14 @@ Host: `split.ailabs.sv`
 - Tailwind v4 + shadcn base-mira + Hugeicons
 - Neon Postgres + Prisma
 - vite-plugin-pwa (installable shell; offline add-expense via TanStack Query persist + sync on reconnect)
-- Mistral OCR for receipt draft-fill
+- OpenAI vision (`gpt-5-mini`) for receipt draft-fill
 
 ## Setup
 
 ```bash
 pnpm install
 cp .env.example .env
-# set DATABASE_URL (Neon) and optional MISTRAL_API_KEY
+# set DATABASE_URL (Neon) and optional OPENAI_API_KEY
 pnpm db:migrate
 pnpm dev
 ```
@@ -50,7 +50,7 @@ Offline: after opening a trip online once, you can add expenses without a connec
 ## Cost / connection hygiene
 
 - Postgres: one shared `pg` Pool per isolate (`PG_POOL_MAX=1`), short idle timeout, Neon **pooled** `DATABASE_URL`
-- OCR: requires a real room code, IP + room rate limits, ~1MB image cap, 20s timeout; no persistent Mistral socket
+- OCR: requires a real room code, IP + room rate limits, ~1MB image cap, 30s timeout; OpenAI vision structured JSON
 - Writes (create/join/add expense): light per-IP rate limits
 
 ## Deploy
@@ -58,7 +58,7 @@ Offline: after opening a trip online once, you can add expenses without a connec
 TanStack Start → **Nitro** → Vercel (auto-detects `vercel` preset when `VERCEL=1`).
 
 1. Link the repo in Vercel (framework: Other / Nitro Build Output API)
-2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `MISTRAL_API_KEY`
+2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `OPENAI_API_KEY`
 3. Build: `pnpm build` (runs `prisma generate` + `vite build`)
 4. Run migrations against Neon once: `pnpm exec prisma migrate deploy`
 5. Point DNS `split.ailabs.sv` at the deployment
