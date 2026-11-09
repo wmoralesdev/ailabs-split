@@ -498,8 +498,7 @@
     @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[15px] font-medium text-foreground transition-[transform,background-color] duration-200 hover:bg-muted/70 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
   }
 
-  :is(.surface, .group-list, [data-slot="sheet-content"]) .split-cta-tinted,
-  :is(.surface, .group-list, [data-slot="sheet-content"]) [data-slot="input"] {
+  :is(.surface, .group-list, [data-slot="sheet-content"]) .split-cta-tinted {
     background-color: var(--muted);
   }
 

@@ -159,6 +159,27 @@ test.describe("dinner split", () => {
   })
 })
 
+test("new check inputs use a hairline instead of muted fill", async ({
+  page,
+}) => {
+  await createDinner(page, `Hairline fields ${Date.now()}`, "Ana")
+  await startManualCheck(page)
+  await page.getByLabel("Item", { exact: true }).fill("Pizza Margherita")
+  await expect(page.getByRole("button", { name: "Add item" })).toBeDisabled()
+  await page.screenshot({
+    path: "test-results/new-check-hairline.png",
+  })
+  await addCheckItem(page, "Pizza Margherita", "24.00")
+  await expect(page.getByRole("button", { name: "10%" })).toBeVisible()
+  await expect(page.getByLabel("Custom tip amount")).toBeVisible()
+  await page
+    .getByRole("heading", { name: "Tip and fees" })
+    .scrollIntoViewIfNeeded()
+  await page.screenshot({
+    path: "test-results/new-check-hairline-tip.png",
+  })
+})
+
 test("manual service fee can be a percent of items", async ({ page }) => {
   await createDinner(page, `Service fee ${Date.now()}`, "Ana")
   await startManualCheck(page)
