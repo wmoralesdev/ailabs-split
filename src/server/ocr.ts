@@ -18,7 +18,9 @@ import {
 import type { OcrScanMode } from "@/lib/ocr-schema"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
+import { extractCheckDraft } from "@/lib/receipt-ocr"
 import type { OcrDraft } from "@/lib/receipt-ocr"
+import { CELESTE_IMPERIO_MD } from "@/lib/receipt-ocr-fixtures"
 import { normalizeRoomCode } from "@/lib/room-code"
 
 const ALLOWED_MIME = new Set([
@@ -60,6 +62,25 @@ async function withTimeout<T>(
     ])
   } finally {
     if (timer) clearTimeout(timer)
+  }
+}
+
+/** Local and e2e stand-in for the vision call; only reachable with OCR_FIXTURE=1 and no key. */
+function fixtureDraft(mode: OcrScanMode): OcrDraft {
+  const check = extractCheckDraft(CELESTE_IMPERIO_MD)
+  switch (mode) {
+    case "trip":
+      return {
+        title: check.merchant,
+        amountCents: check.totalCents,
+        rawText: check.rawText,
+      }
+    case "dinner":
+      return { title: check.merchant, rawText: check.rawText, check }
+    default: {
+      const _exhaustive: never = mode
+      return _exhaustive
+    }
   }
 }
 
@@ -123,6 +144,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<OcrDraft> => {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
+      if (process.env.OCR_FIXTURE === "1") return fixtureDraft(data.mode)
       throw new Error("OPENAI_API_KEY is not configured")
     }
 

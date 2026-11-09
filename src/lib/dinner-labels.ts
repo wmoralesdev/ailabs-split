@@ -10,6 +10,24 @@ export function initials(name: string): string {
     .join("")
 }
 
+const LOWER_WORDS = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "of", "the", "and"])
+
+/** Tickets print the place in capitals; a room title reads better in title case. */
+export function tidyPlaceName(raw: string): string {
+  const name = raw.replace(/\s+/g, " ").trim()
+  const letters = name.replace(/[^\p{L}]/gu, "")
+  if (!letters || letters !== letters.toUpperCase()) return name
+  return name
+    .toLowerCase()
+    .split(" ")
+    .map((word, index) =>
+      index > 0 && LOWER_WORDS.has(word)
+        ? word
+        : word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ")
+}
+
 export function itemSplitSummary(
   item: LineItem,
   nameById: Map<string, string>

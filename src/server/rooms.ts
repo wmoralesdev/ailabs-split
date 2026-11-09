@@ -18,6 +18,7 @@ import {
   getRoomByCodeSchema,
   joinRoomSchema,
   recordSettlementSchema,
+  renameRoomSchema,
   reorderExpensesSchema,
   updateExpenseSchema,
 } from "@/lib/schemas"
@@ -524,6 +525,21 @@ export const addRoomMembers = createServerFn({ method: "POST" })
       })
     }
 
+    const loaded = await loadRoomByCode(data.code)
+    if (!loaded) throw new Error("Room not found")
+    return loaded
+  })
+
+/** Dinner rooms start with a fallback name; the scanned ticket's place replaces it. */
+export const renameRoom = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(renameRoomSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("rename-room")
+    const updated = await prisma.room.updateMany({
+      where: { code: data.code },
+      data: { name: data.name },
+    })
+    if (updated.count === 0) throw new Error("Room not found")
     const loaded = await loadRoomByCode(data.code)
     if (!loaded) throw new Error("Room not found")
     return loaded

@@ -7,12 +7,10 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
-import { NameListInput } from "@/components/name-list-input"
-import { Button } from "@/components/ui/button"
+import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -23,21 +21,22 @@ import {
   defaultDinnerName,
   getLastCurrency,
   getLastName,
-  mergeNames,
   rememberCurrency,
   rememberName,
 } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
+import { setPendingTicket } from "@/lib/pending-ticket"
 import { markInstallEligible } from "@/lib/pwa-install"
 import { createRoom } from "@/server/rooms"
 
+const NAME_REQUIRED = "Write your name so the others know who paid"
+
 const dinnerSchema = z.object({
-  name: z.string().trim().max(60, "Name is too long"),
   currency: z.string().min(3),
   creatorName: z
     .string()
     .trim()
-    .min(1, "Write your name so the others know who paid")
+    .min(1, NAME_REQUIRED)
     .max(40, "Name is too long"),
 })
 type DinnerValues = z.infer<typeof dinnerSchema>
@@ -49,17 +48,12 @@ export function CreateDinnerForm({
 }) {
   const form = useForm<DinnerValues>({
     resolver: zodResolver(dinnerSchema),
-    defaultValues: { name: "", currency: "USD", creatorName: "" },
+    defaultValues: { currency: "USD", creatorName: "" },
   })
-  const [guests, setGuests] = useState<string[]>([])
-  const [guestDraft, setGuestDraft] = useState("")
   const [editCurrency, setEditCurrency] = useState(false)
-  const [fallbackName, setFallbackName] = useState("Dinner")
   const currency = form.watch("currency")
-  const creatorName = form.watch("creatorName")
 
   useEffect(() => {
-    setFallbackName(defaultDinnerName())
     const lastName = getLastName()
     if (lastName && !form.getValues("creatorName")) {
       form.setValue("creatorName", lastName)
@@ -70,59 +64,62 @@ export function CreateDinnerForm({
 
   const mutation = useMutation({
     mutationFn: (data: {
-      name: string
+      creatorName: string
       currency: string
-      memberNames: string[]
+      ticket: File | null
     }) =>
       createRoom({
         data: {
-          name: data.name,
+          name: defaultDinnerName(),
           currency: data.currency,
           currencies: [data.currency],
-          memberNames: data.memberNames,
+          memberNames: [data.creatorName],
           kind: "DINNER",
         },
       }),
     onSuccess: async (room, variables) => {
-      const creator =
-        room.members.find(
-          (member) =>
-            member.name.toLowerCase() === variables.memberNames[0].toLowerCase()
-        ) ?? room.members[0]
-      rememberMember(room.code, creator.id)
+      rememberMember(room.code, room.members[0].id)
       markInstallEligible()
-      await navigate({
-        to: "/r/$code",
-        params: { code: room.code },
-        search: { created: true },
-      })
+      if (variables.ticket) {
+        setPendingTicket(room.code, {
+          file: variables.ticket,
+          nameFromTicket: true,
+        })
+        await navigate({ to: "/r/$code/check", params: { code: room.code } })
+        return
+      }
+      await navigate({ to: "/r/$code", params: { code: room.code } })
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Could not create dinner"
+        error instanceof Error ? error.message : "Could not start the dinner"
       )
     },
   })
 
-  function onSubmit(values: DinnerValues) {
-    const creator = values.creatorName.trim()
-    const others = mergeNames(guests, guestDraft).filter(
-      (name) => name.toLowerCase() !== creator.toLowerCase()
-    )
-    rememberName(creator)
+  function start(values: DinnerValues, ticket: File | null) {
+    const creatorName = values.creatorName.trim()
+    rememberName(creatorName)
     rememberCurrency(values.currency)
-    mutation.mutate({
-      name: values.name.trim() || fallbackName,
-      currency: values.currency,
-      memberNames: [creator, ...others],
+    mutation.mutate({ creatorName, currency: values.currency, ticket })
+  }
+
+  /** Synchronous so the file picker still opens inside the tap. */
+  function nameReady(): boolean {
+    const name = form.getValues("creatorName").trim()
+    if (name && name.length <= 40) return true
+    form.setError("creatorName", {
+      message: name ? "Name is too long" : NAME_REQUIRED,
     })
+    form.setFocus("creatorName")
+    return false
   }
 
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-col gap-5"
+        onSubmit={form.handleSubmit((values) => start(values, null))}
+        className="flex flex-col gap-4"
       >
         <FormField
           control={form.control}
@@ -134,43 +131,10 @@ export function CreateDinnerForm({
                 <Input
                   placeholder="Ana"
                   autoComplete="given-name"
-                  enterKeyHint="next"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <NameListInput
-          id="dinner-guests"
-          label="Who else is at the table?"
-          names={guests}
-          draft={guestDraft}
-          onNamesChange={setGuests}
-          onDraftChange={setGuestDraft}
-          placeholder="Ben, Cam…"
-          hint="Optional. Anyone can also join with the code."
-          fixed={creatorName.trim() ? [creatorName.trim()] : []}
-        />
-
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Dinner name</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder={fallbackName}
                   enterKeyHint="done"
                   {...field}
                 />
               </FormControl>
-              <FormDescription>
-                Optional. Leave it blank for “{fallbackName}”.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -195,37 +159,46 @@ export function CreateDinnerForm({
                   </FormControl>
                 </>
               ) : (
-                <div className="flex min-h-11 items-center justify-between gap-3">
+                <div className="-mt-1 flex min-h-11 items-center justify-between gap-3">
                   <p className="text-[15px] text-muted-foreground">
                     Paying in{" "}
                     <span className="font-semibold text-foreground">
                       {currency}
                     </span>
                   </p>
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-primary"
+                    className="inline-flex min-h-11 items-center text-[15px] font-medium text-primary transition-colors hover:text-foreground"
                     onClick={() => setEditCurrency(true)}
                   >
                     Change currency
-                  </Button>
+                  </button>
                 </div>
               )}
             </FormItem>
           )}
         />
 
-        <div className="form-dock">
-          <Button
-            type="submit"
-            disabled={mutation.isPending}
-            className="cta-lg"
-          >
-            {mutation.isPending ? "Creating…" : "Create dinner"}
-          </Button>
-        </div>
+        <TicketPhotoPicker
+          pending={mutation.isPending}
+          pendingLabel={
+            mutation.variables?.ticket ? "Opening ticket…" : "Starting…"
+          }
+          beforePick={nameReady}
+          onFile={(file) => {
+            if (!file) return
+            void form.handleSubmit((values) => start(values, file))()
+          }}
+          className="mt-1"
+        />
+
+        <button
+          type="submit"
+          disabled={mutation.isPending}
+          className="inline-flex min-h-11 items-center self-center text-[15px] font-medium text-primary transition-colors hover:text-foreground disabled:opacity-50"
+        >
+          Create without a ticket
+        </button>
       </form>
     </Form>
   )
