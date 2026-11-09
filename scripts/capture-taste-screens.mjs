@@ -4,7 +4,7 @@ import path from "node:path"
 
 const OUT =
   process.env.OUT ||
-  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v6"
+  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v7"
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3000"
 
 async function waitForHydration(page) {
@@ -26,6 +26,25 @@ async function shot(page, name) {
   await page.screenshot({ path: file, fullPage: false, type: "png" })
   const info = await stat(file)
   if (info.size < 8_000) {
+    throw new Error(`${file} looks empty (${info.size} bytes)`)
+  }
+  console.log("wrote", file, info.size)
+}
+
+/** Crop from the top of `from` to the bottom of `to`, full width, padded. */
+async function closeup(page, name, from, to, pad = 12) {
+  const a = await from.boundingBox()
+  const b = await to.boundingBox()
+  if (!a || !b) throw new Error(`${name}: close-up target not visible`)
+  const file = path.join(OUT, name.replace(".png", `-${scheme}.png`))
+  const y = Math.max(0, a.y - pad)
+  await page.screenshot({
+    path: file,
+    type: "png",
+    clip: { x: 0, y, width: 390, height: b.y + b.height + pad - y },
+  })
+  const info = await stat(file)
+  if (info.size < 4_000) {
     throw new Error(`${file} looks empty (${info.size} bytes)`)
   }
   console.log("wrote", file, info.size)
@@ -60,6 +79,12 @@ await page.getByLabel("Dinner name").fill("Friday pizzas")
 await page.getByLabel("Dinner name").blur()
 await page.waitForTimeout(200)
 await shot(page, "dinner-landing.png")
+await closeup(
+  page,
+  "closeup-inputs.png",
+  page.getByText("Your name", { exact: true }),
+  page.getByLabel("Dinner name")
+)
 
 const dinnerName = `Friday pizzas ${String(Date.now()).slice(-4)}`
 await page.getByLabel("Dinner name").fill(dinnerName)
@@ -102,6 +127,14 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(300)
 await shot(page, "dinner-check-scrolled.png")
+await page.locator("#custom-tip").scrollIntoViewIfNeeded()
+await page.waitForTimeout(200)
+await closeup(
+  page,
+  "closeup-tip-row.png",
+  page.getByText("Tip and fees", { exact: true }),
+  page.locator("#custom-tip")
+)
 await page.evaluate(() => {
   const scroller = document.querySelector("[data-app-scroll]")
   if (scroller) scroller.scrollTop = 0

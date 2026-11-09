@@ -98,7 +98,7 @@ export function NameListInput({
         <Button
           type="button"
           variant="outline"
-          className="shrink-0 border-transparent bg-card px-4 text-primary disabled:text-muted-foreground"
+          className="shrink-0 border-transparent bg-card px-4 text-primary disabled:text-muted-foreground disabled:opacity-100"
           onClick={commit}
           disabled={!draft.trim()}
         >

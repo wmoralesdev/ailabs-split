@@ -637,12 +637,12 @@ export function CheckEditor({
                   prints it.
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 items-center gap-2">
                 {[10, 15].map((percent) => (
                   <button
                     key={percent}
                     type="button"
-                    className="person-chip h-(--control-height) min-w-14 rounded-xl border-transparent"
+                    className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-base font-medium text-foreground tabular-nums transition-[transform,background-color] duration-150 outline-none select-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
                     onClick={() => applyTipPercent(percent)}
                   >
                     {percent}%
@@ -664,7 +664,7 @@ export function CheckEditor({
                   onBlur={applyCustomTip}
                   placeholder="Other"
                   aria-label="Custom tip amount"
-                  className="flex-1 text-right tabular-nums"
+                  className="text-center tabular-nums"
                 />
               </div>
             </div>

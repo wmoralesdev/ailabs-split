@@ -161,7 +161,7 @@
   --popover-foreground: var(--brand-paper);
   --primary: var(--brand-purple-soft);
   --primary-foreground: var(--brand-white);
-  --secondary: transparent;
+  --secondary: #22202c;
   --secondary-foreground: var(--brand-paper);
   --muted: color-mix(in srgb, var(--brand-paper) 8%, var(--brand-ink));
   --muted-foreground: #97959e;
@@ -308,7 +308,7 @@
     top: 0;
     z-index: -1;
     width: 100%;
-    height: 100vh;
+    height: 52dvh;
     pointer-events: none;
     color: var(--brand-purple);
     opacity: 0.2;
@@ -401,9 +401,12 @@
     background-color: var(--muted);
   }
 
-  .person-chip-ghost,
+  .person-chip-ghost {
+    @apply border-dashed border-border bg-background text-muted-foreground;
+  }
+
   :is(.surface, .group-list) .person-chip-ghost:not([aria-pressed="true"]) {
-    @apply border-dashed border-border bg-transparent text-muted-foreground;
+    @apply border-dashed border-border bg-card text-muted-foreground;
   }
 
   .form-dock {
