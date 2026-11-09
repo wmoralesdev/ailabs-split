@@ -361,11 +361,11 @@ export function ItemSplitSheet({
                 return (
                   <li
                     key={member.id}
-                    className="flex min-h-12 items-center justify-between gap-2 pr-2 pl-3"
+                    className={cn("group-row", "justify-between gap-2")}
                   >
                     <button
                       type="button"
-                      className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-pressed={
                         tab === "EQUAL" || tab === "PARTS" ? active : undefined
                       }
@@ -590,7 +590,7 @@ function Stepper({
     >
       <button
         type="button"
-        className="relative inline-flex h-full w-9 items-center justify-center rounded-l-[inherit] text-foreground after:absolute after:-inset-y-1.5 after:inset-x-0 disabled:opacity-30"
+        className="relative inline-flex h-full w-9 items-center justify-center rounded-l-[inherit] text-foreground after:absolute after:inset-x-0 after:-inset-y-1.5 disabled:opacity-30"
         aria-label={lessLabel}
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
@@ -602,7 +602,7 @@ function Stepper({
       </span>
       <button
         type="button"
-        className="relative inline-flex h-full w-9 items-center justify-center rounded-r-[inherit] text-foreground after:absolute after:-inset-y-1.5 after:inset-x-0"
+        className="relative inline-flex h-full w-9 items-center justify-center rounded-r-[inherit] text-foreground after:absolute after:inset-x-0 after:-inset-y-1.5"
         aria-label={moreLabel}
         onClick={() => onChange(value + 1)}
       >

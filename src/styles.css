@@ -373,7 +373,7 @@
     @apply bg-card text-foreground shadow-[0_1px_2px_var(--shadow-color-strong)];
   }
 
-  /* iOS inset grouped list: one card, hairline-separated 44px rows. */
+  /* Grouped list: one card, hairline rows. Never nest a pill inside a row. */
   .group-list {
     @apply overflow-hidden rounded-2xl bg-card;
   }
@@ -389,6 +389,18 @@
   .group-list > * + *::before {
     content: "";
     @apply pointer-events-none absolute top-0 right-0 left-4 h-px bg-border/70;
+  }
+
+  /* Navigable row hit: fill on press, no nested radius. */
+  .group-row-hit {
+    @apply flex min-h-14 items-center gap-3 px-4 py-2.5 text-[15px] transition-colors outline-none select-none;
+    @apply focus-visible:bg-muted active:bg-muted;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .group-row-hit:hover {
+      background-color: var(--muted);
+    }
   }
 
   .group-label {

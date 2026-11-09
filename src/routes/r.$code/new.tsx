@@ -705,10 +705,7 @@ function AddExpenseForm({
                   const active = isParts ? weight > 0 : included.has(member.id)
                   const shareCents = preview[member.id] ?? 0
                   return (
-                    <li
-                      key={member.id}
-                      className="flex min-h-12 items-center justify-between gap-3 py-2 pr-3 pl-3"
-                    >
+                    <li key={member.id} className="group-row justify-between">
                       <button
                         type="button"
                         onClick={() =>
@@ -846,7 +843,11 @@ function AddExpenseForm({
             </div>
           )}
 
-          <Button type="submit" className="cta-lg" disabled={mutation.isPending}>
+          <Button
+            type="submit"
+            className="cta-lg"
+            disabled={mutation.isPending}
+          >
             {mutation.isPending ? "Saving…" : "Save expense"}
           </Button>
         </form>

@@ -28,7 +28,8 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
-# Taste Skill kit and local Chrome profiles (do not ship)
-.agents/
+# Taste Skill runtime (Chrome profiles, screenshots). The skill itself
+# lives in .agents/skills/design-taste-frontend. Restore the photo/shader
+# kit with: npx skills add https://github.com/Leonxlnx/taste-skill --skill design-taste-frontend -a cursor --copy -y
 .taste-skill/
-skills-lock.json
+.agents/skills/design-taste-frontend/assets/

@@ -591,7 +591,7 @@ export function CheckEditor({
               {payload.adjustments.map((adjustment) => (
                 <li
                   key={adjustment.id}
-                  className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
+                  className={cn("group-row", "justify-between pr-1")}
                 >
                   <span className="text-[15px]">
                     {adjustment.name}
@@ -830,10 +830,7 @@ export function CheckEditor({
             </h2>
             <ul className="group-list mt-2.5">
               {split.shares.map((share) => (
-                <li
-                  key={share.memberId}
-                  className="flex min-h-11 items-center justify-between px-4 text-[15px]"
-                >
+                <li key={share.memberId} className="group-row justify-between">
                   <span>{nameById.get(share.memberId) ?? share.memberId}</span>
                   <span className="font-semibold tabular-nums">
                     {formatMoney(share.totalCents, room.currency)}
