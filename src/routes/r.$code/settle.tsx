@@ -50,7 +50,9 @@ export const Route = createFileRoute("/r/$code/settle")({
   errorComponent: ({ error }) => (
     <main className="page-gutter mx-auto flex min-h-dvh max-w-content flex-col justify-center">
       <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
-      <p className="mt-2 text-muted-foreground">{error.message}</p>
+      <p className="mt-2 text-muted-foreground">
+        {error instanceof Error ? error.message : "Could not load this trip"}
+      </p>
       <Link
         to="/"
         search={{ stay: true }}

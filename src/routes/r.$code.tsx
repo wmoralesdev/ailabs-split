@@ -63,7 +63,9 @@ export const Route = createFileRoute("/r/$code")({
         <p className="mt-2 text-muted-foreground">
           {offline
             ? "Open this trip once while online so it can be cached on this device."
-            : error.message}
+            : error instanceof Error
+              ? error.message
+              : "Could not load this trip"}
         </p>
         <Link
           to="/"
