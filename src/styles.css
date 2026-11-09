@@ -301,6 +301,67 @@
     height: env(safe-area-inset-bottom, 0px);
   }
 
+  /*
+    Dot size follows the grey ramp (soft dots + ramp, hardened by contrast()), so
+    the halftone shrinks to nothing by about half the viewport. The ramp must stay
+    light enough at the top that neighbouring dots never merge into a solid band.
+  */
+  .halftone-wash {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    z-index: -1;
+    height: 52dvh;
+    overflow: hidden;
+    pointer-events: none;
+    isolation: isolate;
+    mix-blend-mode: multiply;
+    opacity: 0.15;
+  }
+
+  .halftone-wash::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(closest-side, #777, #fff) 0 0 / 11px 11px,
+      linear-gradient(#8c8c8c, #fff 90%);
+    background-blend-mode: multiply;
+    filter: contrast(18);
+  }
+
+  .halftone-wash::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--brand-purple);
+    mix-blend-mode: screen;
+  }
+
+  .dark .halftone-wash {
+    mix-blend-mode: screen;
+    opacity: 0.28;
+  }
+
+  .dark .halftone-wash::before {
+    filter: contrast(18) invert(1);
+  }
+
+  .dark .halftone-wash::after {
+    background: var(--brand-purple-soft);
+    mix-blend-mode: multiply;
+  }
+
+  .split-toast {
+    background: color-mix(in srgb, var(--popover) 86%, transparent);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    box-shadow:
+      0 0 0 0.5px color-mix(in srgb, var(--foreground) 10%, transparent),
+      0 1px 2px var(--shadow-color),
+      0 12px 32px -12px var(--shadow-color-strong);
+  }
+
   .tab-panel {
     @apply rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background;
   }
@@ -357,7 +418,7 @@
 
   /* 32px visual chip with an invisible 44px hit area. */
   .person-chip {
-    @apply relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground transition-[transform,background-color,border-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
+    @apply relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-transparent bg-card px-3 text-sm font-medium text-foreground transition-[transform,background-color,border-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
   }
 
   button.person-chip::after {
@@ -369,8 +430,13 @@
     @apply border-foreground bg-foreground text-background;
   }
 
-  .person-chip-ghost {
-    @apply border-dashed bg-transparent text-muted-foreground;
+  :is(.surface, .group-list) .person-chip:not([aria-pressed="true"]) {
+    background-color: var(--muted);
+  }
+
+  .person-chip-ghost,
+  :is(.surface, .group-list) .person-chip-ghost:not([aria-pressed="true"]) {
+    @apply border-dashed border-border bg-transparent text-muted-foreground;
   }
 
   .form-dock {

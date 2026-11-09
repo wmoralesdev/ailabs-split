@@ -4,7 +4,7 @@ import path from "node:path"
 
 const OUT =
   process.env.OUT ||
-  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v2"
+  "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/taste-v4"
 const BASE = process.env.BASE_URL || "http://127.0.0.1:3000"
 
 async function waitForHydration(page) {
@@ -19,8 +19,10 @@ async function waitForHydration(page) {
   })
 }
 
+const SCHEMES = (process.env.SCHEMES || "light,dark").split(",")
+
 async function shot(page, name) {
-  const file = path.join(OUT, name)
+  const file = path.join(OUT, name.replace(".png", `-${scheme}.png`))
   await page.screenshot({ path: file, fullPage: false, type: "png" })
   const info = await stat(file)
   if (info.size < 8_000) {
@@ -30,11 +32,16 @@ async function shot(page, name) {
 }
 
 const browser = await chromium.launch()
-const page = await browser.newPage({
+await mkdir(OUT, { recursive: true })
+let scheme = "light"
+
+for (scheme of SCHEMES) {
+const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 2,
+  colorScheme: scheme,
 })
-await mkdir(OUT, { recursive: true })
+const page = await context.newPage()
 
 await page.goto(`${BASE}/?stay=true`, { waitUntil: "domcontentloaded" })
 await waitForHydration(page)
@@ -119,7 +126,7 @@ await page.evaluate(() => {
   else window.scrollTo(0, 0)
 })
 await page.waitForTimeout(200)
-await shot(page, "dinner-home-confirmed.png")
+await shot(page, "dinner-home.png")
 
 await page
   .getByRole("navigation", { name: "Dinner navigation" })
@@ -128,12 +135,55 @@ await page
 await page.getByRole("heading", { name: "Settle up" }).waitFor()
 await page.getByRole("button", { name: "Ben paid me" }).click()
 await page.getByText("Payment recorded").waitFor()
+await page.waitForTimeout(500)
+await shot(page, "dinner-toast.png")
 await page
   .getByText("Payment recorded")
   .waitFor({ state: "hidden", timeout: 10_000 })
   .catch(() => {})
 await page.waitForTimeout(300)
 await shot(page, "dinner-settle.png")
+
+await page.goto(`${BASE}/?stay=true`, { waitUntil: "domcontentloaded" })
+await waitForHydration(page)
+await page
+  .getByRole("group", { name: "Mode" })
+  .getByRole("button", { name: "Trip" })
+  .click()
+await page.getByLabel("Trip name").fill("Beach weekend")
+const members = page.getByLabel("Members")
+for (const name of ["Ana", "Ben", "Cam"]) {
+  await members.fill(name)
+  await members.press("Enter")
+}
+await page.getByRole("button", { name: "Create trip" }).click()
+const gate = page.getByRole("heading", { name: "Who are you?" })
+const tripReady = page.getByRole("dialog").filter({ hasText: "Trip ready" })
+await gate.or(tripReady).waitFor()
+if (await tripReady.isVisible()) {
+  await tripReady.getByRole("button", { name: "Continue to trip" }).click()
+  await tripReady.waitFor({ state: "hidden" })
+}
+if (await gate.isVisible()) {
+  await page.getByRole("button", { name: "Ana" }).click()
+}
+await page.getByRole("heading", { name: "Beach weekend" }).waitFor()
+const tripUrl = page.url().replace(/\?.*$/, "")
+await page.goto(`${tripUrl}/new`)
+await waitForHydration(page)
+await page.getByLabel("Amount").fill("9000")
+await page.getByLabel("Title").fill("Airbnb")
+await page.getByRole("button", { name: "Save expense" }).click()
+await page.getByText("Expense added").waitFor()
+await page
+  .getByText("Expense added")
+  .waitFor({ state: "hidden", timeout: 10_000 })
+  .catch(() => {})
+await page.waitForTimeout(300)
+await shot(page, "trip-home.png")
+
+await context.close()
+}
 
 await browser.close()
 console.log("taste screens done")

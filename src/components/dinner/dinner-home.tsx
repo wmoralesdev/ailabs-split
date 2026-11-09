@@ -125,18 +125,7 @@ export function DinnerHome({
           </div>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {room.members.map((member) => (
-              <li
-                key={member.id}
-                className={cn(
-                  "person-chip pl-1",
-                  member.id === memberId && "border-foreground"
-                )}
-              >
-                <Avatar className="size-6">
-                  <AvatarFallback className="bg-muted text-[10px] font-semibold text-muted-foreground">
-                    {initials(member.name)}
-                  </AvatarFallback>
-                </Avatar>
+              <li key={member.id} className="person-chip">
                 {member.name}
               </li>
             ))}

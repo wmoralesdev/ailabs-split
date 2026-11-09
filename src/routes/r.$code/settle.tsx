@@ -517,7 +517,7 @@ function TransferCard({
   }
 
   return (
-    <li className="surface p-4 ring-1 ring-foreground/80">
+    <li className="surface p-4">
       <div className="flex items-center gap-2.5">
         <div className="flex -space-x-1.5">
           <Avatar className="size-7 ring-2 ring-card">

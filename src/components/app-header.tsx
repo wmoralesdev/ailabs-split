@@ -47,7 +47,7 @@ export function AppHeader({
       ref={hostRef}
       className={cn(
         "sticky top-0 z-30 shrink-0 border-b border-transparent transition-colors duration-200",
-        scrolled && "border-foreground/10 bg-background",
+        scrolled && "border-foreground/10 bg-background/80 backdrop-blur-xl",
         className
       )}
     >

@@ -9,14 +9,15 @@ type SplitAtmosphereProps = {
   className?: string
 }
 
-/** Flat paper ground shared by every screen. */
+/** Paper ground with a halftone wash that fades out over the top half. */
 export function SplitAtmosphere({
   as: Comp = "div",
   children,
   className,
 }: SplitAtmosphereProps) {
   return (
-    <Comp className={cn("relative min-h-dvh bg-background", className)}>
+    <Comp className={cn("relative isolate min-h-dvh bg-background", className)}>
+      <div aria-hidden className="halftone-wash" />
       {children}
     </Comp>
   )
