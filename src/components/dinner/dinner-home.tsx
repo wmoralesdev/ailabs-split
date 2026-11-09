@@ -227,7 +227,7 @@ function PositionCard({
       <section className="surface mt-4 p-4">
         <p className="font-display text-lg font-semibold">Add the bill</p>
         <p className="mt-0.5 text-[15px] text-muted-foreground">
-          A photo of the ticket fills the items for you.
+          Take a photo or pick one from your gallery.
         </p>
         <div className="mt-3.5 flex flex-col gap-2">
           <Link

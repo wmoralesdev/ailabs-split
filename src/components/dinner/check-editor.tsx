@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   onlineManager,
@@ -10,7 +10,6 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowLeft01Icon,
-  Camera01Icon,
   Delete02Icon,
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
@@ -18,6 +17,7 @@ import {
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { OcrReview } from "@/components/dinner/ocr-review"
 import { MemberPicker } from "@/components/member-picker"
+import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -62,7 +62,6 @@ export function CheckEditor({
   room,
   selfMemberId,
   check,
-  startWithScan,
 }: {
   room: RoomDto
   selfMemberId: string
@@ -72,7 +71,6 @@ export function CheckEditor({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isOnline = useOnlineStatus()
-  const fileRef = useRef<HTMLInputElement>(null)
   const fd = currencyFractionDigits(room.currency)
 
   const [checkId, setCheckId] = useState<string | null>(check?.id ?? null)
@@ -98,11 +96,6 @@ export function CheckEditor({
   const [feeName, setFeeName] = useState("")
   const [feeAmount, setFeeAmount] = useState("")
   const [showFee, setShowFee] = useState(false)
-
-  useEffect(() => {
-    if (!startWithScan) return
-    fileRef.current?.click()
-  }, [startWithScan])
 
   const nameById = useMemo(
     () => new Map(room.members.map((member) => [member.id, member.name])),
@@ -390,27 +383,10 @@ export function CheckEditor({
 
       <div className="mt-3 flex flex-col gap-6 pb-6">
         {payload.items.length === 0 && isOnline ? (
-          <label className="surface flex cursor-pointer items-center gap-3 p-3.5 transition-colors active:bg-muted">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <HugeiconsIcon icon={Camera01Icon} size={20} strokeWidth={2} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[15px] font-semibold">
-                {ocrPending ? "Reading ticket…" : "Scan ticket"}
-              </span>
-              <span className="block text-[13px] text-muted-foreground">
-                Fills the items. Or type them in below.
-              </span>
-            </span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              disabled={ocrPending}
-              onChange={(event) => void onScan(event.target.files?.[0] ?? null)}
-            />
-          </label>
+          <TicketPhotoPicker
+            pending={ocrPending}
+            onFile={(file) => void onScan(file)}
+          />
         ) : null}
         {payload.items.length === 0 && !isOnline ? (
           <p className="text-[15px] text-muted-foreground">

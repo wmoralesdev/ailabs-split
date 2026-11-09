@@ -159,6 +159,21 @@ test.describe("dinner split", () => {
   })
 })
 
+test("new check offers camera and gallery", async ({ page }) => {
+  await createDinner(page, `Gallery pick ${Date.now()}`, "Ana")
+  await page.getByRole("link", { name: "Scan ticket" }).click()
+  await waitForHydration(page)
+  await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "From gallery" })).toBeVisible()
+  await expect(page.getByTestId("ticket-camera-input")).toHaveAttribute(
+    "capture",
+    "environment"
+  )
+  await expect(page.getByTestId("ticket-gallery-input")).not.toHaveAttribute(
+    "capture"
+  )
+})
+
 test("OCR review when Mistral is configured", async ({ page }) => {
   test.skip(
     !process.env.MISTRAL_API_KEY || !existsSync(TICKET_PATH),
@@ -168,7 +183,9 @@ test("OCR review when Mistral is configured", async ({ page }) => {
   const name = `Biblioteca OCR ${Date.now()}`
   await createDinner(page, name, "Ana")
   await page.getByRole("link", { name: "Scan ticket" }).click()
-  await page.locator('input[type="file"]').setInputFiles(TICKET_PATH)
+  await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "From gallery" })).toBeVisible()
+  await page.getByTestId("ticket-gallery-input").setInputFiles(TICKET_PATH)
   await expect(page.getByText("Continue to assign")).toBeVisible({
     timeout: 40_000,
   })
