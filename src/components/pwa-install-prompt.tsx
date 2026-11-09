@@ -109,15 +109,15 @@ function PwaInstallPrompt() {
   return (
     <>
       <div className="animate-rise pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <div className="border-border bg-background/95 shadow-float pointer-events-auto flex w-full max-w-content items-start gap-3 rounded-xl border p-4 backdrop-blur-md">
-          <div className="bg-muted text-primary flex size-10 shrink-0 items-center justify-center rounded-lg">
+        <div className="shadow-float pointer-events-auto flex w-full max-w-content items-start gap-3 rounded-xl border border-border bg-background/95 p-4 backdrop-blur-md">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-primary">
             <HugeiconsIcon icon={Download01Icon} size={20} strokeWidth={2} />
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-display text-base font-semibold tracking-tight">
               Install Split
             </p>
-            <p className="text-muted-foreground mt-0.5 text-sm leading-snug">
+            <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
               {ios
                 ? "Add it to your Home Screen for quick access on this phone."
                 : "Install the app for a faster, full-screen experience."}
@@ -157,7 +157,7 @@ function PwaInstallPrompt() {
           <button
             type="button"
             aria-label="Dismiss install prompt"
-            className="text-muted-foreground hover:text-foreground -mt-1 -mr-1 rounded-md p-1"
+            className="-mt-1 -mr-1 rounded-full p-1 text-muted-foreground hover:text-foreground"
             onClick={dismiss}
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />
@@ -173,7 +173,7 @@ function PwaInstallPrompt() {
               Safari doesn&rsquo;t show an install button — use Share instead.
             </DialogDescription>
           </DialogHeader>
-          <ol className="text-foreground mt-2 list-decimal space-y-3 pl-5 text-sm leading-relaxed">
+          <ol className="mt-2 list-decimal space-y-3 pl-5 text-sm leading-relaxed text-foreground">
             <li>
               Tap{" "}
               <span className="inline-flex items-center gap-1 font-medium">

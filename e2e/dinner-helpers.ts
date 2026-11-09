@@ -27,21 +27,25 @@ export async function createDinner(
   creator: string
 ): Promise<string> {
   await openLanding(page)
-  const dinnerChip = page.getByRole("group", { name: "Mode" }).getByRole("button", {
-    name: "Dinner",
-  })
+  const dinnerChip = page
+    .getByRole("group", { name: "Mode" })
+    .getByRole("button", {
+      name: "Dinner",
+    })
   await expect(async () => {
     await dinnerChip.click()
     await expect(dinnerChip).toHaveAttribute("aria-pressed", "true", {
       timeout: 2_000,
     })
   }).toPass({ timeout: 20_000 })
-  await expect(page.getByRole("button", { name: "Create dinner" })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Create dinner" })
+  ).toBeVisible()
   await page.getByLabel("Dinner name").fill(name)
   await page.getByLabel("Your name").fill(creator)
   await page.getByRole("button", { name: "Create dinner" }).click()
   await expect(page.getByText("Dinner ready")).toBeVisible()
-  const code = (await page.locator("p.font-display.text-4xl").innerText()).trim()
+  const code = (await page.locator("[data-room-code]").innerText()).trim()
   expect(code.length).toBeGreaterThanOrEqual(6)
   await page.getByRole("button", { name: "Continue to dinner" }).click()
   await expect(page.getByRole("heading", { name })).toBeVisible()
@@ -50,17 +54,15 @@ export async function createDinner(
 }
 
 export async function addPeople(page: Page, names: string[]) {
-  await page.getByRole("button", { name: "Add people" }).click()
-  const sheet = page.getByRole("dialog")
-  await expect(sheet.getByText("Add people")).toBeVisible()
+  const field = page.getByLabel("Add people")
   for (const name of names) {
-    await sheet.getByPlaceholder("Type a name").fill(name)
-    await sheet.getByRole("button", { name: "Add", exact: true }).click()
-  }
-  await sheet.getByRole("button", { name: "Save names" }).click()
-  await expect(sheet).toBeHidden()
-  for (const name of names) {
-    await expect(page.getByText(name).first()).toBeVisible()
+    await field.fill(name)
+    await field.press("Enter")
+    await expect(
+      page
+        .getByRole("listitem")
+        .filter({ hasText: new RegExp(`^\\S*${name}$`) })
+    ).toBeVisible()
   }
 }
 
@@ -74,9 +76,6 @@ export async function startManualCheck(page: Page) {
     await newCheck.click()
   }
   await waitForHydration(page)
-  const enter = page.getByRole("button", { name: "Enter bill manually" })
-  await expect(enter).toBeVisible()
-  await enter.click()
   await expect(page.getByLabel("Place")).toBeVisible()
 }
 
@@ -86,14 +85,35 @@ export async function addCheckItem(
   amount: string,
   quantity = 1
 ) {
-  await page.getByPlaceholder("Item").fill(name)
-  await page.getByLabel("Quantity").fill(String(quantity))
-  await page.getByLabel("Item amount").fill(amount)
+  await page.getByLabel("Item", { exact: true }).fill(name)
+  await page.getByLabel("Qty", { exact: true }).fill(String(quantity))
+  await page.getByLabel("Price", { exact: true }).fill(amount)
   await page.getByRole("button", { name: "Add item" }).click()
-  await expect(page.getByRole("button", { name: new RegExp(name) })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: new RegExp(name) })
+  ).toBeVisible()
 }
 
-export async function assignEqual(page: Page, itemName: string, people: string[]) {
+/** Inline chips on the item card: the one-tap path. */
+export async function assignEqual(
+  page: Page,
+  itemName: string,
+  people: string[]
+) {
+  const card = itemCard(page, itemName)
+  for (const person of people) {
+    const chip = card.getByRole("button", { name: person, exact: true })
+    await chip.click()
+    await expect(chip).toHaveAttribute("aria-pressed", "true")
+  }
+}
+
+/** The item sheet's Equal tab: the path for editing an existing split. */
+export async function assignEqualInSheet(
+  page: Page,
+  itemName: string,
+  people: string[]
+) {
   await page.getByRole("button", { name: new RegExp(itemName) }).click()
   const sheet = page.getByRole("dialog")
   await expect(sheet.getByText("Split item")).toBeVisible()
@@ -138,6 +158,12 @@ export async function confirmCheck(page: Page) {
   await expect(confirm).toBeEnabled()
   await confirm.click()
   await expect(page.getByText("Confirmed").first()).toBeVisible()
+}
+
+export function itemCard(page: Page, itemName: string): Locator {
+  return page.getByRole("listitem").filter({
+    has: page.getByRole("button", { name: new RegExp(itemName) }),
+  })
 }
 
 export function dinnerNav(page: Page): Locator {

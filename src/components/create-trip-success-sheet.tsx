@@ -1,6 +1,10 @@
 import { useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Copy01Icon, Share01Icon } from "@hugeicons/core-free-icons"
+import {
+  Copy01Icon,
+  ReceiptDollarIcon,
+  Share01Icon,
+} from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -20,6 +24,7 @@ type CreateTripSuccessSheetProps = {
   name: string
   kind?: "TRIP" | "DINNER"
   onContinue: () => void
+  onAddBill?: () => void
 }
 
 export function CreateTripSuccessSheet({
@@ -28,6 +33,7 @@ export function CreateTripSuccessSheet({
   name,
   kind = "TRIP",
   onContinue,
+  onAddBill,
 }: CreateTripSuccessSheetProps) {
   const isDinner = kind === "DINNER"
   const [copied, setCopied] = useState(false)
@@ -62,44 +68,64 @@ export function CreateTripSuccessSheet({
         if (!next) onContinue()
       }}
     >
-      <SheetContent side="bottom" className="gap-0 rounded-t-2xl px-5 pt-5 pb-safe">
-        <SheetHeader className="gap-2 p-0 text-left">
-          <SheetTitle className="font-display text-2xl font-semibold tracking-tight">
+      <SheetContent
+        side="bottom"
+        className="pb-safe gap-0 rounded-t-3xl px-4 pt-5"
+      >
+        <SheetHeader className="gap-1 p-0 text-left">
+          <SheetTitle className="font-display text-[22px] font-bold tracking-tight">
             {isDinner ? "Dinner ready" : "Trip ready"}
           </SheetTitle>
-          <SheetDescription className="text-base text-muted-foreground">
-            Share this code so everyone can join — no accounts needed.
+          <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
+            {isDinner
+              ? "Add the bill now. Send the code whenever, people join from the link."
+              : "Send the code so everyone can join. No accounts."}
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 flex flex-col items-center rounded-xl border border-border bg-muted/40 px-4 py-6">
-          <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-            {isDinner ? "Dinner code" : "Trip code"}
-          </p>
-          <p className="mt-2 font-display text-4xl font-semibold tracking-[0.22em] text-foreground">
-            {code}
-          </p>
-          <p className="mt-2 truncate text-sm text-muted-foreground">{name}</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => void onCopyCode()}
+          className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Copy code ${code}`}
+        >
+          <span className="min-w-0">
+            <span className="eyebrow block truncate">{name}</span>
+            <span
+              data-room-code
+              className="mt-0.5 block font-display text-[28px] leading-tight font-bold tracking-[0.18em] text-foreground"
+            >
+              {code}
+            </span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-semibold text-primary">
+            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
+            {copied ? "Copied" : "Copy"}
+          </span>
+        </button>
 
-        <SheetFooter className="mt-6 flex-col gap-2 p-0 sm:flex-col">
+        <SheetFooter className="mt-4 flex-col gap-2 p-0 sm:flex-col">
+          {isDinner && onAddBill ? (
+            <Button type="button" className="cta-lg" onClick={onAddBill}>
+              <HugeiconsIcon
+                icon={ReceiptDollarIcon}
+                size={18}
+                strokeWidth={2}
+              />
+              Add the bill
+            </Button>
+          ) : null}
           <Button
             type="button"
-            className="w-full"
+            variant={isDinner ? "secondary" : "default"}
+            className={
+              isDinner ? "w-full bg-muted font-semibold text-primary" : "cta-lg"
+            }
             onClick={() => void onShare()}
             disabled={busy}
           >
-            <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
+            <HugeiconsIcon icon={Share01Icon} size={16} strokeWidth={2} />
             Share invite
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => void onCopyCode()}
-          >
-            <HugeiconsIcon icon={Copy01Icon} size={16} strokeWidth={2} />
-            {copied ? "Copied" : "Copy code"}
           </Button>
           <Button
             type="button"

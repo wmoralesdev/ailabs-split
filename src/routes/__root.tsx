@@ -34,14 +34,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { name: "description", content: SITE_DESCRIPTION },
         {
           name: "theme-color",
-          content: "#ede4ff",
+          content: "#f5f4f8",
           media: "(prefers-color-scheme: light)",
         },
         {
           name: "theme-color",
-          content: "#1a1a1a",
+          content: "#16131f",
           media: "(prefers-color-scheme: dark)",
         },
+        { name: "page-type", content: "software" },
+        { name: "site-kind", content: "software" },
         { name: "application-name", content: "Split" },
         { name: "apple-mobile-web-app-capable", content: "yes" },
         { name: "apple-mobile-web-app-title", content: "Split" },
@@ -68,17 +70,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           404
         </p>
-        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-foreground">
+        <h1 className="mt-3 font-display text-[34px] leading-tight font-bold tracking-tight text-foreground">
           Page not found
         </h1>
-        <p className="mt-3 text-lg text-muted-foreground">
+        <p className="mt-1 text-[15px] text-muted-foreground">
           That trip or page doesn&rsquo;t exist.
         </p>
-        <Link
-          to="/"
-          search={{ stay: true }}
-          className="mt-8 inline-flex h-(--control-height) w-fit items-center rounded-md bg-primary px-5 text-base font-medium text-primary-foreground"
-        >
+        <Link to="/" search={{ stay: true }} className="split-cta mt-8 w-fit">
           Back to Split
         </Link>
       </main>
@@ -89,7 +87,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-type="software"
+      data-radius="round"
+      data-buttons="pill"
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />

@@ -47,7 +47,7 @@ export function BaseCurrencyPicker({
               aria-pressed={selected}
               onClick={() => onChange(code)}
               className={cn(
-                "landing-chip min-h-10 min-w-14 px-3 text-sm",
+                "landing-chip min-w-14",
                 selected ? "landing-chip-on" : "landing-chip-idle"
               )}
             >
@@ -66,15 +66,13 @@ export function BaseCurrencyPicker({
           <SelectTrigger
             size="sm"
             className={cn(
-              "landing-chip min-h-10 min-w-14 border px-3 text-sm shadow-none",
-              moreSelected
-                ? "border-primary/35 bg-primary/12 text-foreground"
-                : "border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              "landing-chip min-w-14 rounded-full px-3 text-sm shadow-none",
+              moreSelected ? "landing-chip-on" : "landing-chip-idle"
             )}
-            aria-label="More currencies"
+            aria-label="Other currencies"
           >
-            <SelectValue placeholder="More">
-              {moreSelected ? value : "More"}
+            <SelectValue placeholder="Other">
+              {moreSelected ? value : "Other"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent

@@ -398,19 +398,19 @@ function RoomHomePage() {
 
   return (
     <PullToRefresh disabled={!online || reordering} onRefresh={() => refetch()}>
-      <main className="page-gutter mx-auto max-w-content pt-4">
+      <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
+          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
             {room.name}
           </h1>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <p className="text-sm text-muted-foreground tabular-nums">
+            <p className="text-[13px] text-muted-foreground tabular-nums">
               You spent {formatMoney(spentCents, room.currency)}
             </p>
             <button
               type="button"
               onClick={() => void copyCode()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs text-muted-foreground"
+              className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-xs font-medium text-primary"
             >
               <span className="font-display tracking-widest text-foreground">
                 {room.code}
@@ -422,20 +422,20 @@ function RoomHomePage() {
           </div>
         </header>
 
-        <section className="mt-4 border-y border-border/70 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <Avatar className="size-8 shrink-0">
-              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+        <section className="group-list mt-4">
+          <div className="flex min-h-11 items-center gap-2.5 py-1.5 pr-2 pl-3">
+            <Avatar className="size-7 shrink-0">
+              <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
                 {me ? initials(me.name) : "?"}
               </AvatarFallback>
             </Avatar>
-            <p className="min-w-0 flex-1 truncate text-sm font-medium">
+            <p className="min-w-0 flex-1 truncate text-[15px]">
               You · {me?.name ?? "Unknown"}
             </p>
             <button
               type="button"
               onClick={() => void copyMyLink()}
-              className="text-muted-foreground hover:text-foreground inline-flex size-9 shrink-0 items-center justify-center rounded-md"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
               aria-label={
                 copied === "link"
                   ? "Personal link copied"
@@ -452,7 +452,7 @@ function RoomHomePage() {
             <button
               type="button"
               onClick={switchIdentity}
-              className="shrink-0 text-sm font-medium text-primary"
+              className="min-h-11 shrink-0 px-2 text-[15px] font-medium text-primary"
             >
               Switch
             </button>
@@ -461,12 +461,12 @@ function RoomHomePage() {
 
         <section className="mt-6">
           <div className="flex items-end justify-between gap-3">
-            <h2 className="font-display text-xl font-semibold">Balances</h2>
+            <h2 className="font-display text-lg font-semibold">Balances</h2>
             {transfers.length > 0 ? (
               <Link
                 to="/r/$code/settle"
                 params={{ code: room.code }}
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary"
+                className="inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-primary"
               >
                 Settle
                 <HugeiconsIcon
@@ -477,21 +477,21 @@ function RoomHomePage() {
               </Link>
             ) : null}
           </div>
-          <ul className="mt-1">
+          <ul className="group-list mt-1">
             {nets.map((line) => {
               const owed = line.netCents > 0
               const owes = line.netCents < 0
               return (
                 <li
                   key={line.memberId}
-                  className="flex items-center gap-3 border-b border-border/70 py-3"
+                  className="flex min-h-12 items-center gap-3 py-2 pr-4 pl-3"
                 >
                   <Avatar className="size-8">
                     <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
                       {initials(line.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-medium">
                     {line.name}
                     {line.memberId === memberId ? (
                       <span className="font-normal text-muted-foreground">
@@ -503,10 +503,10 @@ function RoomHomePage() {
                   <span
                     className={
                       owed
-                        ? "text-sm font-semibold text-primary tabular-nums"
+                        ? "text-[15px] font-semibold text-primary tabular-nums"
                         : owes
-                          ? "text-sm font-semibold text-destructive tabular-nums"
-                          : "text-sm text-muted-foreground tabular-nums"
+                          ? "text-[15px] font-semibold text-destructive tabular-nums"
+                          : "text-[15px] text-muted-foreground tabular-nums"
                     }
                   >
                     {line.netCents === 0
@@ -521,7 +521,7 @@ function RoomHomePage() {
 
         <section className="mt-6">
           <div className="flex items-end justify-between gap-3">
-            <h2 className="font-display text-xl font-semibold">Expenses</h2>
+            <h2 className="font-display text-lg font-semibold">Expenses</h2>
             {listExpenses.length > 1 ? (
               <button
                 type="button"
@@ -534,7 +534,7 @@ function RoomHomePage() {
                   }
                   setReordering(true)
                 }}
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary disabled:opacity-60"
+                className="inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-primary disabled:opacity-60"
               >
                 {reordering ? (
                   savingOrder ? (
@@ -556,28 +556,28 @@ function RoomHomePage() {
             ) : null}
           </div>
           {listExpenses.length === 0 ? (
-            <div className="mt-3 flex flex-col items-center gap-3 border-y border-border/70 py-10 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <div className="surface mt-1 flex flex-col items-center gap-3 px-4 py-8 text-center">
+              <span className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-foreground">
                 <HugeiconsIcon
                   icon={ReceiptDollarIcon}
-                  size={24}
+                  size={22}
                   strokeWidth={2}
                 />
               </span>
               <div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-[15px] font-semibold text-foreground">
                   No expenses yet
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
                   Add the first one to start splitting.
                 </p>
               </div>
               <Link
                 to="/r/$code/new"
                 params={{ code: room.code }}
-                className="inline-flex h-(--control-height) items-center justify-center gap-2 rounded-md bg-primary px-5 text-base font-medium text-primary-foreground hover:bg-primary/80"
+                className="split-cta"
               >
-                <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={2} />
+                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
                 Add expense
               </Link>
             </div>
@@ -591,7 +591,7 @@ function RoomHomePage() {
                 items={order}
                 strategy={verticalListSortingStrategy}
               >
-                <ul className="mt-1">
+                <ul className="group-list mt-1">
                   {orderedExpenses.map((expense) => (
                     <SortableExpenseRow
                       key={expense.id}
@@ -604,7 +604,7 @@ function RoomHomePage() {
               </SortableContext>
             </DndContext>
           ) : (
-            <ul className="mt-1">
+            <ul className="group-list mt-1">
               {listExpenses.map((expense) => (
                 <ExpenseRow
                   key={expense.id}
@@ -673,14 +673,14 @@ function ExpenseRowContent({
 
   return (
     <>
-      <Avatar className={cn("size-9 shrink-0", pending && "opacity-70")}>
+      <Avatar className={cn("size-8 shrink-0", pending && "opacity-70")}>
         <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
           {initials(expense.paidByName)}
         </AvatarFallback>
       </Avatar>
       <div className={cn("min-w-0 flex-1", pending && "opacity-80")}>
         <div className="flex min-w-0 items-baseline gap-2">
-          <p className="truncate text-sm font-semibold">{expense.title}</p>
+          <p className="truncate text-[15px] font-semibold">{expense.title}</p>
           {pending ? (
             <Badge variant="secondary" className="shrink-0">
               Syncing
@@ -700,7 +700,7 @@ function ExpenseRowContent({
             </Badge>
           ) : null}
         </div>
-        <p className="mt-1 truncate text-xs text-muted-foreground">
+        <p className="truncate text-[13px] text-muted-foreground">
           {pending
             ? "Waiting to sync"
             : compact
@@ -709,7 +709,7 @@ function ExpenseRowContent({
         </p>
       </div>
       <div className={cn("shrink-0 text-right", pending && "opacity-80")}>
-        <p className="text-sm font-semibold tabular-nums">
+        <p className="text-[15px] font-semibold tabular-nums">
           {formatMoney(expense.amountCents, expense.currency)}
         </p>
         {isForeign ? (
@@ -734,10 +734,10 @@ function ExpenseRow({
   onOpen: () => void
 }) {
   return (
-    <li className="border-b border-border/70">
+    <li>
       <button
         type="button"
-        className="flex w-full items-center justify-between gap-3.5 py-3.5 text-left transition-colors hover:bg-muted/30"
+        className="flex min-h-14 w-full items-center justify-between gap-3 py-2.5 pr-4 pl-3 text-left transition-colors active:bg-muted"
         onClick={onOpen}
       >
         <ExpenseRowContent expense={expense} room={room} pending={pending} />
@@ -774,7 +774,7 @@ function SortableExpenseRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-3.5 border-b border-border/70 bg-background py-3.5",
+        "flex min-h-14 items-center gap-3 bg-card py-2.5 pr-4 pl-3",
         isDragging && "relative z-10 opacity-90 shadow-lg",
         pending && "opacity-80"
       )}
@@ -846,9 +846,7 @@ function ExpenseDetailSheet({
     !expense.isPersonal &&
     normalizedSplitMode(expense.splitMode) === "AMOUNT"
 
-  const fractionDigits = expense
-    ? currencyFractionDigits(expense.currency)
-    : 0
+  const fractionDigits = expense ? currencyFractionDigits(expense.currency) : 0
   const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
 
   useEffect(() => {
@@ -1047,7 +1045,10 @@ function ExpenseDetailSheet({
         memberId,
         amountCents: atmDigitsToCents(amounts[memberId] ?? "", fractionDigits),
       }))
-      const sum = splits.reduce((total, split) => total + (split.amountCents ?? 0), 0)
+      const sum = splits.reduce(
+        (total, split) => total + (split.amountCents ?? 0),
+        0
+      )
       if (sum !== nextAmountCents) {
         setSplitError(
           `Amounts add up to ${formatMoney(sum, expense.currency)}, need ${formatMoney(nextAmountCents, expense.currency)}`
@@ -1096,7 +1097,7 @@ function ExpenseDetailSheet({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex flex-col gap-5 px-6 pb-2">
+          <div className="flex flex-col gap-4 px-4 pb-2">
             {editing ? (
               <>
                 <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -1116,7 +1117,7 @@ function ExpenseDetailSheet({
                   </div>
                   <div className="grid gap-2">
                     <Label>Currency</Label>
-                    <div className="flex h-(--control-height) min-w-16 items-center justify-center rounded-md border-border bg-muted/40 px-3 text-base font-medium">
+                    <div className="flex h-(--control-height) min-w-16 items-center justify-center rounded-full border-border bg-muted/40 px-3 text-base font-medium">
                       {expense.currency}
                     </div>
                   </div>

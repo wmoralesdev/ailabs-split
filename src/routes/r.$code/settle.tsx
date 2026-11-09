@@ -3,11 +3,10 @@ import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  ArrowRight01Icon,
   CheckmarkCircle02Icon,
-  Copy01Icon,
-  Delete02Icon,
   Share01Icon,
+  Tick02Icon,
+  UndoIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
@@ -18,6 +17,8 @@ import {
 } from "@/components/bank-fx-calibration-sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { formatRelativeTime } from "@/lib/format-relative-time"
+import { copyText } from "@/lib/invite-link"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import {
@@ -28,6 +29,7 @@ import {
   formatTransferSentence,
   simplifyTransfers,
 } from "@/lib/settle"
+import type { Transfer } from "@/lib/settle"
 import type {
   DeleteSettlementInput,
   RecordSettlementInput,
@@ -48,11 +50,11 @@ export const Route = createFileRoute("/r/$code/settle")({
   errorComponent: ({ error }) => (
     <main className="page-gutter mx-auto flex min-h-dvh max-w-content flex-col justify-center">
       <h1 className="font-display text-3xl font-semibold">Trip not found</h1>
-      <p className="text-muted-foreground mt-2">{error.message}</p>
+      <p className="mt-2 text-muted-foreground">{error.message}</p>
       <Link
         to="/"
         search={{ stay: true }}
-        className="text-primary mt-6 underline"
+        className="mt-6 text-primary underline"
       >
         Back to Split
       </Link>
@@ -74,37 +76,49 @@ function SettlePage() {
   const { memberId } = useRoomIdentity()
   const queryClient = useQueryClient()
   const { data: room } = useQuery(roomQueryOptions(code, memberId))
-  const [copiedAll, setCopiedAll] = useState(false)
-  const [summaryCopied, setSummaryCopied] = useState(false)
-  const [copiedOne, setCopiedOne] = useState<number | null>(null)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const [pendingKey, setPendingKey] = useState<string | null>(null)
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
+
+  const deleteMutation = useMutation({
+    mutationFn: (input: DeleteSettlementInput) =>
+      deleteSettlement({ data: input }),
+    onSuccess: async () => {
+      await invalidate()
+      toast.success("Payment undone")
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Could not undo payment"
+      )
+    },
+  })
 
   const recordMutation = useMutation({
     mutationFn: (input: RecordSettlementInput) =>
       recordSettlement({ data: input }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
-      toast.success("Payment recorded")
+    onSuccess: async (settlement) => {
+      await invalidate()
+      toast.success("Payment recorded", {
+        description: `${settlement.fromMemberName} paid ${settlement.toMemberName} ${formatMoney(settlement.amountCents, settlement.currency)}`,
+        action: {
+          label: "Undo",
+          onClick: () =>
+            deleteMutation.mutate({
+              code,
+              settlementId: settlement.id,
+            }),
+        },
+      })
     },
     onError: (error) => {
       toast.error(
         error instanceof Error ? error.message : "Could not record payment"
       )
     },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (input: DeleteSettlementInput) =>
-      deleteSettlement({ data: input }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
-      toast.success("Payment removed")
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not remove payment"
-      )
-    },
+    onSettled: () => setPendingKey(null),
   })
 
   const transfers = useMemo(() => {
@@ -141,16 +155,14 @@ function SettlePage() {
     return simplifyTransfers(nets)
   }, [room])
 
-  const totalCents = useMemo(
-    () => transfers.reduce((sum, transfer) => sum + transfer.amountCents, 0),
-    [transfers]
+  const totalCents = transfers.reduce(
+    (sum, transfer) => sum + transfer.amountCents,
+    0
   )
 
   const hasForeignExpenses = useMemo(() => {
     if (!room) return false
-    return room.expenses.some(
-      (expense) => expense.currency !== room.currency
-    )
+    return room.expenses.some((expense) => expense.currency !== room.currency)
   }, [room])
 
   if (!room) return null
@@ -158,41 +170,14 @@ function SettlePage() {
   const adjustmentBps = room.fxAdjustmentBps
   const sampleCount = room.fxCalibrationSamples.length
   const hasBankMatch = Number.isFinite(adjustmentBps) && adjustmentBps !== 0
-
-  async function copyAll() {
-    if (transfers.length === 0) return
-    const text = transfers
-      .map((transfer) => formatTransferSentence(transfer, room!.currency))
-      .join("\n")
-    await navigator.clipboard.writeText(text)
-    setCopiedAll(true)
-    window.setTimeout(() => setCopiedAll(false), 1500)
-  }
-
-  async function copyOne(index: number) {
-    const transfer = transfers[index]
-    await navigator.clipboard.writeText(
-      formatTransferSentence(transfer, room!.currency)
-    )
-    setCopiedOne(index)
-    window.setTimeout(() => setCopiedOne(null), 1500)
-  }
-
-  async function copySummary() {
-    if (!room) return
-    await navigator.clipboard.writeText(
-      buildTripSummary({
-        name: room.name,
-        code: room.code,
-        currency: room.currency,
-        expenses: room.expenses,
-        settlements: room.settlements,
-        transfers,
-      })
-    )
-    setSummaryCopied(true)
-    window.setTimeout(() => setSummaryCopied(false), 1500)
-  }
+  const mine = transfers.filter(
+    (transfer) => transfer.fromId === memberId || transfer.toId === memberId
+  )
+  const others = transfers.filter(
+    (transfer) => transfer.fromId !== memberId && transfer.toId !== memberId
+  )
+  const paidCount = room.settlements.length
+  const stepCount = paidCount + transfers.length
 
   async function shareSummary() {
     if (!room) return
@@ -207,22 +192,35 @@ function SettlePage() {
     const share = "share" in navigator ? navigator.share.bind(navigator) : null
     if (share) {
       try {
-        await share({
-          title: `${room.name} summary`,
-          text,
-        })
-        return
+        await share({ title: `${room.name} summary`, text })
       } catch {
-        return
+        // Dismissed share sheet.
       }
+      return
     }
     await navigator.clipboard.writeText(text)
     toast.success("Summary copied")
   }
 
-  function markPaid(index: number) {
+  async function sendReminder(transfer: Transfer) {
     if (!room) return
-    const transfer = transfers[index]
+    const text = formatTransferSentence(transfer, room.currency)
+    const share = "share" in navigator ? navigator.share.bind(navigator) : null
+    if (share) {
+      try {
+        await share({ text })
+      } catch {
+        // Dismissed share sheet.
+      }
+      return
+    }
+    await copyText(text)
+    toast.success("Copied, paste it in the group chat")
+  }
+
+  function markPaid(transfer: Transfer) {
+    if (!room) return
+    setPendingKey(transferKey(transfer))
     recordMutation.mutate({
       code: room.code,
       fromMemberId: transfer.fromId,
@@ -233,96 +231,88 @@ function SettlePage() {
   }
 
   return (
-    <main className="page-gutter mx-auto max-w-content pt-6">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+    <main className="page-gutter mx-auto max-w-content pt-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
             Settle up
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Amounts in {room.currency}
+          <p className="mt-0.5 text-[15px] text-muted-foreground">
+            {transfers.length === 0
+              ? paidCount > 0
+                ? `All ${paidCount} ${paidCount === 1 ? "payment" : "payments"} done`
+                : `Amounts in ${room.currency}`
+              : `${formatMoney(totalCents, room.currency)} left · ${paidCount} of ${stepCount} paid`}
           </p>
-          {room.kind !== "DINNER" && hasForeignExpenses ? (
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              {hasBankMatch ? (
-                <>
-                  {formatFxAdjustmentLabel(adjustmentBps, sampleCount)}
-                  {" · "}
-                  <button
-                    type="button"
-                    onClick={() => setCalibrationOpen(true)}
-                    className="font-medium text-primary"
-                  >
-                    Edit
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setCalibrationOpen(true)}
-                  className="font-medium text-primary"
-                >
-                  Settle looks off? Match bank charges
-                </button>
-              )}
-            </p>
-          ) : null}
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void shareSummary()}
-          >
-            <HugeiconsIcon icon={Share01Icon} size={14} strokeWidth={2} />
-            Share
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void copySummary()}
-          >
-            <HugeiconsIcon icon={Copy01Icon} size={14} strokeWidth={2} />
-            {summaryCopied ? "Copied" : "Summary"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="mt-1 bg-card font-semibold text-primary"
+          onClick={() => void shareSummary()}
+        >
+          <HugeiconsIcon icon={Share01Icon} size={14} strokeWidth={2} />
+          Share summary
+        </Button>
       </div>
-      {transfers.length > 0 ? (
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={() => void copyAll()}
-            className="text-muted-foreground hover:text-foreground text-xs font-medium"
-          >
-            {copiedAll ? "Copied all sentences" : "Copy all sentences"}
-          </button>
+
+      {stepCount > 0 ? (
+        <div
+          className="mt-3 flex gap-1"
+          role="progressbar"
+          aria-label="Payments done"
+          aria-valuemin={0}
+          aria-valuemax={stepCount}
+          aria-valuenow={paidCount}
+        >
+          {Array.from({ length: stepCount }, (_, index) => (
+            <span
+              key={index}
+              className={
+                index < paidCount
+                  ? "h-1 flex-1 rounded-full bg-foreground"
+                  : "h-1 flex-1 rounded-full bg-border"
+              }
+            />
+          ))}
         </div>
       ) : null}
 
-      {transfers.length > 0 ? (
-        <div className="border-border/70 mt-3 flex items-center justify-between gap-3 border-b pb-3">
-          <div>
-            <p className="text-sm font-medium">Total to settle</p>
-            {hasBankMatch ? (
-              <p className="text-muted-foreground text-xs">
-                Includes {formatAdjustmentPercent(adjustmentBps)} bank match
-              </p>
-            ) : null}
-          </div>
-          <p className="font-display shrink-0 text-xl font-semibold tabular-nums">
-            {formatMoney(totalCents, room.currency)}
-          </p>
-        </div>
+      {room.kind !== "DINNER" && hasForeignExpenses ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {hasBankMatch ? (
+            <>
+              {formatFxAdjustmentLabel(adjustmentBps, sampleCount)}
+              {" · "}
+              {formatAdjustmentPercent(adjustmentBps)} bank match included
+              {" · "}
+              <button
+                type="button"
+                onClick={() => setCalibrationOpen(true)}
+                className="min-h-11 font-medium text-primary"
+              >
+                Edit
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCalibrationOpen(true)}
+              className="min-h-11 font-medium text-primary"
+            >
+              Settle looks off? Match bank charges
+            </button>
+          )}
+        </p>
       ) : null}
 
       {transfers.length === 0 ? (
-        <div className="border-border/70 mt-6 flex flex-col items-center gap-3 border-y py-12 text-center">
-          <span className="flex size-14 items-center justify-center rounded-full bg-accent text-accent-foreground">
+        <div className="surface mt-5 flex flex-col items-center gap-3 px-4 py-8 text-center">
+          <span className="flex size-11 items-center justify-center rounded-full bg-foreground text-background">
             <HugeiconsIcon
               icon={CheckmarkCircle02Icon}
-              size={28}
+              size={22}
               strokeWidth={2}
             />
           </span>
@@ -330,81 +320,61 @@ function SettlePage() {
             <p className="font-display text-lg font-semibold">
               {room.expenses.length === 0 ? "Nothing to settle" : "All settled"}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-[15px] text-muted-foreground">
               {room.expenses.length === 0
                 ? room.kind === "DINNER"
-                  ? "Confirm a check to get started."
+                  ? "Confirm a check to see who owes what."
                   : "Add an expense to get started."
-                : "Everyone is even. Nice."}
+                : "Everyone is square."}
             </p>
           </div>
         </div>
-      ) : (
-        <ul className="mt-4">
-          {transfers.map((transfer, index) => (
-            <li
-              key={`${transfer.fromId}-${transfer.toId}`}
-              className="border-border/70 border-b py-3.5"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <Avatar className="size-8">
-                    <AvatarFallback className="bg-destructive/10 text-xs font-semibold text-destructive">
-                      {initials(transfer.fromName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <HugeiconsIcon
-                    icon={ArrowRight01Icon}
-                    size={14}
-                    strokeWidth={2}
-                    className="text-muted-foreground shrink-0"
-                  />
-                  <Avatar className="size-8">
-                    <AvatarFallback className="bg-primary/15 text-xs font-semibold text-primary">
-                      {initials(transfer.toName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <p className="min-w-0 truncate text-sm font-medium">
-                    {transfer.fromName}
-                    <span className="text-muted-foreground font-normal">
-                      {" "}
-                      →{" "}
-                    </span>
-                    {transfer.toName}
-                  </p>
-                </div>
-                <p className="font-display shrink-0 text-lg font-semibold tabular-nums">
-                  {formatMoney(transfer.amountCents, room.currency)}
-                </p>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => markPaid(index)}
-                  disabled={recordMutation.isPending}
-                >
-                  <HugeiconsIcon
-                    icon={CheckmarkCircle02Icon}
-                    size={12}
-                    strokeWidth={2}
-                  />
-                  Record
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => void copyOne(index)}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs font-medium"
-                >
-                  <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
-                  {copiedOne === index ? "Copied" : "Copy sentence"}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      ) : null}
+
+      {mine.length > 0 ? (
+        <section className="mt-5" aria-labelledby="yours-heading">
+          <h2 id="yours-heading" className="group-label">
+            Yours
+          </h2>
+          <ul className="flex flex-col gap-2.5">
+            {mine.map((transfer) => (
+              <TransferCard
+                key={transferKey(transfer)}
+                transfer={transfer}
+                currency={room.currency}
+                memberId={memberId}
+                emphasis
+                pending={pendingKey === transferKey(transfer)}
+                disabled={recordMutation.isPending}
+                onMarkPaid={() => markPaid(transfer)}
+                onRemind={() => void sendReminder(transfer)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {others.length > 0 ? (
+        <section className="mt-6" aria-labelledby="others-heading">
+          <h2 id="others-heading" className="group-label">
+            {mine.length > 0 ? "Between others" : "Who pays whom"}
+          </h2>
+          <ul className="group-list">
+            {others.map((transfer) => (
+              <TransferCard
+                key={transferKey(transfer)}
+                transfer={transfer}
+                currency={room.currency}
+                memberId={memberId}
+                pending={pendingKey === transferKey(transfer)}
+                disabled={recordMutation.isPending}
+                onMarkPaid={() => markPaid(transfer)}
+                onRemind={() => void sendReminder(transfer)}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {room.kind !== "DINNER" ? (
         <BankFxCalibrationSheet
@@ -415,59 +385,186 @@ function SettlePage() {
       ) : null}
 
       {room.settlements.length > 0 ? (
-        <section className="mt-8">
-          <h2 className="font-display text-xl font-semibold">
-            Recorded payments
+        <section className="mt-6" aria-labelledby="paid-heading">
+          <h2 id="paid-heading" className="group-label">
+            Paid
           </h2>
-          <ul className="mt-1">
+          <ul className="group-list">
             {room.settlements.map((settlement) => (
               <li
                 key={settlement.id}
-                className="border-border/70 flex items-center justify-between gap-3 border-b py-3"
+                className="flex min-h-13 items-center gap-3 py-2 pr-1.5 pl-4"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                  <HugeiconsIcon
+                    icon={Tick02Icon}
+                    size={14}
+                    strokeWidth={2.2}
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px]">
                     <span className="font-medium">
-                      {settlement.fromMemberName}
+                      {settlement.fromMemberId === memberId
+                        ? "You"
+                        : settlement.fromMemberName}
                     </span>
                     <span className="text-muted-foreground"> paid </span>
                     <span className="font-medium">
-                      {settlement.toMemberName}
+                      {settlement.toMemberId === memberId
+                        ? "you"
+                        : settlement.toMemberName}
                     </span>
                   </p>
-                  <p className="text-muted-foreground text-xs">
-                    {new Date(settlement.createdAt).toLocaleDateString()}
+                  <p className="text-[13px] text-muted-foreground">
+                    {formatMoney(settlement.amountCents, settlement.currency)} ·{" "}
+                    {formatRelativeTime(settlement.createdAt)}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <p className="font-display text-base font-semibold tabular-nums">
-                    {formatMoney(settlement.amountCents, settlement.currency)}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      deleteMutation.mutate({
-                        code: room.code,
-                        settlementId: settlement.id,
-                      })
-                    }
-                    disabled={deleteMutation.isPending}
-                    aria-label="Remove recorded payment"
-                  >
-                    <HugeiconsIcon
-                      icon={Delete02Icon}
-                      size={14}
-                      strokeWidth={2}
-                    />
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-primary"
+                  onClick={() =>
+                    deleteMutation.mutate({
+                      code: room.code,
+                      settlementId: settlement.id,
+                    })
+                  }
+                  disabled={deleteMutation.isPending}
+                  aria-label={`Undo payment from ${settlement.fromMemberName} to ${settlement.toMemberName}`}
+                >
+                  <HugeiconsIcon icon={UndoIcon} size={14} strokeWidth={2} />
+                  Undo
+                </Button>
               </li>
             ))}
           </ul>
         </section>
       ) : null}
     </main>
+  )
+}
+
+function transferKey(transfer: Transfer): string {
+  return `${transfer.fromId}-${transfer.toId}`
+}
+
+function TransferCard({
+  transfer,
+  currency,
+  memberId,
+  emphasis = false,
+  pending,
+  disabled,
+  onMarkPaid,
+  onRemind,
+}: {
+  transfer: Transfer
+  currency: string
+  memberId: string
+  emphasis?: boolean
+  pending: boolean
+  disabled: boolean
+  onMarkPaid: () => void
+  onRemind: () => void
+}) {
+  const iPay = transfer.fromId === memberId
+  const iGet = transfer.toId === memberId
+  const sentence = iPay
+    ? `You pay ${transfer.toName}`
+    : iGet
+      ? `${transfer.fromName} pays you`
+      : `${transfer.fromName} pays ${transfer.toName}`
+  const markLabel = iPay
+    ? `I paid ${transfer.toName}`
+    : iGet
+      ? `${transfer.fromName} paid me`
+      : "Mark paid"
+
+  if (!emphasis) {
+    return (
+      <li className="flex min-h-14 items-center gap-3 py-2 pr-2 pl-4">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px]">{sentence}</p>
+          <p className="text-[15px] font-semibold tabular-nums">
+            {formatMoney(transfer.amountCents, currency)}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground"
+          onClick={onRemind}
+          aria-label={`Remind ${transfer.fromName}`}
+        >
+          <HugeiconsIcon icon={Share01Icon} size={16} strokeWidth={2} />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="bg-muted font-semibold text-primary"
+          onClick={onMarkPaid}
+          disabled={disabled}
+        >
+          {pending ? "Saving…" : markLabel}
+        </Button>
+      </li>
+    )
+  }
+
+  return (
+    <li className="surface p-4">
+      <div className="flex items-center gap-2.5">
+        <div className="flex -space-x-1.5">
+          <Avatar className="size-7 ring-2 ring-card">
+            <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
+              {initials(transfer.fromName)}
+            </AvatarFallback>
+          </Avatar>
+          <Avatar className="size-7 ring-2 ring-card">
+            <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
+              {initials(transfer.toName)}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <p className="min-w-0 truncate text-[15px] font-medium">{sentence}</p>
+      </div>
+      <p className="mt-2 font-display text-[34px] leading-none font-bold tracking-tight tabular-nums">
+        {formatMoney(transfer.amountCents, currency)}
+      </p>
+      <div className="mt-4 flex gap-2">
+        <Button
+          type="button"
+          className="flex-1 font-semibold"
+          onClick={onMarkPaid}
+          disabled={disabled}
+        >
+          <HugeiconsIcon
+            icon={CheckmarkCircle02Icon}
+            size={18}
+            strokeWidth={2}
+          />
+          {pending ? "Saving…" : markLabel}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon-lg"
+          className="bg-muted text-primary"
+          onClick={onRemind}
+          aria-label={
+            iPay
+              ? `Share payment to ${transfer.toName}`
+              : `Remind ${transfer.fromName}`
+          }
+        >
+          <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
+        </Button>
+      </div>
+    </li>
   )
 }

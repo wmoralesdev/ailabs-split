@@ -27,6 +27,7 @@ import {
 } from "@/lib/atm-amount"
 import { formatMoney } from "@/lib/settle"
 import type { RoomMemberDto } from "@/server/rooms"
+import { cn } from "@/lib/utils"
 
 type SplitTab = "EQUAL" | "PARTS" | "QUANTITY" | "AMOUNT"
 
@@ -71,7 +72,9 @@ export function ItemSplitSheet({
         setTab(item.quantity > 1 ? "QUANTITY" : "EQUAL")
         setEqualIds(new Set())
         setWeights(Object.fromEntries(members.map((member) => [member.id, 0])))
-        setQtyShares(Object.fromEntries(members.map((member) => [member.id, 0])))
+        setQtyShares(
+          Object.fromEntries(members.map((member) => [member.id, 0]))
+        )
         setAmountShares({})
         break
       case "EQUAL":
@@ -127,7 +130,10 @@ export function ItemSplitSheet({
   }, [item, fractionDigits, members])
 
   const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
-  const qtyAssigned = Object.values(qtyShares).reduce((sum, qty) => sum + qty, 0)
+  const qtyAssigned = Object.values(qtyShares).reduce(
+    (sum, qty) => sum + qty,
+    0
+  )
   const qtyLeft = quantity - qtyAssigned
 
   const tabs = useMemo(() => {
@@ -213,11 +219,6 @@ export function ItemSplitSheet({
     onOpenChange(false)
   }
 
-  function assignOnly(memberId: string) {
-    setTab("EQUAL")
-    setEqualIds(new Set([memberId]))
-  }
-
   function copyPrevious() {
     if (!previousItem) return
     switch (previousItem.split.mode) {
@@ -278,346 +279,335 @@ export function ItemSplitSheet({
     return <Sheet open={open} onOpenChange={onOpenChange} />
   }
 
+  const tabLabel: Record<SplitTab, string> = {
+    EQUAL: "Equal",
+    PARTS: "Parts",
+    QUANTITY: "Qty",
+    AMOUNT: "Amount",
+  }
+  const equalShareCents =
+    equalIds.size > 0 ? Math.round(amountCents / equalIds.size) : 0
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[90dvh] overflow-y-auto rounded-t-2xl"
+        className="flex max-h-[92dvh] flex-col gap-0 rounded-t-3xl bg-background p-0"
       >
-        <div className="mx-auto flex w-full max-w-content flex-col">
-          <SheetHeader>
-            <SheetTitle>Split item</SheetTitle>
-            <SheetDescription>
-              {formatMoney(amountCents, currency)}
+        <div className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col">
+          <SheetHeader className="gap-0.5 px-4 pt-4 pb-3 text-left">
+            <SheetTitle className="eyebrow">Split item</SheetTitle>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate font-display text-xl font-bold tracking-tight">
+                {quantity > 1 ? `${quantity} × ` : ""}
+                {name || item.name}
+              </p>
+              <p className="shrink-0 font-display text-xl font-bold tabular-nums">
+                {formatMoney(amountCents, currency)}
+              </p>
+            </div>
+            <SheetDescription className="text-[13px]">
               {item.modifiers.length > 0
-                ? ` · ${item.modifiers.join(", ")}`
-                : ""}
+                ? item.modifiers.join(", ")
+                : "Pick who had it and how to split it."}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex flex-col gap-5 px-6 pb-2">
-            <div className="grid gap-2">
-              <Label htmlFor="item-name">Name</Label>
-              <Input
-                id="item-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label>Quantity</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="size-8 rounded-full"
-                    onClick={() => setQuantity((value) => Math.max(1, value - 1))}
-                    aria-label="Fewer"
-                  >
-                    <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2} />
-                  </Button>
-                  <span className="w-8 text-center text-sm font-semibold tabular-nums">
-                    {quantity}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="size-8 rounded-full"
-                    onClick={() => setQuantity((value) => value + 1)}
-                    aria-label="More"
-                  >
-                    <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-                  </Button>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="item-amount">Amount</Label>
-                <Input
-                  id="item-amount"
-                  inputMode="numeric"
-                  value={formatAtmAmountInput(amountDigits, fractionDigits)}
-                  onChange={(event) =>
-                    setAmountDigits(atmDigitsFromInput(event.target.value))
-                  }
-                  onFocus={(event) => event.target.select()}
-                  placeholder={formatAtmAmount("", fractionDigits)}
-                  className="text-right tabular-nums"
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="item-mods">Modifiers</Label>
-              <Input
-                id="item-mods"
-                value={modifiers}
-                onChange={(event) => setModifiers(event.target.value)}
-                placeholder="16 ONZ, RES…"
-              />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <Label>Who · tap a name for 100%</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {members.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => assignOnly(member.id)}
-                    className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    {member.name}
-                  </button>
-                ))}
-              </div>
-              <Tabs
-                value={tab}
-                onValueChange={(value) => {
-                  if (
-                    value === "EQUAL" ||
-                    value === "PARTS" ||
-                    value === "QUANTITY" ||
-                    value === "AMOUNT"
-                  ) {
-                    setTab(value)
-                  }
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+            <Tabs
+              value={tab}
+              onValueChange={(value) => {
+                if (
+                  value === "EQUAL" ||
+                  value === "PARTS" ||
+                  value === "QUANTITY" ||
+                  value === "AMOUNT"
+                ) {
+                  setTab(value)
+                }
+              }}
+            >
+              <TabsList
+                className="segmented w-full group-data-horizontal/tabs:h-9"
+                style={{
+                  gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
                 }}
               >
-                <TabsList
-                  className="grid w-full"
-                  style={{
-                    gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {tabs.map((entry) => (
-                    <TabsTrigger key={entry} value={entry}>
-                      {entry === "EQUAL"
-                        ? "Equal"
-                        : entry === "PARTS"
-                          ? "Parts"
-                          : entry === "QUANTITY"
-                            ? "Qty"
-                            : "Amount"}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+                {tabs.map((entry) => (
+                  <TabsTrigger
+                    key={entry}
+                    value={entry}
+                    className="segmented-item"
+                  >
+                    {tabLabel[entry]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
-              <ul className="divide-y divide-border/60">
-                {members.map((member) => {
-                  const active =
-                    tab === "EQUAL"
-                      ? equalIds.has(member.id)
-                      : tab === "PARTS"
-                        ? (weights[member.id] ?? 0) > 0
-                        : tab === "QUANTITY"
-                          ? (qtyShares[member.id] ?? 0) > 0
-                          : atmDigitsToCents(
-                              amountShares[member.id] ?? "",
-                              fractionDigits
-                            ) > 0
-                  return (
-                    <li
-                      key={member.id}
-                      className="flex items-center justify-between gap-3 py-2.5"
-                    >
-                      <button
-                        type="button"
-                        className="flex min-w-0 items-center gap-3 text-left"
-                        onClick={() => {
-                          if (tab === "EQUAL") toggleEqual(member.id)
-                          if (tab === "PARTS") {
-                            setWeights((prev) => ({
-                              ...prev,
-                              [member.id]: (prev[member.id] ?? 0) > 0 ? 0 : 1,
-                            }))
-                          }
-                        }}
-                      >
-                        <Avatar
-                          className={
-                            active ? "size-9" : "size-9 opacity-40 grayscale"
-                          }
-                        >
-                          <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                            {initials(member.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span
-                          className={
-                            active
-                              ? "truncate font-medium"
-                              : "truncate text-muted-foreground"
-                          }
-                        >
-                          {member.name}
-                        </span>
-                      </button>
-                      {tab === "PARTS" ? (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="size-8 rounded-full"
-                            onClick={() =>
-                              setWeights((prev) => ({
-                                ...prev,
-                                [member.id]: Math.max(
-                                  0,
-                                  (prev[member.id] ?? 0) - 1
-                                ),
-                              }))
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={MinusSignIcon}
-                              size={14}
-                              strokeWidth={2}
-                            />
-                          </Button>
-                          <span className="w-5 text-center text-sm font-semibold tabular-nums">
-                            {weights[member.id] ?? 0}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="size-8 rounded-full"
-                            onClick={() =>
-                              setWeights((prev) => ({
-                                ...prev,
-                                [member.id]: (prev[member.id] ?? 0) + 1,
-                              }))
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={Add01Icon}
-                              size={14}
-                              strokeWidth={2}
-                            />
-                          </Button>
-                        </div>
-                      ) : null}
-                      {tab === "QUANTITY" ? (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="size-8 rounded-full"
-                            aria-label={`Less for ${member.name}`}
-                            onClick={() =>
-                              setQtyShares((prev) => ({
-                                ...prev,
-                                [member.id]: Math.max(
-                                  0,
-                                  (prev[member.id] ?? 0) - 1
-                                ),
-                              }))
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={MinusSignIcon}
-                              size={14}
-                              strokeWidth={2}
-                            />
-                          </Button>
-                          <span className="w-5 text-center text-sm font-semibold tabular-nums">
-                            {qtyShares[member.id] ?? 0}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="size-8 rounded-full"
-                            aria-label={`More for ${member.name}`}
-                            onClick={() =>
-                              setQtyShares((prev) => ({
-                                ...prev,
-                                [member.id]: (prev[member.id] ?? 0) + 1,
-                              }))
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={Add01Icon}
-                              size={14}
-                              strokeWidth={2}
-                            />
-                          </Button>
-                        </div>
-                      ) : null}
-                      {tab === "AMOUNT" ? (
-                        <Input
-                          inputMode="numeric"
-                          value={formatAtmAmountInput(
+            <ul className="group-list mt-3">
+              {members.map((member) => {
+                const active =
+                  tab === "EQUAL"
+                    ? equalIds.has(member.id)
+                    : tab === "PARTS"
+                      ? (weights[member.id] ?? 0) > 0
+                      : tab === "QUANTITY"
+                        ? (qtyShares[member.id] ?? 0) > 0
+                        : atmDigitsToCents(
                             amountShares[member.id] ?? "",
                             fractionDigits
-                          )}
-                          onChange={(event) =>
-                            setAmountShares((prev) => ({
-                              ...prev,
-                              [member.id]: atmDigitsFromInput(
-                                event.target.value
-                              ),
-                            }))
+                          ) > 0
+                return (
+                  <li
+                    key={member.id}
+                    className="flex min-h-12 items-center justify-between gap-2 pr-2 pl-3"
+                  >
+                    <button
+                      type="button"
+                      className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-pressed={
+                        tab === "EQUAL" || tab === "PARTS" ? active : undefined
+                      }
+                      onClick={() => {
+                        if (tab === "EQUAL") toggleEqual(member.id)
+                        if (tab === "PARTS") {
+                          setWeights((prev) => ({
+                            ...prev,
+                            [member.id]: (prev[member.id] ?? 0) > 0 ? 0 : 1,
+                          }))
+                        }
+                      }}
+                    >
+                      <Avatar className="size-8">
+                        <AvatarFallback
+                          className={
+                            active
+                              ? "bg-foreground text-xs font-semibold text-background"
+                              : "bg-muted text-xs font-semibold text-muted-foreground"
                           }
-                          onFocus={(event) => event.target.select()}
-                          placeholder={formatAtmAmount("", fractionDigits)}
-                          className="h-9 w-28 text-right tabular-nums"
-                        />
+                        >
+                          {initials(member.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
+                        className={
+                          active
+                            ? "truncate text-[15px] font-semibold"
+                            : "truncate text-[15px] text-muted-foreground"
+                        }
+                      >
+                        {member.name}
+                      </span>
+                      {tab === "EQUAL" && active ? (
+                        <span className="ml-auto pr-2 text-[15px] font-medium tabular-nums">
+                          {formatMoney(equalShareCents, currency)}
+                        </span>
                       ) : null}
-                    </li>
-                  )
-                })}
-              </ul>
-              {tab === "QUANTITY" ? (
-                <p
-                  className={
-                    qtyLeft === 0
-                      ? "text-xs font-medium text-primary"
-                      : "text-xs font-medium text-destructive"
+                    </button>
+                    {tab === "PARTS" ? (
+                      <Stepper
+                        value={weights[member.id] ?? 0}
+                        lessLabel={`Fewer parts for ${member.name}`}
+                        moreLabel={`More parts for ${member.name}`}
+                        onChange={(next) =>
+                          setWeights((prev) => ({ ...prev, [member.id]: next }))
+                        }
+                      />
+                    ) : null}
+                    {tab === "QUANTITY" ? (
+                      <Stepper
+                        value={qtyShares[member.id] ?? 0}
+                        lessLabel={`Less for ${member.name}`}
+                        moreLabel={`More for ${member.name}`}
+                        onChange={(next) =>
+                          setQtyShares((prev) => ({
+                            ...prev,
+                            [member.id]: next,
+                          }))
+                        }
+                      />
+                    ) : null}
+                    {tab === "AMOUNT" ? (
+                      <Input
+                        inputMode="numeric"
+                        value={formatAtmAmountInput(
+                          amountShares[member.id] ?? "",
+                          fractionDigits
+                        )}
+                        onChange={(event) =>
+                          setAmountShares((prev) => ({
+                            ...prev,
+                            [member.id]: atmDigitsFromInput(event.target.value),
+                          }))
+                        }
+                        onFocus={(event) => event.target.select()}
+                        placeholder={formatAtmAmount("", fractionDigits)}
+                        aria-label={`Amount for ${member.name}`}
+                        className="h-9 w-28 rounded-lg text-right tabular-nums"
+                      />
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+            {tab === "QUANTITY" ? (
+              <p
+                className={
+                  qtyLeft === 0
+                    ? "mt-2 px-4 text-[13px] font-medium text-muted-foreground"
+                    : "mt-2 px-4 text-[13px] font-medium text-destructive"
+                }
+              >
+                {qtyLeft === 0
+                  ? `All ${quantity} assigned`
+                  : `${qtyLeft} of ${quantity} left`}
+              </p>
+            ) : null}
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {tab === "EQUAL" && members.length > 1 ? (
+                <button
+                  type="button"
+                  className="person-chip person-chip-ghost"
+                  onClick={() =>
+                    setEqualIds(new Set(members.map((member) => member.id)))
                   }
                 >
-                  {qtyLeft === 0
-                    ? `All ${quantity} assigned`
-                    : `${qtyLeft} of ${quantity} left`}
-                </p>
+                  Everyone
+                </button>
               ) : null}
-            </div>
-
-            <div className="flex flex-col gap-2">
               {previousItem ? (
                 <button
                   type="button"
-                  className="text-left text-sm font-medium text-primary"
+                  className="person-chip person-chip-ghost"
                   onClick={copyPrevious}
                 >
-                  Same people as last item
+                  Same as last item
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="text-left text-sm font-medium text-primary"
-                onClick={() => {
-                  onSplitLine(item)
-                  onOpenChange(false)
-                }}
-              >
-                Split line into two
-              </button>
             </div>
+
+            <details className="surface group mt-5">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-[15px] font-medium">
+                Edit item
+                <span className="text-[13px] text-muted-foreground group-open:hidden">
+                  Name, quantity, price
+                </span>
+              </summary>
+              <div className="flex flex-col gap-3.5 px-4 pb-4">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="item-name">Name</Label>
+                  <Input
+                    id="item-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
+                  <div className="grid gap-1.5">
+                    <Label>Quantity</Label>
+                    <Stepper
+                      value={quantity}
+                      min={1}
+                      tall
+                      lessLabel="Fewer"
+                      moreLabel="More"
+                      onChange={setQuantity}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="item-amount">Price</Label>
+                    <Input
+                      id="item-amount"
+                      inputMode="numeric"
+                      value={formatAtmAmountInput(amountDigits, fractionDigits)}
+                      onChange={(event) =>
+                        setAmountDigits(atmDigitsFromInput(event.target.value))
+                      }
+                      onFocus={(event) => event.target.select()}
+                      placeholder={formatAtmAmount("", fractionDigits)}
+                      className="text-right tabular-nums"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="item-mods">Notes on the ticket</Label>
+                  <Input
+                    id="item-mods"
+                    value={modifiers}
+                    onChange={(event) => setModifiers(event.target.value)}
+                    placeholder="16 ONZ, RES…"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full bg-muted font-semibold text-primary"
+                  onClick={() => {
+                    onSplitLine(item)
+                    onOpenChange(false)
+                  }}
+                >
+                  Split line into two
+                </Button>
+              </div>
+            </details>
           </div>
 
-          <SheetFooter>
-            <Button type="button" onClick={save}>
+          <SheetFooter className="pb-safe border-t border-border px-4 pt-3">
+            <Button type="button" className="cta-lg" onClick={save}>
               Save item
             </Button>
           </SheetFooter>
         </div>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function Stepper({
+  value,
+  min = 0,
+  tall = false,
+  lessLabel,
+  moreLabel,
+  onChange,
+}: {
+  value: number
+  min?: number
+  tall?: boolean
+  lessLabel: string
+  moreLabel: string
+  onChange: (next: number) => void
+}) {
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center bg-muted",
+        tall ? "h-(--control-height) rounded-xl" : "h-8 rounded-lg"
+      )}
+    >
+      <button
+        type="button"
+        className="relative inline-flex h-full w-9 items-center justify-center rounded-l-[inherit] text-foreground after:absolute after:-inset-y-1.5 after:inset-x-0 disabled:opacity-30"
+        aria-label={lessLabel}
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+      >
+        <HugeiconsIcon icon={MinusSignIcon} size={14} strokeWidth={2.2} />
+      </button>
+      <span className="w-6 text-center text-[15px] font-semibold tabular-nums">
+        {value}
+      </span>
+      <button
+        type="button"
+        className="relative inline-flex h-full w-9 items-center justify-center rounded-r-[inherit] text-foreground after:absolute after:-inset-y-1.5 after:inset-x-0"
+        aria-label={moreLabel}
+        onClick={() => onChange(value + 1)}
+      >
+        <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2.2} />
+      </button>
+    </div>
   )
 }

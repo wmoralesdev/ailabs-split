@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { onlineManager, useMutation, useQueryClient } from "@tanstack/react-query"
+import {
+  onlineManager,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { toast } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
+  Add01Icon,
   ArrowLeft01Icon,
   Camera01Icon,
   Delete02Icon,
+  MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
@@ -23,6 +29,7 @@ import {
   emptyCheckPayload,
   manualTip,
   splitLineItem,
+  splitLineItemShares,
   tipCentsFromPercent,
   withForcedPrintedTotal,
 } from "@/lib/dinner-split"
@@ -49,7 +56,7 @@ import {
 } from "@/server/checks"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
-type Phase = "start" | "review" | "assign"
+type Phase = "review" | "assign"
 
 export function CheckEditor({
   room,
@@ -80,11 +87,8 @@ export function CheckEditor({
   const [payload, setPayload] = useState<CheckPayload>(
     check?.payload ?? emptyCheckPayload()
   )
-  const [phase, setPhase] = useState<Phase>(() => {
-    if (check) return "assign"
-    if (startWithScan) return "start"
-    return "start"
-  })
+  const [phase, setPhase] = useState<Phase>("assign")
+  const itemNameRef = useRef<HTMLInputElement>(null)
   const [ocrPending, setOcrPending] = useState(false)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [newName, setNewName] = useState("")
@@ -221,7 +225,9 @@ export function CheckEditor({
       setPhase(next.items.length > 0 ? "review" : "assign")
       toast.success("Ticket scanned")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read ticket")
+      toast.error(
+        error instanceof Error ? error.message : "Could not read ticket"
+      )
     } finally {
       setOcrPending(false)
     }
@@ -243,13 +249,44 @@ export function CheckEditor({
       modifiers: [],
       source: "MANUAL",
       confidence: null,
-      split: { mode: "UNASSIGNED" },
+      split:
+        room.members.length === 1
+          ? { mode: "EQUAL", memberIds: [room.members[0].id] }
+          : { mode: "UNASSIGNED" },
     }
     setPayload((prev) => ({ ...prev, items: [...prev.items, item] }))
     setNewName("")
     setNewQty(1)
     setNewAmount("")
     setPhase("assign")
+    itemNameRef.current?.focus()
+  }
+
+  function setItemSplit(itemId: string, memberIds: string[]) {
+    setPayload((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              split:
+                memberIds.length === 0
+                  ? { mode: "UNASSIGNED" }
+                  : { mode: "EQUAL", memberIds },
+            }
+          : item
+      ),
+    }))
+  }
+
+  function toggleItemMember(item: LineItem, memberId: string) {
+    const current = item.split.mode === "EQUAL" ? item.split.memberIds : []
+    setItemSplit(
+      item.id,
+      current.includes(memberId)
+        ? current.filter((id) => id !== memberId)
+        : [...current, memberId]
+    )
   }
 
   function applyTipPercent(percent: number) {
@@ -303,55 +340,17 @@ export function CheckEditor({
     }))
   }
 
-  if (phase === "start" && payload.items.length === 0 && !check) {
+  const unassignedCount = payload.items.filter(
+    (item) => item.split.mode === "UNASSIGNED"
+  ).length
+  const backHome = () =>
+    void navigate({ to: "/r/$code", params: { code: room.code } })
+
+  if (phase === "review") {
     return (
-      <main className="page-gutter mx-auto max-w-content pt-6">
-        <EditorHeader
-          title="New check"
-          onBack={() =>
-            void navigate({ to: "/r/$code", params: { code: room.code } })
-          }
-        />
-        <div className="mt-8 flex flex-col gap-3">
-          {isOnline ? (
-            <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
-              <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
-              {ocrPending ? "Reading ticket…" : "Scan ticket"}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                disabled={ocrPending}
-                onChange={(event) =>
-                  void onScan(event.target.files?.[0] ?? null)
-                }
-              />
-            </label>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Scanning needs a connection. Enter the bill by hand.
-            </p>
-          )}
-          <Button type="button" variant="outline" onClick={() => setPhase("assign")}>
-            Enter bill manually
-          </Button>
-        </div>
-      </main>
-    )
-  }
-
-  return (
-    <main className="page-gutter mx-auto max-w-content pt-6 pb-28">
-      <EditorHeader
-        title={checkId ? merchant || "Check" : "New check"}
-        onBack={() =>
-          void navigate({ to: "/r/$code", params: { code: room.code } })
-        }
-      />
-
-      {phase === "review" ? (
-        <div className="mt-6 flex flex-col gap-5">
+      <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
+        <EditorHeader title="Check the ticket" onBack={backHome} />
+        <div className="mt-5 flex flex-col gap-5">
           <div className="grid gap-2">
             <Label htmlFor="merchant">Place</Label>
             <Input
@@ -361,25 +360,76 @@ export function CheckEditor({
             />
           </div>
           {isPrecuenta ? (
-            <p className="text-xs text-muted-foreground">Marked as precuenta</p>
+            <p className="text-sm text-muted-foreground">Marked as precuenta</p>
           ) : null}
-          <OcrReview payload={payload} currency={room.currency} onChange={setPayload} />
-          <Button type="button" onClick={() => setPhase("assign")}>
+          <OcrReview
+            payload={payload}
+            currency={room.currency}
+            onChange={setPayload}
+          />
+        </div>
+        <div className="action-bar mt-auto">
+          <Button
+            type="button"
+            className="cta-lg"
+            onClick={() => setPhase("assign")}
+          >
             Continue to assign
           </Button>
         </div>
-      ) : (
-        <div className="mt-6 flex flex-col gap-6">
-          <div className="grid gap-2">
-            <Label htmlFor="merchant-assign">Place</Label>
-            <Input
-              id="merchant-assign"
-              value={merchant}
-              onChange={(event) => setMerchant(event.target.value)}
-              placeholder="Celeste Imperio"
-            />
-          </div>
+      </main>
+    )
+  }
 
+  return (
+    <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
+      <EditorHeader
+        title={checkId ? merchant || "Check" : "New check"}
+        onBack={backHome}
+      />
+
+      <div className="mt-3 flex flex-col gap-6 pb-6">
+        {payload.items.length === 0 && isOnline ? (
+          <label className="surface flex cursor-pointer items-center gap-3 p-3.5 transition-colors active:bg-muted">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <HugeiconsIcon icon={Camera01Icon} size={20} strokeWidth={2} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-semibold">
+                {ocrPending ? "Reading ticket…" : "Scan ticket"}
+              </span>
+              <span className="block text-[13px] text-muted-foreground">
+                Fills the items. Or type them in below.
+              </span>
+            </span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={ocrPending}
+              onChange={(event) => void onScan(event.target.files?.[0] ?? null)}
+            />
+          </label>
+        ) : null}
+        {payload.items.length === 0 && !isOnline ? (
+          <p className="text-[15px] text-muted-foreground">
+            Scanning needs a connection. Type the items in below.
+          </p>
+        ) : null}
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="merchant-assign">Place</Label>
+          <Input
+            id="merchant-assign"
+            value={merchant}
+            onChange={(event) => setMerchant(event.target.value)}
+            placeholder="Celeste Imperio"
+            enterKeyHint="next"
+          />
+        </div>
+
+        {room.members.length > 1 ? (
           <div className="grid gap-2">
             <Label>Paid by</Label>
             <MemberPicker
@@ -388,191 +438,283 @@ export function CheckEditor({
               onChange={setPaidById}
             />
           </div>
+        ) : null}
 
-          <div>
-            <div className="flex items-end justify-between gap-3">
-              <Label>Items</Label>
-              {payload.items.some((item) => item.split.mode === "UNASSIGNED") &&
-              room.members[0] ? (
-                <button
-                  type="button"
-                  className="text-xs font-medium text-primary"
-                  onClick={() =>
-                    setPayload((prev) => ({
-                      ...prev,
-                      items: assignRestToMember(prev.items, selfMemberId),
-                    }))
+        <section aria-labelledby="items-heading">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2
+              id="items-heading"
+              className="font-display text-lg font-semibold"
+            >
+              Items
+            </h2>
+            {unassignedCount > 0 && room.members.length > 1 ? (
+              <button
+                type="button"
+                className="min-h-11 text-[15px] font-medium text-primary"
+                onClick={() =>
+                  setPayload((prev) => ({
+                    ...prev,
+                    items: assignRestToMember(prev.items, selfMemberId),
+                  }))
+                }
+              >
+                Assign rest to me
+              </button>
+            ) : null}
+          </div>
+          {room.members.length > 1 && payload.items.length > 0 ? (
+            <p className="text-[13px] leading-snug text-muted-foreground">
+              Tap who shared each item. Tap the item for parts or amounts.
+            </p>
+          ) : null}
+
+          {payload.items.length > 0 ? (
+            <ul className="group-list mt-2.5">
+              {payload.items.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  members={room.members}
+                  currency={room.currency}
+                  nameById={nameById}
+                  onOpen={() => setSelectedItemId(item.id)}
+                  onToggle={(memberId) => toggleItemMember(item, memberId)}
+                  onEveryone={() =>
+                    setItemSplit(
+                      item.id,
+                      room.members.map((member) => member.id)
+                    )
                   }
-                >
-                  Assign rest to me
-                </button>
-              ) : null}
-            </div>
-            <ul className="mt-2 divide-y divide-border/60">
-              {payload.items.map((item) => {
-                const unassigned = item.split.mode === "UNASSIGNED"
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-start justify-between gap-3 py-3 text-left"
-                      onClick={() => setSelectedItemId(item.id)}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">
-                          {item.quantity > 1 ? `${item.quantity} × ` : ""}
-                          {item.name}
-                        </p>
-                        {item.modifiers.length > 0 ? (
-                          <p className="text-xs text-muted-foreground">
-                            {item.modifiers.join(" · ")}
-                          </p>
-                        ) : null}
-                        <p
-                          className={
-                            unassigned
-                              ? "text-xs font-medium text-destructive"
-                              : "text-xs text-muted-foreground"
-                          }
-                        >
-                          {itemSplitSummary(item, nameById)}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold tabular-nums">
-                        {formatMoney(item.amountCents, room.currency)}
-                      </p>
-                    </button>
-                  </li>
-                )
-              })}
+                />
+              ))}
             </ul>
+          ) : null}
 
-            <div className="mt-3 grid grid-cols-[1fr_4.5rem_6.5rem_auto] items-end gap-2">
+          <form
+            className="surface mt-2.5 flex flex-col gap-3 p-3.5"
+            onSubmit={(event) => {
+              event.preventDefault()
+              addManualItem()
+            }}
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="new-item-name">Item</Label>
               <Input
+                ref={itemNameRef}
+                id="new-item-name"
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
-                placeholder="Item"
+                placeholder="Pizza Margherita"
+                autoComplete="off"
+                enterKeyHint="next"
               />
-              <Input
-                inputMode="numeric"
-                value={String(newQty)}
-                onChange={(event) =>
-                  setNewQty(Math.max(1, Number.parseInt(event.target.value, 10) || 1))
-                }
-                aria-label="Quantity"
-              />
-              <Input
-                inputMode="numeric"
-                value={formatAtmAmountInput(newAmount, fd)}
-                onChange={(event) =>
-                  setNewAmount(atmDigitsFromInput(event.target.value))
-                }
-                onFocus={(event) => event.target.select()}
-                placeholder={formatAtmAmount("", fd)}
-                aria-label="Item amount"
-                className="text-right tabular-nums"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addManualItem}
-                aria-label="Add item"
-              >
-                Add
-              </Button>
             </div>
-          </div>
-
-          {payload.adjustments.length > 0 ? (
-            <div>
-              <Label>Fees</Label>
-              <ul className="mt-2 divide-y divide-border/60">
-                {payload.adjustments.map((adjustment) => (
-                  <li
-                    key={adjustment.id}
-                    className="flex items-center justify-between gap-3 py-2"
+            <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
+              <div className="grid gap-1.5">
+                <Label htmlFor="new-item-qty">Qty</Label>
+                <div className="flex h-(--control-height) items-center rounded-xl bg-muted">
+                  <button
+                    type="button"
+                    className="inline-flex h-full w-10 items-center justify-center rounded-l-xl text-muted-foreground disabled:opacity-40"
+                    onClick={() => setNewQty((value) => Math.max(1, value - 1))}
+                    disabled={newQty <= 1}
+                    aria-label="One fewer"
                   >
-                    <span className="text-sm">{adjustment.name}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm tabular-nums">
-                        {formatMoney(adjustment.amountCents, room.currency)}
-                      </span>
-                      <button
-                        type="button"
-                        className="text-muted-foreground"
-                        aria-label={`Remove ${adjustment.name}`}
-                        onClick={() =>
-                          setPayload((prev) => ({
-                            ...prev,
-                            adjustments: prev.adjustments.filter(
-                              (entry) => entry.id !== adjustment.id
-                            ),
-                          }))
-                        }
-                      >
-                        <HugeiconsIcon
-                          icon={Delete02Icon}
-                          size={14}
-                          strokeWidth={2}
-                        />
-                      </button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                    <HugeiconsIcon
+                      icon={MinusSignIcon}
+                      size={16}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  <input
+                    id="new-item-qty"
+                    inputMode="numeric"
+                    value={String(newQty)}
+                    onChange={(event) =>
+                      setNewQty(
+                        Math.max(
+                          1,
+                          Number.parseInt(event.target.value, 10) || 1
+                        )
+                      )
+                    }
+                    onFocus={(event) => event.target.select()}
+                    className="w-7 bg-transparent text-center text-base font-semibold tabular-nums outline-none"
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex h-full w-10 items-center justify-center rounded-r-xl text-muted-foreground"
+                    onClick={() => setNewQty((value) => value + 1)}
+                    aria-label="One more"
+                  >
+                    <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="new-item-amount">Price</Label>
+                <Input
+                  id="new-item-amount"
+                  inputMode="numeric"
+                  enterKeyHint="done"
+                  value={formatAtmAmountInput(newAmount, fd)}
+                  onChange={(event) =>
+                    setNewAmount(atmDigitsFromInput(event.target.value))
+                  }
+                  onFocus={(event) => event.target.select()}
+                  placeholder={formatAtmAmount("", fd)}
+                  className="text-right tabular-nums"
+                />
+              </div>
             </div>
+            <Button
+              type="submit"
+              variant="secondary"
+              className="w-full bg-muted font-semibold text-primary"
+              disabled={!newName.trim() || atmDigitsToCents(newAmount, fd) <= 0}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+              Add item
+            </Button>
+          </form>
+        </section>
+
+        <section
+          aria-labelledby="extras-heading"
+          className="flex flex-col gap-2.5"
+        >
+          <h2
+            id="extras-heading"
+            className="font-display text-lg font-semibold"
+          >
+            Tip and fees
+          </h2>
+          {payload.adjustments.length > 0 ? (
+            <ul className="group-list">
+              {payload.adjustments.map((adjustment) => (
+                <li
+                  key={adjustment.id}
+                  className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
+                >
+                  <span className="text-[15px]">{adjustment.name}</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-[15px] tabular-nums">
+                      {formatMoney(adjustment.amountCents, room.currency)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${adjustment.name}`}
+                      onClick={() =>
+                        setPayload((prev) => ({
+                          ...prev,
+                          adjustments: prev.adjustments.filter(
+                            (entry) => entry.id !== adjustment.id
+                          ),
+                        }))
+                      }
+                    >
+                      <HugeiconsIcon
+                        icon={Delete02Icon}
+                        size={16}
+                        strokeWidth={2}
+                      />
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
           ) : null}
 
           {showTipChips ? (
             <div className="flex flex-col gap-2">
-              <Label>Add tip</Label>
-              <p className="text-xs text-muted-foreground">
-                Only if you want to — nothing is added from a missing footer.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div>
+                <Label htmlFor="custom-tip">Add tip</Label>
+                <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+                  Only if you want one. Nothing is added unless the ticket
+                  prints it.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 items-center gap-2">
                 {[10, 15].map((percent) => (
                   <button
                     key={percent}
                     type="button"
-                    className="landing-chip landing-chip-idle"
+                    className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-base font-medium text-foreground tabular-nums transition-[transform,background-color] duration-150 outline-none select-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
                     onClick={() => applyTipPercent(percent)}
                   >
                     {percent}%
                   </button>
                 ))}
-              </div>
-              <div className="flex gap-2">
                 <Input
+                  id="custom-tip"
                   inputMode="numeric"
                   value={formatAtmAmountInput(customTip, fd)}
                   onChange={(event) =>
                     setCustomTip(atmDigitsFromInput(event.target.value))
                   }
-                  placeholder="Custom amount"
-                  className="text-right tabular-nums"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault()
+                      applyCustomTip()
+                    }
+                  }}
+                  onBlur={applyCustomTip}
+                  placeholder="Other"
+                  aria-label="Custom tip amount"
+                  className="text-center tabular-nums"
                 />
-                <Button type="button" variant="outline" onClick={applyCustomTip}>
-                  Add
-                </Button>
               </div>
             </div>
           ) : payload.tip.amountCents > 0 ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm">
+            <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
+              <p className="text-[15px]">
                 Tip
-                {payload.tip.source === "TICKET" ? " (ticket)" : " (added)"}
+                <span className="text-muted-foreground">
+                  {payload.tip.source === "TICKET"
+                    ? " · on ticket"
+                    : " · added"}
+                </span>
               </p>
-              <p className="text-sm font-semibold tabular-nums">
-                {formatMoney(payload.tip.amountCents, room.currency)}
-              </p>
+              <span className="flex items-center gap-1">
+                <span className="text-[15px] font-semibold tabular-nums">
+                  {formatMoney(payload.tip.amountCents, room.currency)}
+                </span>
+                {payload.tip.source === "TICKET" ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove tip"
+                    onClick={() =>
+                      setPayload((prev) => ({ ...prev, tip: manualTip(0) }))
+                    }
+                  >
+                    <HugeiconsIcon
+                      icon={Delete02Icon}
+                      size={16}
+                      strokeWidth={2}
+                    />
+                  </Button>
+                )}
+              </span>
             </div>
           ) : null}
 
           {showFee ? (
-            <div className="flex flex-col gap-2">
-              <Label>Add fee</Label>
+            <form
+              className="flex flex-col gap-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                addFee()
+              }}
+            >
+              <Label htmlFor="fee-name">Add fee</Label>
               <div className="flex gap-2">
                 <Input
+                  id="fee-name"
                   value={feeName}
                   onChange={(event) => setFeeName(event.target.value)}
                   placeholder="Service"
@@ -583,92 +725,77 @@ export function CheckEditor({
                   onChange={(event) =>
                     setFeeAmount(atmDigitsFromInput(event.target.value))
                   }
+                  aria-label="Fee amount"
                   className="w-28 text-right tabular-nums"
                 />
-                <Button type="button" variant="outline" onClick={addFee}>
-                  Add
-                </Button>
               </div>
-            </div>
+              <Button type="submit" variant="secondary" className="w-full bg-card font-semibold text-primary">
+                Add fee
+              </Button>
+            </form>
           ) : (
-            <button
+            <Button
               type="button"
-              className="text-left text-sm font-medium text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              className="self-start px-0 text-primary hover:bg-transparent"
               onClick={() => setShowFee(true)}
             >
-              Add fee
-            </button>
-          )}
-
-          {isOnline && payload.items.length === 0 ? (
-            <label className="border-border hover:bg-muted/40 flex h-(--control-height) cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-sm">
-              <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
-              {ocrPending ? "Reading ticket…" : "Scan ticket instead"}
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                disabled={ocrPending}
-                onChange={(event) => void onScan(event.target.files?.[0] ?? null)}
-              />
-            </label>
-          ) : null}
-
-          <Totals
-            split={split}
-            currency={room.currency}
-            onForcePrinted={
-              split.ocrDeltaCents != null && split.ocrDeltaCents !== 0
-                ? forcePrintedTotal
-                : undefined
-            }
-          />
-
-          {split.shares.length > 0 ? (
-            <div>
-              <Label>By person</Label>
-              <ul className="mt-2 divide-y divide-border/60">
-                {split.shares.map((share) => (
-                  <li
-                    key={share.memberId}
-                    className="flex items-center justify-between py-2 text-sm"
-                  >
-                    <span>{nameById.get(share.memberId) ?? share.memberId}</span>
-                    <span className="tabular-nums">
-                      {formatMoney(share.totalCents, room.currency)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {split.confirmBlockReason ? (
-            <p className="text-xs text-destructive" role="alert">
-              {split.confirmBlockReason}
-            </p>
-          ) : null}
-
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              disabled={!split.canConfirm || saveMutation.isPending}
-              onClick={() => saveMutation.mutate(true)}
-            >
-              {saveMutation.isPending ? "Saving…" : "Confirm check"}
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+              Add a fee or service charge
             </Button>
+          )}
+        </section>
+
+        <Totals
+          split={split}
+          currency={room.currency}
+          onForcePrinted={
+            split.ocrDeltaCents != null && split.ocrDeltaCents !== 0
+              ? forcePrintedTotal
+              : undefined
+          }
+        />
+
+        {split.shares.length > 0 ? (
+          <section aria-labelledby="by-person-heading">
+            <h2
+              id="by-person-heading"
+              className="font-display text-lg font-semibold"
+            >
+              By person
+            </h2>
+            <ul className="group-list mt-2.5">
+              {split.shares.map((share) => (
+                <li
+                  key={share.memberId}
+                  className="flex min-h-11 items-center justify-between px-4 text-[15px]"
+                >
+                  <span>{nameById.get(share.memberId) ?? share.memberId}</span>
+                  <span className="font-semibold tabular-nums">
+                    {formatMoney(share.totalCents, room.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {payload.items.length > 0 || checkId ? (
+          <div className="flex flex-col gap-1">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              className="w-full"
               disabled={saveMutation.isPending}
               onClick={() => saveMutation.mutate(false)}
             >
-              Save draft
+              Save draft for later
             </Button>
             {check?.status === "CONFIRMED" ? (
               <Button
                 type="button"
                 variant="ghost"
+                className="w-full"
                 onClick={() => revertMutation.mutate()}
               >
                 Move back to draft
@@ -677,7 +804,8 @@ export function CheckEditor({
             {checkId ? (
               <Button
                 type="button"
-                variant="destructive"
+                variant="ghost"
+                className="w-full text-destructive hover:text-destructive"
                 onClick={() => {
                   if (window.confirm("Delete this check?")) {
                     deleteMutation.mutate()
@@ -688,8 +816,37 @@ export function CheckEditor({
               </Button>
             ) : null}
           </div>
+        ) : null}
+      </div>
+
+      <div className="action-bar mt-auto">
+        <div className="mb-2 flex items-baseline justify-between gap-3">
+          <p className="font-display text-xl font-bold tabular-nums">
+            {formatMoney(split.totalCents, room.currency)}
+          </p>
+          {split.confirmBlockReason ? (
+            <p
+              className="text-right text-[13px] font-medium text-destructive"
+              role="alert"
+            >
+              {split.confirmBlockReason}
+            </p>
+          ) : payload.items.length > 0 ? (
+            <p className="text-[13px] text-muted-foreground">
+              Split between {split.shares.length}{" "}
+              {split.shares.length === 1 ? "person" : "people"}
+            </p>
+          ) : null}
         </div>
-      )}
+        <Button
+          type="button"
+          className="cta-lg"
+          disabled={!split.canConfirm || saveMutation.isPending}
+          onClick={() => saveMutation.mutate(true)}
+        >
+          {saveMutation.isPending ? "Saving…" : "Confirm check"}
+        </Button>
+      </div>
 
       <ItemSplitSheet
         item={selectedItem}
@@ -726,6 +883,126 @@ export function CheckEditor({
   )
 }
 
+function ItemCard({
+  item,
+  members,
+  currency,
+  nameById,
+  onOpen,
+  onToggle,
+  onEveryone,
+}: {
+  item: LineItem
+  members: RoomDto["members"]
+  currency: string
+  nameById: Map<string, string>
+  onOpen: () => void
+  onToggle: (memberId: string) => void
+  onEveryone: () => void
+}) {
+  const unassigned = item.split.mode === "UNASSIGNED"
+  const inlineEditable = item.split.mode === "EQUAL" || unassigned
+  const selected = new Set(
+    item.split.mode === "EQUAL" ? item.split.memberIds : []
+  )
+  const everyone = members.length > 1 && selected.size === members.length
+  const lineShares = splitLineItemShares(item)
+  const perPerson = [...lineShares.shares.values()]
+  const evenShare =
+    perPerson.length > 0 && perPerson.every((cents) => cents === perPerson[0])
+
+  let summary: string
+  if (unassigned) {
+    summary = "Who had this?"
+  } else if (item.split.mode === "EQUAL" && evenShare) {
+    summary =
+      perPerson.length === 1
+        ? `${nameById.get(item.split.memberIds[0]) ?? "One person"} pays it all`
+        : `${formatMoney(perPerson[0], currency)} each`
+  } else if (item.split.mode === "EQUAL") {
+    summary = `About ${formatMoney(Math.round(item.amountCents / perPerson.length), currency)} each`
+  } else {
+    summary = itemSplitSummary(item, nameById)
+  }
+
+  return (
+    <li
+      className={cn(
+        "overflow-hidden",
+        unassigned && members.length > 1 && "bg-destructive/[0.04]"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted"
+      >
+        <span className="min-w-0">
+          <span className="block text-[15px] font-semibold">
+            {item.quantity > 1 ? `${item.quantity} × ` : ""}
+            {item.name}
+          </span>
+          {item.modifiers.length > 0 ? (
+            <span className="block text-[13px] text-muted-foreground">
+              {item.modifiers.join(" · ")}
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              "block text-[13px]",
+              unassigned
+                ? "font-medium text-destructive"
+                : "text-muted-foreground"
+            )}
+          >
+            {summary}
+          </span>
+        </span>
+        <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+          {formatMoney(item.amountCents, currency)}
+        </span>
+      </button>
+      {members.length > 1 ? (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+          {inlineEditable ? (
+            <>
+              {members.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  className="person-chip"
+                  aria-pressed={selected.has(member.id)}
+                  onClick={() => onToggle(member.id)}
+                >
+                  {member.name}
+                </button>
+              ))}
+              {members.length > 2 ? (
+                <button
+                  type="button"
+                  className="person-chip person-chip-ghost"
+                  aria-pressed={everyone}
+                  onClick={onEveryone}
+                >
+                  Everyone
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <button
+              type="button"
+              className="person-chip person-chip-ghost"
+              onClick={onOpen}
+            >
+              Custom split · edit
+            </button>
+          )}
+        </div>
+      ) : null}
+    </li>
+  )
+}
+
 function EditorHeader({
   title,
   onBack,
@@ -734,18 +1011,18 @@ function EditorHeader({
   onBack: () => void
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1">
       <Button
         type="button"
         variant="ghost"
         size="icon-lg"
-        className="-ml-2"
+        className="-ml-3"
         onClick={onBack}
         aria-label="Back"
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
       </Button>
-      <h1 className="font-display text-3xl font-semibold tracking-tight">
+      <h1 className="min-w-0 truncate font-display text-[22px] font-bold tracking-tight">
         {title}
       </h1>
     </div>
@@ -762,7 +1039,7 @@ function Totals({
   onForcePrinted?: () => void
 }) {
   return (
-    <div className="flex flex-col gap-1 border-y border-border/70 py-3 text-sm">
+    <div className="surface flex flex-col gap-1.5 p-4 text-[15px]">
       <div className="flex justify-between">
         <span className="text-muted-foreground">Subtotal</span>
         <span className="tabular-nums">
@@ -785,7 +1062,7 @@ function Totals({
           </span>
         </div>
       ) : null}
-      <div className="flex justify-between font-semibold">
+      <div className="mt-1 flex justify-between border-t border-border/70 pt-2.5 text-[17px] font-semibold">
         <span>Total</span>
         <span className="tabular-nums">
           {formatMoney(split.totalCents, currency)}

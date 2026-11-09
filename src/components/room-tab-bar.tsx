@@ -20,14 +20,21 @@ export function RoomTabBar({
   const matchRoute = useMatchRoute()
   const onHome = !!matchRoute({ to: "/r/$code", params: { code } })
   const onSettle = !!matchRoute({ to: "/r/$code/settle", params: { code } })
+  const onCheck = !!matchRoute({
+    to: "/r/$code/check",
+    params: { code },
+    fuzzy: true,
+  })
   const isDinner = kind === "DINNER"
+
+  if (onCheck) return null
 
   return (
     <nav
       aria-label={isDinner ? "Dinner navigation" : "Trip navigation"}
-      className="border-border/60 bg-background pb-safe relative z-30 shrink-0 border-t"
+      className="pb-safe relative z-30 shrink-0 border-t border-border bg-background"
     >
-      <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-2">
+      <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-1">
         <TabLink
           to="/r/$code"
           code={code}
@@ -41,18 +48,18 @@ export function RoomTabBar({
               to="/r/$code/check"
               params={{ code }}
               aria-label="Add check"
-              className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
+              className="-mt-4 inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
             >
-              <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
+              <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
             </Link>
           ) : (
             <Link
               to="/r/$code/new"
               params={{ code }}
               aria-label="Add expense"
-              className="bg-primary text-primary-foreground -mt-6 inline-flex size-14 items-center justify-center rounded-full transition-transform active:translate-y-px"
+              className="-mt-4 inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
             >
-              <HugeiconsIcon icon={Add01Icon} size={26} strokeWidth={2.2} />
+              <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
             </Link>
           )}
         </div>
@@ -86,11 +93,11 @@ function TabLink({
       to={to}
       params={{ code }}
       className={cn(
-        "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium transition-colors",
+        "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium transition-colors",
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
-      <HugeiconsIcon icon={icon} size={22} strokeWidth={active ? 2.2 : 2} />
+      <HugeiconsIcon icon={icon} size={20} strokeWidth={active ? 2.2 : 2} />
       {label}
     </Link>
   )
