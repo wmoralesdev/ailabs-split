@@ -93,6 +93,7 @@ export const adjustmentSchema = z.object({
   kind: adjustmentKindSchema,
   name: z.string().trim().min(1).max(80),
   amountCents: z.number().int(),
+  percent: z.number().nullable().optional(),
   allocate: z.literal("BY_ITEMS"),
   source: z.enum(["OCR", "MANUAL"]),
   confidence: z.number().min(0).max(1).nullable(),

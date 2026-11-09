@@ -28,12 +28,13 @@ import {
   computeDinnerSplit,
   emptyCheckPayload,
   manualTip,
+  resolveManualFee,
   splitLineItem,
   splitLineItemShares,
   tipCentsFromPercent,
   withForcedPrintedTotal,
 } from "@/lib/dinner-split"
-import type { CheckPayload, LineItem } from "@/lib/dinner-split"
+import type { CheckPayload, LineItem, ManualFeeUnit } from "@/lib/dinner-split"
 import {
   atmDigitsFromInput,
   atmDigitsToCents,
@@ -95,6 +96,8 @@ export function CheckEditor({
   const [customTip, setCustomTip] = useState("")
   const [feeName, setFeeName] = useState("")
   const [feeAmount, setFeeAmount] = useState("")
+  const [feePercent, setFeePercent] = useState("")
+  const [feeUnit, setFeeUnit] = useState<ManualFeeUnit>("amount")
   const [showFee, setShowFee] = useState(false)
 
   const nameById = useMemo(
@@ -120,6 +123,13 @@ export function CheckEditor({
     selectedIndex > 0 ? (payload.items[selectedIndex - 1] ?? null) : null
 
   const showTipChips = payload.tip.amountCents === 0
+  const pendingFee = resolveManualFee({
+    unit: feeUnit,
+    amountDigits: feeAmount,
+    percentText: feePercent,
+    fractionDigits: fd,
+    itemSubtotalCents: split.itemSubtotalCents,
+  })
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(room.code) })
@@ -298,8 +308,15 @@ export function CheckEditor({
   }
 
   function addFee() {
-    const amountCents = atmDigitsToCents(feeAmount, fd)
-    if (!feeName.trim() || amountCents === 0) return
+    const resolved = resolveManualFee({
+      unit: feeUnit,
+      amountDigits: feeAmount,
+      percentText: feePercent,
+      fractionDigits: fd,
+      itemSubtotalCents: split.itemSubtotalCents,
+    })
+    const name = feeName.trim() || "Service"
+    if (!resolved) return
     setPayload((prev) => ({
       ...prev,
       adjustments: [
@@ -307,8 +324,9 @@ export function CheckEditor({
         {
           id: crypto.randomUUID(),
           kind: "FEE",
-          name: feeName.trim(),
-          amountCents,
+          name,
+          amountCents: resolved.amountCents,
+          percent: resolved.percent,
           allocate: "BY_ITEMS",
           source: "MANUAL",
           confidence: null,
@@ -317,6 +335,8 @@ export function CheckEditor({
     }))
     setFeeName("")
     setFeeAmount("")
+    setFeePercent("")
+    setFeeUnit("amount")
     setShowFee(false)
   }
 
@@ -573,7 +593,15 @@ export function CheckEditor({
                   key={adjustment.id}
                   className="flex min-h-11 items-center justify-between gap-3 pr-1 pl-4"
                 >
-                  <span className="text-[15px]">{adjustment.name}</span>
+                  <span className="text-[15px]">
+                    {adjustment.name}
+                    {adjustment.percent != null ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {adjustment.percent}%
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="flex items-center gap-1">
                     <span className="text-[15px] tabular-nums">
                       {formatMoney(adjustment.amountCents, room.currency)}
@@ -605,7 +633,7 @@ export function CheckEditor({
           ) : null}
 
           {showTipChips ? (
-            <div className="flex flex-col gap-2">
+            <div className="surface flex flex-col gap-3 p-3.5">
               <div>
                 <Label htmlFor="custom-tip">Add tip</Label>
                 <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
@@ -613,36 +641,37 @@ export function CheckEditor({
                   prints it.
                 </p>
               </div>
-              <div className="grid grid-cols-3 items-center gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[10, 15].map((percent) => (
-                  <button
+                  <Button
                     key={percent}
                     type="button"
-                    className="inline-flex h-(--control-height) items-center justify-center rounded-xl bg-card text-base font-medium text-foreground tabular-nums transition-[transform,background-color] duration-150 outline-none select-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
+                    variant="outline"
+                    className="rounded-xl"
                     onClick={() => applyTipPercent(percent)}
                   >
                     {percent}%
-                  </button>
+                  </Button>
                 ))}
-                <Input
-                  id="custom-tip"
-                  inputMode="numeric"
-                  value={formatAtmAmountInput(customTip, fd)}
-                  onChange={(event) =>
-                    setCustomTip(atmDigitsFromInput(event.target.value))
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault()
-                      applyCustomTip()
-                    }
-                  }}
-                  onBlur={applyCustomTip}
-                  placeholder="Other"
-                  aria-label="Custom tip amount"
-                  className="text-center tabular-nums"
-                />
               </div>
+              <Input
+                id="custom-tip"
+                inputMode="numeric"
+                value={formatAtmAmountInput(customTip, fd)}
+                onChange={(event) =>
+                  setCustomTip(atmDigitsFromInput(event.target.value))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    applyCustomTip()
+                  }
+                }}
+                onBlur={applyCustomTip}
+                placeholder={formatAtmAmount("", fd)}
+                aria-label="Custom tip amount"
+                className="text-right tabular-nums"
+              />
             </div>
           ) : payload.tip.amountCents > 0 ? (
             <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
@@ -681,31 +710,90 @@ export function CheckEditor({
 
           {showFee ? (
             <form
-              className="flex flex-col gap-2"
+              className="surface flex flex-col gap-3 p-3.5"
               onSubmit={(event) => {
                 event.preventDefault()
                 addFee()
               }}
             >
               <Label htmlFor="fee-name">Add fee</Label>
+              <Input
+                id="fee-name"
+                value={feeName}
+                onChange={(event) => setFeeName(event.target.value)}
+                placeholder="Service"
+                autoComplete="off"
+              />
               <div className="flex gap-2">
-                <Input
-                  id="fee-name"
-                  value={feeName}
-                  onChange={(event) => setFeeName(event.target.value)}
-                  placeholder="Service"
-                />
-                <Input
-                  inputMode="numeric"
-                  value={formatAtmAmountInput(feeAmount, fd)}
-                  onChange={(event) =>
-                    setFeeAmount(atmDigitsFromInput(event.target.value))
-                  }
-                  aria-label="Fee amount"
-                  className="w-28 text-right tabular-nums"
-                />
+                <div
+                  role="group"
+                  aria-label="Fee as amount or percent"
+                  className="flex h-(--control-height) shrink-0 rounded-xl bg-muted p-0.5"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={feeUnit === "amount"}
+                    aria-label="Fee as amount"
+                    className={cn(
+                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors",
+                      feeUnit === "amount"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground"
+                    )}
+                    onClick={() => setFeeUnit("amount")}
+                  >
+                    $
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={feeUnit === "percent"}
+                    aria-label="Fee as percent"
+                    className={cn(
+                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors",
+                      feeUnit === "percent"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground"
+                    )}
+                    onClick={() => setFeeUnit("percent")}
+                  >
+                    %
+                  </button>
+                </div>
+                {feeUnit === "percent" ? (
+                  <Input
+                    id="fee-value"
+                    inputMode="decimal"
+                    value={feePercent}
+                    onChange={(event) => setFeePercent(event.target.value)}
+                    placeholder="10"
+                    aria-label="Fee percent"
+                    className="text-right tabular-nums"
+                  />
+                ) : (
+                  <Input
+                    id="fee-value"
+                    inputMode="numeric"
+                    value={formatAtmAmountInput(feeAmount, fd)}
+                    onChange={(event) =>
+                      setFeeAmount(atmDigitsFromInput(event.target.value))
+                    }
+                    placeholder={formatAtmAmount("", fd)}
+                    aria-label="Fee amount"
+                    className="text-right tabular-nums"
+                  />
+                )}
               </div>
-              <Button type="submit" variant="secondary" className="w-full bg-card font-semibold text-primary">
+              {feeUnit === "percent" && pendingFee ? (
+                <p className="text-[13px] text-muted-foreground">
+                  Adds {formatMoney(pendingFee.amountCents, room.currency)}
+                </p>
+              ) : null}
+              <Button
+                type="submit"
+                variant="secondary"
+                className="w-full bg-muted font-semibold text-primary"
+                disabled={!pendingFee}
+              >
                 Add fee
               </Button>
             </form>
