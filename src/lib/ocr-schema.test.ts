@@ -13,6 +13,7 @@ import {
   CELESTE_IMPERIO_MD,
   PUPUSERIA_PANCHIMALCO_MD,
   PUPUSERIA_PANCHIMALCO_PRETICKET_MD,
+  UNIT_DIVIDES_TOTAL_MD,
 } from "./receipt-ocr-fixtures"
 import { checkPayloadFromOcr, extractCheckDraft } from "./receipt-ocr"
 import type { OcrCheckDraft } from "./receipt-ocr"
@@ -136,12 +137,40 @@ describe("draftFromExtract", () => {
     ).toBe(6)
     expect(computeDinnerSplit(payload).totalCents).toBe(6000)
   })
+
+  it("infers quantity from vision rows where unit price divides the line total", () => {
+    const parsed = extractCheckDraft(UNIT_DIVIDES_TOTAL_MD)
+    const extract = extractFromParsed(parsed)
+    extract.items = extract.items.map((item) => ({
+      ...item,
+      quantity: 1,
+    }))
+
+    const check = checkFromExtract(extract, extract.rawText)
+    expect(
+      check.items.find((item) => item.name === "Frijol/Queso pq")?.quantity
+    ).toBe(8)
+    expect(
+      check.items.find((item) => item.name === "Soda vidrio")?.quantity
+    ).toBe(6)
+    expect(
+      check.items.find((item) => item.name === "Frijol pq")?.quantity
+    ).toBe(1)
+    expect(check.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
+    expect(check.tip?.amountCents).toBe(0)
+  })
 })
 
 describe("RECEIPT_VISION_INSTRUCTIONS", () => {
-  it("tells the model CNT is quantity when P.UNI differs from TOTAL", () => {
+  it("tells the model quantity comes from unit÷total and any count column", () => {
     expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/P\.UNI/)
-    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/quantity/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/divides evenly/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/QTY/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/CANTIDAD/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/AMT/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/AMOUNT/)
     expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/Frijol\/Queso pq/)
     expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/PRE-TICKET/)
   })

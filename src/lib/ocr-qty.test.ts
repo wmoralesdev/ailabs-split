@@ -33,7 +33,7 @@ describe("normalizeOcrItemQty", () => {
     })
   })
 
-  it("infers quantity from P.UNI ≠ TOTAL even when CNT is not in the name", () => {
+  it("infers quantity when unit price ≠ total and the total divides evenly", () => {
     expect(
       normalizeOcrItemQty({
         name: "Soda vidrio",
@@ -45,6 +45,21 @@ describe("normalizeOcrItemQty", () => {
       name: "Soda vidrio",
       quantity: 6,
       unitPriceCents: 125,
+    })
+  })
+
+  it("does not invent quantity when the total is not divisible by the unit", () => {
+    expect(
+      normalizeOcrItemQty({
+        name: "Taco",
+        quantity: 1,
+        unitPriceCents: 175,
+        amountCents: 400,
+      })
+    ).toEqual({
+      name: "Taco",
+      quantity: 1,
+      unitPriceCents: 175,
     })
   })
 

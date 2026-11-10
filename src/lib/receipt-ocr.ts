@@ -192,26 +192,54 @@ function peelMoneyFromEnd(line: string): { rest: string; amounts: number[] } {
   return { rest, amounts }
 }
 
-function parseItemLine(
-  line: string
-): {
+const QTY_COLUMN_HEADER = /^(?:cnt|cant(?:idad)?|qty|quantity|amt|amount)\b/i
+
+const QTY_HEADER_REST =
+  /\b(?:producto|product|descrip|item|detalle|precio|price|total|unit|uni)\b/i
+
+function isQtyColumnHeader(line: string): boolean {
+  if (peelMoneyFromEnd(line).amounts.length > 0) return false
+  return QTY_COLUMN_HEADER.test(line) && QTY_HEADER_REST.test(line)
+}
+
+function parseItemLine(line: string): {
   quantity: number
   name: string
   unitPriceCents?: number
   amountCents: number
 } | null {
+  if (
+    FOOTER_LINE.test(line) ||
+    SKIP_LINE.test(line) ||
+    isQtyColumnHeader(line)
+  ) {
+    return null
+  }
   const { rest, amounts } = peelMoneyFromEnd(line)
   if (amounts.length === 0) return null
+
   const qtyMatch = rest.match(/^(\d+)\s+(.+)$/)
-  if (!qtyMatch) return null
-  const name = qtyMatch[2].trim()
-  if (!name || FOOTER_LINE.test(name) || SKIP_LINE.test(name)) return null
-  if (FOOTER_LINE.test(line) || SKIP_LINE.test(line)) return null
-  const quantity = Number.parseInt(qtyMatch[1], 10)
-  if (!Number.isFinite(quantity) || quantity <= 0) return null
   const amountCents = amounts.length === 2 ? amounts[1] : amounts[0]
-  const unitPriceCents =
-    amounts.length === 2 ? amounts[0] : Math.round(amountCents / quantity)
+  let name: string
+  let quantity: number
+  let unitPriceCents: number | undefined
+
+  if (qtyMatch) {
+    name = qtyMatch[2].trim()
+    quantity = Number.parseInt(qtyMatch[1], 10)
+    if (!Number.isFinite(quantity) || quantity <= 0) return null
+    unitPriceCents =
+      amounts.length === 2 ? amounts[0] : Math.round(amountCents / quantity)
+  } else if (amounts.length === 2 && rest.length > 0) {
+    name = rest
+    quantity = 1
+    unitPriceCents = amounts[0]
+  } else {
+    return null
+  }
+
+  if (!name || FOOTER_LINE.test(name) || SKIP_LINE.test(name)) return null
+
   return {
     ...normalizeOcrItemQty({
       name,
@@ -289,6 +317,7 @@ export function extractCheckDraft(markdown: string): OcrCheckDraft {
   const headerLines: string[] = []
 
   for (const line of lines) {
+    if (isQtyColumnHeader(line)) continue
     if (SKIP_LINE.test(line) && !FOOTER_LINE.test(line)) {
       if (!seenItem) headerLines.push(line)
       continue

@@ -16,18 +16,18 @@ const itemSchema = z.object({
   name: z
     .string()
     .describe(
-      "Product name only — no CNT, no '8 ×', no size/modifier suffixes. Example: Frijol/Queso pq"
+      "Product name only — no quantity, no '8 ×', no CNT/QTY/AMT prefix, no size/modifier suffixes. Example: Frijol/Queso pq"
     ),
   quantity: z
     .number()
     .describe(
-      "Printed CNT/CANT. When P.UNI ≠ line TOTAL, use the leading number (e.g. 8), not 1 per row"
+      "Printed count from CNT, QTY, QUANTITY, AMT, AMOUNT, CANT, CANTIDAD, or similar. When unit price ≠ line total and the total divides evenly by the unit, use that quotient (e.g. 8), not 1 per row"
     ),
   unitPriceCents: z
     .number()
     .nullable()
     .describe(
-      "P.UNI / P.UNIT in cents if printed; otherwise null. Example: 1.40 → 140"
+      "P.UNI / P.UNIT / unit price in cents if printed; otherwise null. Example: 1.40 → 140"
     ),
   amountCents: z.number().describe("Line total in cents"),
   modifiers: z
@@ -86,7 +86,7 @@ export const RECEIPT_VISION_INSTRUCTIONS = `Extract a restaurant or receipt phot
 
 Amounts are integer cents (4.10 → 410). Nested modifiers like ** 16 ONZ or RES/VAS belong on the previous item, not as their own items.
 
-Quantity lives in \`quantity\`, never in \`name\`. Thermal tickets often print CNT or CANT as the first column. When unit price (P.UNI / P.UNIT) differs from the line TOTAL, that leading number is quantity. Example: \`8 Frijol/Queso pq  1.40  $11.20\` → name "Frijol/Queso pq", quantity 8, unitPriceCents 140, amountCents 1120. Do not write "8 × Frijol/Queso pq". If quantity is 1, the name is only the product (\`Chicharron/Frijol pq\`), never prefixed with "1 ×".
+Quantity lives in \`quantity\`, never in \`name\`. If unit price (P.UNI / P.UNIT / similar) differs from the line TOTAL and the total divides evenly by the unit, that quotient is quantity — even when no count is printed. A leading column labeled CNT, QTY, QUANTITY, AMT, AMOUNT, CANT, CANTIDAD, or similar is also quantity. Example: \`8 Frijol/Queso pq  1.40  $11.20\` or \`Frijol/Queso pq  1.40  $11.20\` → name "Frijol/Queso pq", quantity 8, unitPriceCents 140, amountCents 1120. Do not write "8 × Frijol/Queso pq". If quantity is 1, the name is only the product (\`Chicharron/Frijol pq\`), never prefixed with "1 ×".
 
 Do not invent tip, tax, IVA, or fees — only footer lines that are printed. PROPINA 0% or $0.00 means tip amountCents 0 and percentHint 0, never 10%. If no tip line exists, tip is null.
 

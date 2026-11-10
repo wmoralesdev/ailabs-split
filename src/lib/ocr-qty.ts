@@ -1,7 +1,10 @@
 /**
- * Thermal tickets often print CNT/CANT at the start of the row.
- * When unit price (P.UNI) differs from the line TOTAL, that number is quantity.
  * Quantity belongs on the field; the name is the product only.
+ *
+ * If unit price (P.UNI / similar) differs from the line total and the total
+ * divides evenly by the unit, that quotient is quantity — even with no count
+ * column. A leading CNT, QTY, QUANTITY, AMT, AMOUNT, CANT, CANTIDAD (or
+ * similar) is also quantity. Recover when the model bakes `N ×` into the name.
  */
 
 export type OcrQtyFields = {

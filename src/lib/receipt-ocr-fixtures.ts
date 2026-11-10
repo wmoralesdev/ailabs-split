@@ -149,6 +149,18 @@ Pague en caja
 GRACIAS POR SU VISITA
 `
 
+/** No leading CNT: quantity is unit price dividing the line total. */
+export const UNIT_DIVIDES_TOTAL_MD = `
+PRE-TICKET
+ITEM P.UNI TOTAL
+Frijol/Queso pq 1.40 $11.20
+Soda vidrio 1.25 $7.50
+1 Frijol pq 1.40 $1.40
+SUB TOTAL $20.10
+PROPINA 0% $0.00
+TOTAL A PAGAR $20.10
+`
+
 export const CELESTE_IMPERIO_MD = `
 RESTAURANTE CELESTE IMPERIO
 CALLE CHILTIUPAN Y, AVENIDA

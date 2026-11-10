@@ -6,6 +6,7 @@ import {
   CELESTE_IMPERIO_MD,
   PUPUSERIA_PANCHIMALCO_MD,
   PUPUSERIA_PANCHIMALCO_PRETICKET_MD,
+  UNIT_DIVIDES_TOTAL_MD,
 } from "./receipt-ocr-fixtures"
 import {
   checkPayloadFromOcr,
@@ -154,6 +155,62 @@ describe("extractCheckDraft", () => {
     expect(frijol?.name).toBe("Frijol/Queso pq")
     expect(payload.tip.amountCents).toBe(0)
     expect(computeDinnerSplit(payload).totalCents).toBe(6000)
+  })
+
+  it.each([
+    "CNT PRODUCTO P.UNI TOTAL",
+    "QTY ITEM UNIT TOTAL",
+    "QUANTITY DESCRIPTION PRICE TOTAL",
+    "AMT PRODUCT P.UNI TOTAL",
+    "AMOUNT ITEM PRICE TOTAL",
+    "CANT DESCRIPCION P.UNIT TOTAL",
+    "CANTIDAD DESCRIPCION PRECIO TOTAL",
+  ])("reads quantity from a %s column, not the name", (header) => {
+    const draft = extractCheckDraft(`
+CAFE
+${header}
+4 Tacos 2.50 $10.00
+TOTAL $10.00
+`)
+    expect(draft.items).toHaveLength(1)
+    expect(draft.items[0]).toMatchObject({
+      name: "Tacos",
+      quantity: 4,
+      unitPriceCents: 250,
+      amountCents: 1000,
+    })
+  })
+
+  it("infers quantity when unit price divides the line total with no CNT", () => {
+    const draft = extractCheckDraft(UNIT_DIVIDES_TOTAL_MD)
+    expect(draft.isPrecuenta).toBe(true)
+    expect(draft.tip?.amountCents).toBe(0)
+    expect(draft.totalCents).toBe(2010)
+    expect(draft.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Frijol/Queso pq",
+          quantity: 8,
+          unitPriceCents: 140,
+          amountCents: 1120,
+        }),
+        expect.objectContaining({
+          name: "Soda vidrio",
+          quantity: 6,
+          unitPriceCents: 125,
+          amountCents: 750,
+        }),
+        expect.objectContaining({
+          name: "Frijol pq",
+          quantity: 1,
+          unitPriceCents: 140,
+          amountCents: 140,
+        }),
+      ])
+    )
+    expect(draft.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
   })
 
   it("parses Celeste continuation modifiers and printed propina", () => {
