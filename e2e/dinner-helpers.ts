@@ -210,3 +210,32 @@ export function itemCard(page: Page, itemName: string): Locator {
 export function dinnerNav(page: Page): Locator {
   return page.getByRole("navigation", { name: "Dinner navigation" })
 }
+
+/** Settle sheet: record the open transfer. Photo is optional. */
+export async function recordPayment(
+  page: Page,
+  options?: { proofPath?: string }
+) {
+  const sheet = page.getByRole("dialog")
+  await expect(
+    sheet.getByRole("heading", { name: "Record this payment" })
+  ).toBeVisible()
+  if (options?.proofPath) {
+    await page
+      .getByTestId("payment-proof-gallery-input")
+      .setInputFiles(options.proofPath)
+    await expect(
+      sheet.getByRole("img", { name: "Transfer photo" })
+    ).toBeVisible()
+  } else {
+    await expect(
+      sheet.getByRole("button", { name: "From photos" })
+    ).toBeVisible()
+    await expect(
+      sheet.getByRole("img", { name: "Transfer photo" })
+    ).toHaveCount(0)
+  }
+  await sheet.getByRole("button", { name: "Record payment" }).click()
+  await expect(page.getByText("Payment recorded")).toBeVisible()
+  await expect(sheet).toBeHidden()
+}

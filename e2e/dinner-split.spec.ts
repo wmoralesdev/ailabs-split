@@ -11,6 +11,7 @@ import {
   confirmCheck,
   createDinner,
   openDinnerCreate,
+  recordPayment,
   signInE2e,
   dinnerNav,
   openBill,
@@ -83,7 +84,7 @@ test.describe("dinner split", () => {
       .getByRole("button", { name: /paid me/ })
       .first()
       .click()
-    await expect(page.getByText("Payment recorded")).toBeVisible()
+    await recordPayment(page)
     await expect(page.getByRole("heading", { name: "Paid" })).toBeVisible()
     await expect(page.getByRole("button", { name: /paid me/ })).toHaveCount(1)
 

@@ -34,6 +34,10 @@ function normalizeRoomDto(room: RoomDto): RoomDto {
       ...expense,
       redacted: expense.redacted === true,
     })),
+    settlements: room.settlements.map((settlement) => ({
+      ...settlement,
+      hasProof: settlement.hasProof === true,
+    })),
     checks: Array.isArray(room.checks) ? room.checks : [],
   }
 }

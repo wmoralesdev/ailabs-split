@@ -4,6 +4,10 @@ import type { ZodType } from "zod"
 
 import { getAuthUserId } from "@/server/auth-user.server"
 import { emptyCheckPayload } from "@/lib/dinner-split"
+import {
+  encodePaymentProof,
+  paymentProofBytesFromPayload,
+} from "@/lib/payment-proof"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
@@ -17,6 +21,7 @@ import {
   deleteExpenseSchema,
   deleteSettlementSchema,
   getRoomByCodeSchema,
+  getSettlementProofSchema,
   joinRoomSchema,
   recordSettlementSchema,
   renameRoomSchema,
@@ -68,6 +73,12 @@ export type SettlementDto = {
   amountCents: number
   currency: string
   createdAt: string
+  hasProof: boolean
+}
+
+export type SettlementProofDto = {
+  mimeType: string
+  base64: string
 }
 
 export type CheckDto = {
@@ -271,6 +282,7 @@ function settlementToDto(settlement: {
   amountCents: number
   currency: string
   createdAt: Date
+  proofMimeType?: string | null
 }): SettlementDto {
   return {
     id: settlement.id,
@@ -281,6 +293,7 @@ function settlementToDto(settlement: {
     amountCents: settlement.amountCents,
     currency: settlement.currency,
     createdAt: settlement.createdAt.toISOString(),
+    hasProof: Boolean(settlement.proofMimeType),
   }
 }
 
@@ -376,9 +389,16 @@ async function loadRoomByCode(
       },
       settlements: {
         orderBy: { createdAt: "desc" },
-        include: {
-          fromMember: true,
-          toMember: true,
+        select: {
+          id: true,
+          fromMemberId: true,
+          toMemberId: true,
+          amountCents: true,
+          currency: true,
+          createdAt: true,
+          proofMimeType: true,
+          fromMember: { select: { name: true } },
+          toMember: { select: { name: true } },
         },
       },
       checks: {
@@ -810,6 +830,16 @@ export const recordSettlement = createServerFn({ method: "POST" })
         ? data.currency
         : room.currency
 
+    let proof:
+      { proofBytes: Uint8Array<ArrayBuffer>; proofMimeType: string } | undefined
+    if (data.proof) {
+      const stored = paymentProofBytesFromPayload(data.proof)
+      proof = {
+        proofBytes: new Uint8Array(stored.bytes),
+        proofMimeType: stored.mimeType,
+      }
+    }
+
     const settlement = await prisma.settlement.create({
       data: {
         roomId: room.id,
@@ -817,6 +847,7 @@ export const recordSettlement = createServerFn({ method: "POST" })
         toMemberId: data.toMemberId,
         amountCents: data.amountCents,
         currency,
+        ...proof,
       },
       include: {
         fromMember: true,
@@ -825,6 +856,35 @@ export const recordSettlement = createServerFn({ method: "POST" })
     })
 
     return settlementToDto(settlement)
+  })
+
+export const getSettlementProof = createServerFn({ method: "GET" })
+  .validator((data: unknown) => parseOrThrow(getSettlementProofSchema, data))
+  .handler(async ({ data }): Promise<SettlementProofDto | null> => {
+    assertRateLimit(`proof:ip:${clientIp()}`, {
+      limit: 60,
+      windowMs: 60_000,
+      label: "payment photos",
+    })
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      select: { id: true },
+    })
+    if (!room) throw new Error("Trip not found")
+
+    const settlement = await prisma.settlement.findFirst({
+      where: { id: data.settlementId, roomId: room.id },
+      select: { proofBytes: true, proofMimeType: true },
+    })
+    if (!settlement?.proofBytes || settlement.proofBytes.length === 0) {
+      return null
+    }
+
+    const mimeType = settlement.proofMimeType ?? "image/jpeg"
+    return {
+      mimeType,
+      base64: encodePaymentProof(settlement.proofBytes),
+    }
   })
 
 export const deleteSettlement = createServerFn({ method: "POST" })

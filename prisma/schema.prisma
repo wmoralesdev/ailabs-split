@@ -119,6 +119,10 @@ model Settlement {
   amountCents  Int
   currency     String
   createdAt    DateTime @default(now())
+  // Optional transfer screenshot. Never required to settle. Omitted from room
+  // list queries; fetched by settlement id when someone opens the photo.
+  proofBytes     Bytes?
+  proofMimeType  String?
   room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   fromMember   Member   @relation("SettlementFrom", fields: [fromMemberId], references: [id], onDelete: Restrict)
   toMember     Member   @relation("SettlementTo", fields: [toMemberId], references: [id], onDelete: Restrict)

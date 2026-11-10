@@ -15,6 +15,11 @@ import {
   formatAdjustmentPercent,
   formatFxAdjustmentLabel,
 } from "@/components/bank-fx-calibration-sheet"
+import {
+  PaymentProofButton,
+  PaymentProofDialog,
+} from "@/components/payment-proof-dialog"
+import { PaymentProofSheet } from "@/components/payment-proof-sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { formatRelativeTime } from "@/lib/format-relative-time"
@@ -35,6 +40,7 @@ import type {
   RecordSettlementInput,
 } from "@/lib/schemas"
 import { deleteSettlement, recordSettlement } from "@/server/rooms"
+import type { SettlementDto } from "@/server/rooms"
 
 const roomRoute = getRouteApi("/r/$code")
 
@@ -80,6 +86,8 @@ function SettlePage() {
   const { data: room } = useQuery(roomQueryOptions(code, memberId))
   const [calibrationOpen, setCalibrationOpen] = useState(false)
   const [pendingKey, setPendingKey] = useState<string | null>(null)
+  const [pendingTransfer, setPendingTransfer] = useState<Transfer | null>(null)
+  const [viewing, setViewing] = useState<SettlementDto | null>(null)
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
@@ -102,6 +110,7 @@ function SettlePage() {
     mutationFn: (input: RecordSettlementInput) =>
       recordSettlement({ data: input }),
     onSuccess: async (settlement) => {
+      setPendingTransfer(null)
       await invalidate()
       toast.success("Payment recorded", {
         description: `${settlement.fromMemberName} paid ${settlement.toMemberName} ${formatMoney(settlement.amountCents, settlement.currency)}`,
@@ -221,14 +230,19 @@ function SettlePage() {
   }
 
   function markPaid(transfer: Transfer) {
-    if (!room) return
-    setPendingKey(transferKey(transfer))
+    setPendingTransfer(transfer)
+  }
+
+  function confirmPaid(proof?: { base64: string; mimeType: "image/jpeg" }) {
+    if (!room || !pendingTransfer) return
+    setPendingKey(transferKey(pendingTransfer))
     recordMutation.mutate({
       code: room.code,
-      fromMemberId: transfer.fromId,
-      toMemberId: transfer.toId,
-      amountCents: transfer.amountCents,
+      fromMemberId: pendingTransfer.fromId,
+      toMemberId: pendingTransfer.toId,
+      amountCents: pendingTransfer.amountCents,
       currency: room.currency,
+      ...(proof ? { proof } : {}),
     })
   }
 
@@ -420,6 +434,12 @@ function SettlePage() {
                     {formatRelativeTime(settlement.createdAt)}
                   </p>
                 </div>
+                {settlement.hasProof ? (
+                  <PaymentProofButton
+                    fromName={settlement.fromMemberName}
+                    onClick={() => setViewing(settlement)}
+                  />
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"
@@ -442,6 +462,32 @@ function SettlePage() {
           </ul>
         </section>
       ) : null}
+
+      <PaymentProofSheet
+        transfer={pendingTransfer}
+        currency={room.currency}
+        memberId={memberId}
+        open={pendingTransfer !== null}
+        saving={recordMutation.isPending}
+        onOpenChange={(next) => {
+          if (recordMutation.isPending) return
+          if (!next) setPendingTransfer(null)
+        }}
+        onConfirm={confirmPaid}
+      />
+      <PaymentProofDialog
+        open={viewing !== null}
+        onOpenChange={(next) => {
+          if (!next) setViewing(null)
+        }}
+        code={room.code}
+        settlementId={viewing?.id ?? null}
+        label={
+          viewing
+            ? `${viewing.fromMemberName} paid ${viewing.toMemberName} ${formatMoney(viewing.amountCents, viewing.currency)}`
+            : ""
+        }
+      />
     </main>
   )
 }

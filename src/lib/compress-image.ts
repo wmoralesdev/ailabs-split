@@ -6,10 +6,26 @@ export type CompressedImage = {
   bytesApprox: number
 }
 
+type CompressOptions = {
+  maxEdge: number
+  targetBytes: number
+  quality: number
+}
+
 /** Long edge for vision: enough for ticket type, small enough to upload fast. */
-const MAX_EDGE = 1280
-/** Keep well under the server OCR base64 cap (~1.4M chars ≈ 1MB binary). */
-const TARGET_BYTES = 480_000
+const OCR_COMPRESS: CompressOptions = {
+  maxEdge: 1280,
+  targetBytes: 480_000,
+  quality: 0.74,
+}
+
+/** Transfer screenshots: keep digits readable, still under the ~1MB payload cap. */
+const PROOF_COMPRESS: CompressOptions = {
+  maxEdge: 1600,
+  targetBytes: 520_000,
+  quality: 0.82,
+}
+
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024
 
 function yieldToPaint(): Promise<void> {
@@ -42,7 +58,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   })
 }
 
-async function rasterize(file: File): Promise<ImageBitmap> {
+async function rasterize(file: File, maxEdge: number): Promise<ImageBitmap> {
   let source: ImageBitmap
   try {
     source = await createImageBitmap(file)
@@ -51,7 +67,7 @@ async function rasterize(file: File): Promise<ImageBitmap> {
     source = await createImageBitmap(image)
   }
 
-  const scale = Math.min(1, MAX_EDGE / Math.max(source.width, source.height))
+  const scale = Math.min(1, maxEdge / Math.max(source.width, source.height))
   const width = Math.max(1, Math.round(source.width * scale))
   const height = Math.max(1, Math.round(source.height * scale))
   if (width === source.width && height === source.height) return source
@@ -95,12 +111,9 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary)
 }
 
-/**
- * Resize + JPEG-compress a phone photo in the browser before OCR upload.
- * Handles typical iPhone sizes (~8–12MB) without shipping a heavy library.
- */
-export async function compressImageForOcr(
-  file: File
+async function compressImage(
+  file: File,
+  options: CompressOptions
 ): Promise<CompressedImage> {
   if (!file.type.startsWith("image/") && file.type !== "") {
     throw new Error("Pick an image file (JPEG, PNG, or WebP)")
@@ -111,7 +124,7 @@ export async function compressImageForOcr(
 
   await yieldToPaint()
 
-  const bitmap = await rasterize(file)
+  const bitmap = await rasterize(file, options.maxEdge)
   const width = bitmap.width
   const height = bitmap.height
 
@@ -129,15 +142,16 @@ export async function compressImageForOcr(
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
 
-  let quality = 0.74
+  let quality = options.quality
   let blob = await canvasToJpegBlob(canvas, quality)
+  const targetBytes = options.targetBytes
 
-  while (blob.size > TARGET_BYTES && quality > 0.45) {
+  while (blob.size > targetBytes && quality > 0.45) {
     quality -= 0.1
     blob = await canvasToJpegBlob(canvas, quality)
   }
 
-  if (blob.size > TARGET_BYTES) {
+  if (blob.size > targetBytes) {
     const shrink = 0.75
     canvas.width = Math.max(1, Math.round(width * shrink))
     canvas.height = Math.max(1, Math.round(height * shrink))
@@ -145,15 +159,15 @@ export async function compressImageForOcr(
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     const image = await loadImage(file)
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
-    quality = 0.68
+    quality = Math.min(0.68, options.quality)
     blob = await canvasToJpegBlob(canvas, quality)
-    while (blob.size > TARGET_BYTES && quality > 0.4) {
+    while (blob.size > targetBytes && quality > 0.4) {
       quality -= 0.1
       blob = await canvasToJpegBlob(canvas, quality)
     }
   }
 
-  if (blob.size > TARGET_BYTES) {
+  if (blob.size > targetBytes) {
     throw new Error("Could not compress photo enough. Try a closer crop.")
   }
 
@@ -165,4 +179,17 @@ export async function compressImageForOcr(
     height: canvas.height,
     bytesApprox: blob.size,
   }
+}
+
+/**
+ * Resize + JPEG-compress a phone photo in the browser before OCR upload.
+ * Handles typical iPhone sizes (~8–12MB) without shipping a heavy library.
+ */
+export function compressImageForOcr(file: File): Promise<CompressedImage> {
+  return compressImage(file, OCR_COMPRESS)
+}
+
+/** Same pipeline as OCR, slightly sharper so transfer amounts stay readable. */
+export function compressImageForProof(file: File): Promise<CompressedImage> {
+  return compressImage(file, PROOF_COMPRESS)
 }
