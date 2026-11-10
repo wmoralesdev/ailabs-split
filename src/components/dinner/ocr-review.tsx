@@ -231,7 +231,7 @@ function ReviewRow({
         {detail ? (
           <p className="text-[13px] text-muted-foreground">{detail}</p>
         ) : null}
-        <label className="relative -ml-1 inline-flex min-h-9 items-center gap-0.5 rounded-md px-1 text-[13px] text-muted-foreground focus-within:ring-2 focus-within:ring-ring">
+        <label className="relative -ml-1 inline-flex min-h-9 items-center gap-0.5 rounded-md px-1 text-[13px] text-muted-foreground has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring">
           <span className={cn(lowConfidence && "text-destructive")}>
             {lowConfidence ? `${label} · check this one` : label}
           </span>
