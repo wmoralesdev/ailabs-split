@@ -93,11 +93,20 @@ export async function addPeople(page: Page, names: string[]) {
     await field.fill(name)
     await field.press("Enter")
     await expect(
-      page
-        .getByRole("listitem")
-        .filter({ hasText: new RegExp(`^\\S*${name}$`) })
+      page.getByRole("button", { name: `Edit ${name}`, exact: true })
     ).toBeVisible()
   }
+}
+
+export async function openPersonSheet(page: Page, name: string) {
+  await page.getByRole("button", { name: `Edit ${name}`, exact: true }).click()
+  const sheet = page.getByRole("dialog")
+  await expect(
+    sheet.getByRole("heading", { name: "On this bill" })
+  ).toBeVisible()
+  await expect(sheet.getByRole("button", { name: "Save name" })).toBeVisible()
+  await expect(sheet).toHaveCSS("opacity", "1")
+  return sheet
 }
 
 /** Opens the dinner's one bill: "Enter items by hand" before it exists, the tab bar after. */

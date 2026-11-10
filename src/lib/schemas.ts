@@ -156,6 +156,17 @@ export const addRoomMembersSchema = z.object({
   names: z.array(memberNameSchema).min(1, "Add at least one name"),
 })
 
+export const renameRoomMemberSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
+  name: memberNameSchema,
+})
+
+export const removeRoomMemberSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
+})
+
 export const renameRoomSchema = z.object({
   code: roomCodeSchema,
   name: z.string().trim().min(1, "Give it a name").max(60, "Name is too long"),
@@ -342,6 +353,8 @@ export const calibrateRoomFxSchema = z.object({
 
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
+export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>
+export type RemoveRoomMemberInput = z.input<typeof removeRoomMemberSchema>
 export type UpsertCheckInput = z.input<typeof upsertCheckSchema>
 export type ConfirmCheckInput = z.input<typeof confirmCheckSchema>
 export type DeleteCheckInput = z.input<typeof deleteCheckSchema>

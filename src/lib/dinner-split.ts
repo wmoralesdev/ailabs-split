@@ -692,3 +692,69 @@ export function itemSplitMemberIds(split: ItemSplit): string[] {
     }
   }
 }
+
+/** Typed price is per unit; the line on the bill is unit × qty. */
+export function lineAmountCents(
+  unitPriceCents: number,
+  quantity: number
+): number {
+  const qty = Math.max(1, Math.round(quantity))
+  return Math.max(0, Math.round(unitPriceCents)) * qty
+}
+
+export function unitPriceFromLine(
+  amountCents: number,
+  quantity: number
+): number {
+  const qty = Math.max(1, Math.round(quantity))
+  if (amountCents <= 0) return 0
+  return Math.round(amountCents / qty)
+}
+
+export function unassignMemberFromSplit(
+  split: ItemSplit,
+  memberId: string
+): ItemSplit {
+  switch (split.mode) {
+    case "UNASSIGNED":
+      return split
+    case "EQUAL": {
+      const memberIds = split.memberIds.filter((id) => id !== memberId)
+      return memberIds.length === 0
+        ? { mode: "UNASSIGNED" }
+        : { mode: "EQUAL", memberIds }
+    }
+    case "PARTS": {
+      const parts = split.parts.filter((part) => part.memberId !== memberId)
+      return parts.length === 0
+        ? { mode: "UNASSIGNED" }
+        : { mode: "PARTS", parts }
+    }
+    case "QUANTITY": {
+      const shares = split.shares.filter((share) => share.memberId !== memberId)
+      return shares.length === 0
+        ? { mode: "UNASSIGNED" }
+        : { mode: "QUANTITY", shares }
+    }
+    case "AMOUNT": {
+      const shares = split.shares.filter((share) => share.memberId !== memberId)
+      return shares.length === 0
+        ? { mode: "UNASSIGNED" }
+        : { mode: "AMOUNT", shares }
+    }
+    default: {
+      const _never: never = split
+      return _never
+    }
+  }
+}
+
+export function unassignMemberFromItems(
+  items: LineItem[],
+  memberId: string
+): LineItem[] {
+  return items.map((item) => ({
+    ...item,
+    split: unassignMemberFromSplit(item.split, memberId),
+  }))
+}

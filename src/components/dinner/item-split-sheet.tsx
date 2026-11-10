@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { initials } from "@/lib/dinner-labels"
+import { lineAmountCents, unitPriceFromLine } from "@/lib/dinner-split"
 import type { ItemSplit, LineItem } from "@/lib/dinner-split"
 import {
   atmDigitsFromInput,
@@ -66,7 +67,14 @@ export function ItemSplitSheet({
     if (!item) return
     setName(item.name)
     setQuantity(item.quantity)
-    setAmountDigits(centsToAtmDigits(item.amountCents, fractionDigits))
+    setAmountDigits(
+      centsToAtmDigits(
+        item.unitPriceCents > 0
+          ? item.unitPriceCents
+          : unitPriceFromLine(item.amountCents, item.quantity),
+        fractionDigits
+      )
+    )
     setModifiers(item.modifiers.join(", "))
     switch (item.split.mode) {
       case "UNASSIGNED":
@@ -130,7 +138,8 @@ export function ItemSplitSheet({
     }
   }, [item, fractionDigits, members])
 
-  const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
+  const unitPriceCents = atmDigitsToCents(amountDigits, fractionDigits)
+  const amountCents = lineAmountCents(unitPriceCents, quantity)
   const qtyAssigned = Object.values(qtyShares).reduce(
     (sum, qty) => sum + qty,
     0
@@ -209,8 +218,8 @@ export function ItemSplitSheet({
       ...item,
       name: name.trim() || item.name,
       quantity: qty,
-      amountCents,
-      unitPriceCents: Math.round(amountCents / qty),
+      amountCents: lineAmountCents(unitPriceCents, qty),
+      unitPriceCents,
       modifiers: modifiers
         .split(",")
         .map((entry) => entry.trim())
@@ -534,6 +543,11 @@ export function ItemSplitSheet({
                     />
                   </div>
                 </div>
+                {quantity > 1 && unitPriceCents > 0 ? (
+                  <p className="text-[13px] text-muted-foreground">
+                    {formatMoney(amountCents, currency)} on the bill
+                  </p>
+                ) : null}
                 <div className="grid gap-1.5">
                   <Label htmlFor="item-mods">Notes on the ticket</Label>
                   <Input

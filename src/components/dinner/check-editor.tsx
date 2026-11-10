@@ -30,6 +30,7 @@ import {
   computedTotalWithoutPrintedForce,
   computeDinnerSplit,
   emptyCheckPayload,
+  lineAmountCents,
   manualTip,
   resolveManualFee,
   splitLineItem,
@@ -284,17 +285,18 @@ export function CheckEditor({
   }, [])
 
   function addManualItem() {
-    const amountCents = atmDigitsToCents(newAmount, fd)
-    if (!newName.trim() || amountCents <= 0) {
+    const unitPriceCents = atmDigitsToCents(newAmount, fd)
+    if (!newName.trim() || unitPriceCents <= 0) {
       toast.error("Add a name and amount")
       return
     }
     const quantity = Math.max(1, newQty)
+    const amountCents = lineAmountCents(unitPriceCents, quantity)
     const item: LineItem = {
       id: crypto.randomUUID(),
       name: newName.trim(),
       quantity,
-      unitPriceCents: Math.round(amountCents / quantity),
+      unitPriceCents,
       amountCents,
       modifiers: [],
       source: "MANUAL",
@@ -495,10 +497,14 @@ export function CheckEditor({
         </div>
 
         <BillPeople
-          code={room.code}
-          members={room.members}
+          room={room}
+          selfMemberId={selfMemberId}
           paidById={paidById}
           onPaidByChange={setPaidById}
+          items={payload.items}
+          onItemsChange={(nextItems) =>
+            setPayload((prev) => ({ ...prev, items: nextItems }))
+          }
         />
 
         <section aria-labelledby="items-heading">
@@ -629,6 +635,15 @@ export function CheckEditor({
                 />
               </div>
             </div>
+            {newQty > 1 && atmDigitsToCents(newAmount, fd) > 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                {formatMoney(
+                  lineAmountCents(atmDigitsToCents(newAmount, fd), newQty),
+                  room.currency
+                )}{" "}
+                on the bill
+              </p>
+            ) : null}
             <Button
               type="submit"
               variant="secondary"
