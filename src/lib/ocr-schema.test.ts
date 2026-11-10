@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { computeDinnerSplit } from "./dinner-split"
 import {
+  RECEIPT_VISION_INSTRUCTIONS,
   checkFromExtract,
   draftFromExtract,
   parseReceiptExtract,
@@ -11,6 +12,7 @@ import {
   BIBLIOTECA_CAFE_MD,
   CELESTE_IMPERIO_MD,
   PUPUSERIA_PANCHIMALCO_MD,
+  PUPUSERIA_PANCHIMALCO_PRETICKET_MD,
 } from "./receipt-ocr-fixtures"
 import { checkPayloadFromOcr, extractCheckDraft } from "./receipt-ocr"
 import type { OcrCheckDraft } from "./receipt-ocr"
@@ -102,6 +104,46 @@ describe("draftFromExtract", () => {
     const check = checkFromExtract(extract, extract.rawText)
     expect(check.tip).toBeUndefined()
     expect(checkPayloadFromOcr(check).tip.source).toBe("NONE")
+  })
+
+  it("pulls Panchimalco CNT out of vision item names into quantity", () => {
+    const parsed = extractCheckDraft(PUPUSERIA_PANCHIMALCO_PRETICKET_MD)
+    const extract = extractFromParsed(parsed)
+    extract.items = extract.items.map((item) => ({
+      ...item,
+      name: item.quantity > 1 ? `${item.quantity} × ${item.name}` : item.name,
+      quantity: 1,
+    }))
+
+    const check = checkFromExtract(extract, extract.rawText)
+    const frijol = check.items.find((item) => item.name === "Frijol/Queso pq")
+    expect(frijol?.quantity).toBe(8)
+    expect(frijol?.name).toBe("Frijol/Queso pq")
+    const chicharron = check.items.find(
+      (item) => item.name === "Chicharron/Frijol pq"
+    )
+    expect(chicharron?.quantity).toBe(1)
+    expect(chicharron?.name).not.toMatch(/^\d/)
+    expect(check.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
+    expect(check.totalCents).toBe(6000)
+    expect(check.tip?.amountCents).toBe(0)
+
+    const payload = checkPayloadFromOcr(check)
+    expect(
+      payload.items.find((item) => item.name === "Soda vidrio")?.quantity
+    ).toBe(6)
+    expect(computeDinnerSplit(payload).totalCents).toBe(6000)
+  })
+})
+
+describe("RECEIPT_VISION_INSTRUCTIONS", () => {
+  it("tells the model CNT is quantity when P.UNI differs from TOTAL", () => {
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/P\.UNI/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/quantity/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/Frijol\/Queso pq/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/PRE-TICKET/)
   })
 })
 

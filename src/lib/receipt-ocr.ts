@@ -4,6 +4,7 @@ import {
   ticketTip,
 } from "@/lib/dinner-split"
 import type { CheckPayload, LineItem } from "@/lib/dinner-split"
+import { normalizeOcrItemQty } from "@/lib/ocr-qty"
 import { parseAmountToCents } from "@/lib/settle"
 
 export type OcrCheckItem = {
@@ -149,7 +150,7 @@ export function extractDraft(markdown: string): OcrDraft {
 }
 
 const SKIP_LINE =
-  /^(invitados|clientes atendidos|mesa:?|mesas$|mesero|caja(?:\s+no)?\.?|pague en caja|gracias|order no|cambio|vuelto|tel:?$|fecha(?:\s+de)?|atendido por|ticket$|no valido|precuenta|doscientos|f\s*:|cant\s+descript|cnt\s+producto|cant\s+descripcion|hora\b|#\s*no valido)/i
+  /^(invitados|clientes atendidos|mesa:?|mesas$|mesero|caja(?:\s+no)?\.?|pague en caja|gracias|order no|cambio|vuelto|tel:?$|fecha(?:\s+de)?|atendido por|ticket$|no valido|precuenta|pre-ticket|preticket|doscientos|f\s*:|cant\s+descript|cnt\s+producto|cant\s+descripcion|hora\b|#\s*no valido)/i
 
 const FOOTER_LINE =
   /^(sub\s*total|subtotal|sub\s*vta|subnosujetas|sub\s*no\s*sujetas|propina|tip\b|iva\b|tax\b|impuesto|descuento|discount|total(?:\s|$)|total ventas)/i
@@ -193,7 +194,12 @@ function peelMoneyFromEnd(line: string): { rest: string; amounts: number[] } {
 
 function parseItemLine(
   line: string
-): { quantity: number; name: string; unitPriceCents?: number; amountCents: number } | null {
+): {
+  quantity: number
+  name: string
+  unitPriceCents?: number
+  amountCents: number
+} | null {
   const { rest, amounts } = peelMoneyFromEnd(line)
   if (amounts.length === 0) return null
   const qtyMatch = rest.match(/^(\d+)\s+(.+)$/)
@@ -205,10 +211,16 @@ function parseItemLine(
   if (!Number.isFinite(quantity) || quantity <= 0) return null
   const amountCents = amounts.length === 2 ? amounts[1] : amounts[0]
   const unitPriceCents =
-    amounts.length === 2
-      ? amounts[0]
-      : Math.round(amountCents / quantity)
-  return { quantity, name, unitPriceCents, amountCents }
+    amounts.length === 2 ? amounts[0] : Math.round(amountCents / quantity)
+  return {
+    ...normalizeOcrItemQty({
+      name,
+      quantity,
+      unitPriceCents,
+      amountCents,
+    }),
+    amountCents,
+  }
 }
 
 function isModifierLine(line: string): string | null {
@@ -349,7 +361,8 @@ export function extractCheckDraft(markdown: string): OcrCheckDraft {
     if (!seenItem) headerLines.push(line)
   }
 
-  const isPrecuenta = /precuenta|no valido como ticket/i.test(markdown)
+  const isPrecuenta =
+    /precuenta|pre-ticket|preticket|no valido como ticket/i.test(markdown)
   const merchant =
     headerLines.find(
       (line) =>
@@ -454,4 +467,3 @@ export function checkPayloadFromOcr(
     rawText: draft.rawText,
   }
 }
-

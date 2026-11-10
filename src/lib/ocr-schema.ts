@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { normalizeOcrItemQty } from "@/lib/ocr-qty"
 import type { OcrCheckDraft, OcrDraft, OcrNamedAmount } from "@/lib/receipt-ocr"
 
 /** Vision items are model-read, not a deterministic OCR parse. */
@@ -12,12 +13,22 @@ const namedAmountSchema = z.object({
 })
 
 const itemSchema = z.object({
-  name: z.string().describe("Menu name only, without size/modifier suffixes"),
-  quantity: z.number().describe("Printed quantity; 1 if omitted"),
+  name: z
+    .string()
+    .describe(
+      "Product name only — no CNT, no '8 ×', no size/modifier suffixes. Example: Frijol/Queso pq"
+    ),
+  quantity: z
+    .number()
+    .describe(
+      "Printed CNT/CANT. When P.UNI ≠ line TOTAL, use the leading number (e.g. 8), not 1 per row"
+    ),
   unitPriceCents: z
     .number()
     .nullable()
-    .describe("Unit price in cents if printed; otherwise null"),
+    .describe(
+      "P.UNI / P.UNIT in cents if printed; otherwise null. Example: 1.40 → 140"
+    ),
   amountCents: z.number().describe("Line total in cents"),
   modifiers: z
     .array(z.string())
@@ -47,7 +58,7 @@ export const receiptExtractSchema = z.object({
   date: z.string().nullable().describe("Printed date if any"),
   isPrecuenta: z
     .boolean()
-    .describe("True if PRECUENTA or NO VALIDO COMO TICKET"),
+    .describe("True if PRECUENTA, PRE-TICKET, or NO VALIDO COMO TICKET"),
   guestCountPrinted: z
     .number()
     .nullable()
@@ -75,11 +86,13 @@ export const RECEIPT_VISION_INSTRUCTIONS = `Extract a restaurant or receipt phot
 
 Amounts are integer cents (4.10 → 410). Nested modifiers like ** 16 ONZ or RES/VAS belong on the previous item, not as their own items.
 
+Quantity lives in \`quantity\`, never in \`name\`. Thermal tickets often print CNT or CANT as the first column. When unit price (P.UNI / P.UNIT) differs from the line TOTAL, that leading number is quantity. Example: \`8 Frijol/Queso pq  1.40  $11.20\` → name "Frijol/Queso pq", quantity 8, unitPriceCents 140, amountCents 1120. Do not write "8 × Frijol/Queso pq". If quantity is 1, the name is only the product (\`Chicharron/Frijol pq\`), never prefixed with "1 ×".
+
 Do not invent tip, tax, IVA, or fees — only footer lines that are printed. PROPINA 0% or $0.00 means tip amountCents 0 and percentHint 0, never 10%. If no tip line exists, tip is null.
 
 Gravado that matches the subtotal is not extra tax. Ignore Invitados, CLIENTES ATENDIDOS, MESA, MESERO, Order No, NIT, Caja.
 
-isPrecuenta is true for PRECUENTA or NO VALIDO COMO TICKET. rawText is a transcription of what you can read, not a paraphrase. If the photo is unreadable, return empty items and whatever rawText you can see.`
+isPrecuenta is true for PRECUENTA, PRE-TICKET, or NO VALIDO COMO TICKET. rawText is a transcription of what you can read, not a paraphrase. If the photo is unreadable, return empty items and whatever rawText you can see.`
 
 export type OcrScanMode = "trip" | "dinner"
 
@@ -110,14 +123,18 @@ export function checkFromExtract(
     const name = row.name.trim()
     const amountCents = Math.round(row.amountCents)
     if (!name || !Number.isFinite(amountCents) || amountCents < 0) continue
-    const quantity =
-      typeof row.quantity === "number" && row.quantity > 0 ? row.quantity : 1
-    const unitPriceCents =
-      row.unitPriceCents == null ? undefined : Math.round(row.unitPriceCents)
-    items.push({
+    const normalized = normalizeOcrItemQty({
       name,
-      quantity,
-      unitPriceCents,
+      quantity:
+        typeof row.quantity === "number" && row.quantity > 0 ? row.quantity : 1,
+      unitPriceCents: row.unitPriceCents,
+      amountCents,
+    })
+    if (!normalized.name) continue
+    items.push({
+      name: normalized.name,
+      quantity: normalized.quantity,
+      unitPriceCents: normalized.unitPriceCents,
       amountCents,
       modifiers: row.modifiers
         .map((mod) => mod.trim())
