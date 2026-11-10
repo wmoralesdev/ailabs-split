@@ -376,7 +376,7 @@ export function BankFxCalibrationSheet({
                 type="button"
                 onClick={addRow}
                 disabled={!canAddAnother}
-                className="text-left text-sm font-medium text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                className="text-action min-h-8 text-left text-sm"
               >
                 + Add another
               </button>

@@ -365,7 +365,7 @@ export function ItemSplitSheet({
                   >
                     <button
                       type="button"
-                      className="flex min-h-12 min-w-0 flex-1 items-center gap-3 px-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="row-hit flex min-h-12 min-w-0 flex-1 items-center gap-3 px-1 text-left"
                       aria-pressed={
                         tab === "EQUAL" || tab === "PARTS" ? active : undefined
                       }
@@ -489,7 +489,7 @@ export function ItemSplitSheet({
             </div>
 
             <details className="surface group mt-5">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-[15px] font-medium">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-[15px] font-medium outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
                 Edit item
                 <span className="text-[13px] text-muted-foreground group-open:hidden">
                   Name, quantity, price
@@ -543,7 +543,7 @@ export function ItemSplitSheet({
                 <Button
                   type="button"
                   variant="secondary"
-                  className="w-full bg-muted font-semibold text-primary"
+                  className="btn-tint w-full bg-muted"
                   onClick={() => {
                     onSplitLine(item)
                     onOpenChange(false)
@@ -590,7 +590,7 @@ function Stepper({
     >
       <button
         type="button"
-        className="relative inline-flex h-full w-9 items-center justify-center rounded-l-[inherit] text-foreground after:absolute after:inset-x-0 after:-inset-y-1.5 disabled:opacity-30"
+        className="stepper-hit h-full w-9 rounded-l-[inherit] after:absolute after:inset-x-0 after:-inset-y-1.5"
         aria-label={lessLabel}
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
@@ -602,7 +602,7 @@ function Stepper({
       </span>
       <button
         type="button"
-        className="relative inline-flex h-full w-9 items-center justify-center rounded-r-[inherit] text-foreground after:absolute after:inset-x-0 after:-inset-y-1.5"
+        className="stepper-hit h-full w-9 rounded-r-[inherit] after:absolute after:inset-x-0 after:-inset-y-1.5"
         aria-label={moreLabel}
         onClick={() => onChange(value + 1)}
       >

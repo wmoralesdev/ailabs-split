@@ -57,7 +57,7 @@ export function LineKindPicker({
         aria-expanded={open}
         aria-label={`What is ${lineName}? ${label}`}
         onClick={() => setOpen(true)}
-        className="-ml-1 inline-flex min-h-9 items-center gap-0.5 rounded-md px-1 text-[13px] text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="-ml-1 inline-flex min-h-9 items-center gap-0.5 rounded-md px-1 text-[13px] text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className={cn(lowConfidence && "text-destructive")}>
           {lowConfidence ? `${label} · check this one` : label}

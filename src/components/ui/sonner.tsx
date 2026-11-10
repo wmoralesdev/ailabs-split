@@ -43,9 +43,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
           title: "text-[15px] leading-tight font-semibold",
           description: "mt-0.5 truncate text-[13px] leading-snug text-muted-foreground",
           actionButton:
-            "inline-flex h-8 shrink-0 items-center rounded-full bg-muted px-3.5 text-[13px] font-semibold text-primary active:scale-[0.97]",
+            "inline-flex h-8 shrink-0 items-center rounded-full bg-muted px-3.5 text-[13px] font-semibold text-primary transition-colors hover:bg-foreground/10 active:scale-[0.97]",
           cancelButton:
-            "inline-flex h-8 shrink-0 items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground",
+            "inline-flex h-8 shrink-0 items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
         },
       }}
       {...props}

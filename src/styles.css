@@ -363,7 +363,7 @@
   }
 
   .segmented-item {
-    @apply inline-flex h-full items-center justify-center gap-1.5 rounded-full py-0 text-[15px] font-medium text-muted-foreground transition-[background-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply inline-flex h-full items-center justify-center gap-1.5 rounded-full py-0 text-[15px] font-medium text-muted-foreground transition-[background-color,color] duration-200 outline-none hover:bg-card/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring;
     transition-timing-function: var(--ease-out);
   }
 
@@ -371,6 +371,12 @@
   .segmented-item[aria-selected="true"],
   .segmented-item[data-active] {
     @apply bg-card text-foreground shadow-[0_1px_2px_var(--shadow-color-strong)];
+  }
+
+  .segmented-item[aria-pressed="true"]:hover,
+  .segmented-item[aria-selected="true"]:hover,
+  .segmented-item[data-active]:hover {
+    background-color: color-mix(in srgb, var(--card) 86%, var(--foreground));
   }
 
   /* Grouped list: one card, hairline rows. Never nest a pill inside a row. */
@@ -411,9 +417,9 @@
     @apply px-4 pt-1.5 text-[13px] leading-snug text-muted-foreground;
   }
 
-  /* 32px visual chip with an invisible 44px hit area. */
+  /* 32px visual chip with an invisible 44px hit area. Borderless; hover is a wash. */
   .person-chip {
-    @apply relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-transparent bg-card px-3 text-sm font-medium text-foreground transition-[transform,background-color,border-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
+    @apply relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-transparent bg-card px-3 text-sm font-medium text-foreground transition-[transform,background-color,color] duration-150 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97];
   }
 
   button.person-chip::after {
@@ -422,7 +428,7 @@
   }
 
   .person-chip[aria-pressed="true"] {
-    @apply border-foreground bg-foreground text-background;
+    @apply bg-foreground text-background;
   }
 
   :is(.surface, .group-list) .person-chip:not([aria-pressed="true"]) {
@@ -430,11 +436,11 @@
   }
 
   .person-chip-ghost {
-    @apply border-dashed border-border bg-background text-muted-foreground;
+    @apply bg-background text-muted-foreground;
   }
 
   :is(.surface, .group-list) .person-chip-ghost:not([aria-pressed="true"]) {
-    @apply border-dashed border-border bg-card text-muted-foreground;
+    @apply bg-card text-muted-foreground;
   }
 
   .form-dock {
@@ -482,7 +488,7 @@
   }
 
   .landing-chip {
-    @apply inline-flex h-8 items-center justify-center rounded-full border px-3 text-sm font-medium transition-[transform,background-color,border-color,color] duration-200;
+    @apply inline-flex h-8 items-center justify-center rounded-full border px-3 text-sm font-medium transition-[transform,background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring;
     transition-timing-function: var(--ease-out);
   }
 
@@ -491,11 +497,11 @@
   }
 
   .landing-chip-idle {
-    @apply border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground;
+    @apply border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground;
   }
 
   .landing-chip-on {
-    @apply border-foreground bg-foreground text-background;
+    @apply border-foreground bg-foreground text-background hover:bg-foreground/90;
   }
 
   .landing-member-chip {
@@ -503,11 +509,11 @@
   }
 
   .split-cta {
-    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-primary px-5 text-[15px] font-semibold text-primary-foreground transition-[transform,background-color] duration-200 hover:bg-primary/90 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
+    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-primary px-5 text-[15px] font-semibold text-primary-foreground transition-[transform,background-color] duration-200 outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
   }
 
   .split-cta-outline {
-    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[15px] font-medium text-foreground transition-[transform,background-color] duration-200 hover:bg-muted/70 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
+    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full border border-border bg-background px-5 text-[15px] font-medium text-foreground transition-[transform,background-color] duration-200 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
   }
 
   :is(.surface, .group-list, [data-slot="sheet-content"]) .split-cta-tinted {
@@ -515,7 +521,71 @@
   }
 
   .split-cta-tinted {
-    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-card px-5 text-[15px] font-semibold text-primary transition-[transform,background-color] duration-200 active:bg-muted;
+    @apply inline-flex h-(--control-height) items-center justify-center gap-2 rounded-full bg-card px-5 text-[15px] font-semibold text-primary transition-[transform,background-color] duration-200 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px;
+  }
+
+  :is(.surface, .group-list, [data-slot="sheet-content"])
+    .split-cta-tinted:hover {
+    background-color: color-mix(in srgb, var(--muted) 78%, var(--foreground));
+  }
+
+  /* Text path (Create without a ticket, Save draft): underline, not a hairline box. */
+  .text-action {
+    @apply inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 transition-colors outline-none hover:text-foreground hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .icon-hit {
+    @apply inline-flex items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .stepper-hit {
+    @apply relative inline-flex items-center justify-center text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-40;
+  }
+
+  .row-hit {
+    @apply rounded-lg transition-colors outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .btn-tint {
+    @apply font-semibold text-primary transition-colors;
+    background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  }
+
+  .btn-tint:hover,
+  .btn-tint:focus-visible {
+    background-color: color-mix(in srgb, var(--primary) 16%, transparent);
+  }
+
+  .fill-fab {
+    @apply bg-primary text-primary-foreground transition-[transform,background-color] duration-200 outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-px;
+  }
+}
+
+button.person-chip:not([aria-pressed="true"]):focus-visible {
+  background-color: var(--muted);
+}
+
+:is(.surface, .group-list)
+  button.person-chip:not([aria-pressed="true"]):focus-visible {
+  background-color: color-mix(in srgb, var(--muted) 78%, var(--foreground));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  button.person-chip:not([aria-pressed="true"]):hover {
+    background-color: var(--muted);
+  }
+
+  :is(.surface, .group-list)
+    button.person-chip:not([aria-pressed="true"]):hover {
+    background-color: color-mix(in srgb, var(--muted) 78%, var(--foreground));
+  }
+
+  button.person-chip[aria-pressed="true"]:hover {
+    background-color: color-mix(
+      in srgb,
+      var(--foreground) 88%,
+      var(--background)
+    );
   }
 }
 

@@ -113,7 +113,7 @@ export function DinnerHome({
             <button
               type="button"
               onClick={() => void copyCode()}
-              className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+              className="icon-hit min-h-11 gap-1.5 rounded-full px-2 text-[13px] font-medium"
               aria-label={`Copy dinner code ${room.code}`}
             >
               <span className="font-display tracking-widest text-foreground">
@@ -190,7 +190,7 @@ function StartBillCard({ code }: { code: string }) {
       <Link
         to="/r/$code/check"
         params={{ code }}
-        className="mt-1 flex min-h-11 items-center justify-center text-[15px] font-medium text-primary transition-colors hover:text-foreground"
+        className="text-action mt-1 w-full justify-center text-[15px]"
       >
         Enter items by hand
       </Link>

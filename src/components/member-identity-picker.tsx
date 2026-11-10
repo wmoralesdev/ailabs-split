@@ -73,7 +73,7 @@ function MemberIdentityPicker({
           </ul>
           <button
             type="button"
-            className="mt-1 min-h-11 text-left text-[15px] font-medium text-primary"
+            className="text-action mt-1 text-[15px]"
             onClick={() => setMode("new")}
           >
             I&rsquo;m new — add my name
@@ -109,7 +109,7 @@ function MemberIdentityPicker({
           {members.length > 0 ? (
             <button
               type="button"
-              className="min-h-11 text-left text-[15px] font-medium text-primary"
+              className="text-action text-[15px]"
               onClick={() => setMode("pick")}
             >
               Pick from the list instead

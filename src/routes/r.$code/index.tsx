@@ -410,7 +410,7 @@ function RoomHomePage() {
             <button
               type="button"
               onClick={() => void copyCode()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-xs font-medium text-primary"
+              className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-xs font-medium text-primary transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="font-display tracking-widest text-foreground">
                 {room.code}
@@ -435,7 +435,7 @@ function RoomHomePage() {
             <button
               type="button"
               onClick={() => void copyMyLink()}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+              className="icon-hit size-9 shrink-0"
               aria-label={
                 copied === "link"
                   ? "Personal link copied"
@@ -452,7 +452,7 @@ function RoomHomePage() {
             <button
               type="button"
               onClick={switchIdentity}
-              className="min-h-11 shrink-0 px-2 text-[15px] font-medium text-primary"
+              className="text-action min-h-11 shrink-0 px-2 text-[15px]"
             >
               Switch
             </button>
@@ -466,7 +466,7 @@ function RoomHomePage() {
               <Link
                 to="/r/$code/settle"
                 params={{ code: room.code }}
-                className="inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-primary"
+                className="text-action gap-1 text-[15px]"
               >
                 Settle
                 <HugeiconsIcon
@@ -531,7 +531,7 @@ function RoomHomePage() {
                   }
                   setReordering(true)
                 }}
-                className="inline-flex min-h-11 items-center gap-1 text-[15px] font-medium text-primary disabled:opacity-60"
+                className="text-action gap-1 text-[15px]"
               >
                 {reordering ? (
                   savingOrder ? (
@@ -778,7 +778,7 @@ function SortableExpenseRow({
     >
       <button
         type="button"
-        className="shrink-0 cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        className="icon-hit size-9 shrink-0 cursor-grab touch-none active:cursor-grabbing"
         aria-label="Drag to reorder expense"
         {...attributes}
         {...listeners}
@@ -1151,7 +1151,7 @@ function ExpenseDetailSheet({
                             <button
                               type="button"
                               onClick={() => toggleMember(member.id)}
-                              className="flex min-w-0 items-center gap-3 text-left"
+                              className="row-hit flex min-w-0 items-center gap-3 px-1 text-left"
                             >
                               <Avatar
                                 className={
@@ -1247,7 +1247,7 @@ function ExpenseDetailSheet({
                     <button
                       type="button"
                       onClick={() => onCalibrateBank(expense.id)}
-                      className="mt-2 text-sm font-medium text-primary"
+                      className="text-action mt-2 min-h-8 text-sm"
                     >
                       Bank charged different?
                     </button>

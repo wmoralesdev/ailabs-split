@@ -292,7 +292,7 @@ function SettlePage() {
               <button
                 type="button"
                 onClick={() => setCalibrationOpen(true)}
-                className="min-h-11 font-medium text-primary"
+                className="text-action min-h-11 font-medium"
               >
                 Edit
               </button>
@@ -301,7 +301,7 @@ function SettlePage() {
             <button
               type="button"
               onClick={() => setCalibrationOpen(true)}
-              className="min-h-11 font-medium text-primary"
+              className="text-action min-h-11 font-medium"
             >
               Settle looks off? Match bank charges
             </button>

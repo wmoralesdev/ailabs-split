@@ -482,7 +482,7 @@ export function CheckEditor({
             {unassignedCount > 0 ? (
               <button
                 type="button"
-                className="min-h-11 text-[15px] font-medium text-primary"
+                className="text-action text-[15px]"
                 onClick={() =>
                   setPayload((prev) => ({
                     ...prev,
@@ -547,7 +547,7 @@ export function CheckEditor({
                 <div className="flex h-(--control-height) items-center rounded-xl border border-border bg-card">
                   <button
                     type="button"
-                    className="inline-flex h-full w-10 items-center justify-center rounded-l-xl text-muted-foreground disabled:opacity-40"
+                    className="stepper-hit h-full w-10 rounded-l-xl"
                     onClick={() => setNewQty((value) => Math.max(1, value - 1))}
                     disabled={newQty <= 1}
                     aria-label="One fewer"
@@ -575,7 +575,7 @@ export function CheckEditor({
                   />
                   <button
                     type="button"
-                    className="inline-flex h-full w-10 items-center justify-center rounded-r-xl text-muted-foreground"
+                    className="stepper-hit h-full w-10 rounded-r-xl"
                     onClick={() => setNewQty((value) => value + 1)}
                     aria-label="One more"
                   >
@@ -602,7 +602,7 @@ export function CheckEditor({
             <Button
               type="submit"
               variant="secondary"
-              className="w-full bg-primary/8 font-semibold text-primary"
+              className="btn-tint w-full"
               disabled={!newName.trim() || atmDigitsToCents(newAmount, fd) <= 0}
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
@@ -682,7 +682,7 @@ export function CheckEditor({
                     key={percent}
                     type="button"
                     variant="secondary"
-                    className="rounded-xl bg-primary/8 text-primary"
+                    className="btn-tint rounded-xl"
                     onClick={() => applyTipPercent(percent)}
                   >
                     {percent}%
@@ -770,10 +770,10 @@ export function CheckEditor({
                     aria-pressed={feeUnit === "amount"}
                     aria-label="Fee as amount"
                     className={cn(
-                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors",
+                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       feeUnit === "amount"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground"
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "text-muted-foreground hover:bg-card hover:text-foreground"
                     )}
                     onClick={() => setFeeUnit("amount")}
                   >
@@ -784,10 +784,10 @@ export function CheckEditor({
                     aria-pressed={feeUnit === "percent"}
                     aria-label="Fee as percent"
                     className={cn(
-                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors",
+                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       feeUnit === "percent"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground"
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "text-muted-foreground hover:bg-card hover:text-foreground"
                     )}
                     onClick={() => setFeeUnit("percent")}
                   >
@@ -826,7 +826,7 @@ export function CheckEditor({
               <Button
                 type="submit"
                 variant="secondary"
-                className="w-full bg-primary/8 font-semibold text-primary"
+                className="btn-tint w-full"
                 disabled={!pendingFee}
               >
                 Add fee
@@ -836,7 +836,7 @@ export function CheckEditor({
             <Button
               type="button"
               variant="ghost"
-              className="self-start px-0 text-primary hover:bg-transparent"
+              className="text-action h-auto self-start px-0"
               onClick={() => setShowFee(true)}
             >
               <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
@@ -1028,7 +1028,7 @@ function ItemCard({
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <span className="min-w-0">
           <span className="block text-[15px] font-semibold">
@@ -1175,7 +1175,7 @@ function Totals({
           {onForcePrinted ? (
             <button
               type="button"
-              className="text-xs font-medium text-primary"
+              className="text-action min-h-8 text-xs"
               onClick={onForcePrinted}
             >
               Use printed total

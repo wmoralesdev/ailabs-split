@@ -86,7 +86,7 @@ export function CreateTripSuccessSheet({
         <button
           type="button"
           onClick={() => void onCopyCode()}
-          className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left outline-none transition-colors hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={`Copy code ${code}`}
         >
           <span className="min-w-0">
