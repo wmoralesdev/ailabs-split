@@ -8,11 +8,14 @@ import {
   emptyTip,
   expenseSharesFromDinner,
   itemToAdjustment,
+  lineAmountCents,
   manualTip,
   resolveManualFee,
   splitLineItem,
   ticketTip,
   tipCentsFromPercent,
+  unassignItemsForMember,
+  unassignMemberFromItems,
   withForcedPrintedTotal,
 } from "./dinner-split"
 import type { LineItem, TipConfig } from "./dinner-split"
@@ -404,6 +407,91 @@ describe("split line, assign rest, reclassify, force total", () => {
   it("computes a manual 10% from the item subtotal only when asked", () => {
     expect(tipCentsFromPercent(4800, 10)).toBe(480)
     expect(tipCentsFromPercent(8475, 10)).toBe(848)
+  })
+})
+
+describe("unit price times quantity", () => {
+  it("multiplies the typed unit price by quantity", () => {
+    expect(lineAmountCents(140, 3)).toBe(420)
+    expect(lineAmountCents(675, 3)).toBe(2025)
+    expect(lineAmountCents(2400, 1)).toBe(2400)
+  })
+})
+
+describe("unassign a person from items", () => {
+  it("drops them from an equal split and leaves the others", () => {
+    const [next] = unassignMemberFromItems(
+      [
+        item({
+          id: "pizza",
+          name: "Pizza",
+          amountCents: 2400,
+          split: { mode: "EQUAL", memberIds: ["ana", "ben", "cam"] },
+        }),
+      ],
+      "ben"
+    )
+    expect(next.split).toEqual({ mode: "EQUAL", memberIds: ["ana", "cam"] })
+  })
+
+  it("marks the item unassigned when they were the last person", () => {
+    const [next] = unassignMemberFromItems(
+      [
+        item({
+          id: "coke",
+          name: "Coke",
+          amountCents: 200,
+          split: { mode: "EQUAL", memberIds: ["ben"] },
+        }),
+      ],
+      "ben"
+    )
+    expect(next.split).toEqual({ mode: "UNASSIGNED" })
+  })
+
+  it("drops their quantity share and keeps the rest", () => {
+    const [next] = unassignMemberFromItems(
+      [
+        item({
+          id: "pupusa",
+          name: "Pupusa",
+          quantity: 3,
+          unitPriceCents: 140,
+          amountCents: 420,
+          split: {
+            mode: "QUANTITY",
+            shares: [
+              { memberId: "ana", quantity: 1 },
+              { memberId: "ben", quantity: 1 },
+              { memberId: "cam", quantity: 1 },
+            ],
+          },
+        }),
+      ],
+      "ben"
+    )
+    expect(next.split).toEqual({
+      mode: "QUANTITY",
+      shares: [
+        { memberId: "ana", quantity: 1 },
+        { memberId: "cam", quantity: 1 },
+      ],
+    })
+  })
+
+  it("marks every dish they were on as unassigned", () => {
+    const [next] = unassignItemsForMember(
+      [
+        item({
+          id: "pizza",
+          name: "Pizza",
+          amountCents: 2400,
+          split: { mode: "EQUAL", memberIds: ["ana", "ben", "cam"] },
+        }),
+      ],
+      "ben"
+    )
+    expect(next.split).toEqual({ mode: "UNASSIGNED" })
   })
 })
 

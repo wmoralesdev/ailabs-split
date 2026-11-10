@@ -117,11 +117,20 @@ export async function addPeople(page: Page, names: string[]) {
     await field.fill(name)
     await field.press("Enter")
     await expect(
-      page
-        .getByRole("listitem")
-        .filter({ hasText: new RegExp(`^\\S*${name}$`) })
+      page.getByRole("button", { name: `Edit ${name}`, exact: true })
     ).toBeVisible()
   }
+}
+
+export async function openPersonSheet(page: Page, name: string) {
+  await page.getByRole("button", { name: `Edit ${name}`, exact: true }).click()
+  const sheet = page.getByRole("dialog")
+  await expect(
+    sheet.getByRole("heading", { name: "On this bill" })
+  ).toBeVisible()
+  await expect(sheet.getByRole("button", { name: "Save" })).toBeVisible()
+  await expect(sheet).toHaveCSS("opacity", "1")
+  return sheet
 }
 
 /** Opens the dinner's one bill: "Enter items by hand" before it exists, the tab bar after. */
@@ -233,4 +242,33 @@ export function itemCard(page: Page, itemName: string): Locator {
 
 export function dinnerNav(page: Page): Locator {
   return page.getByRole("navigation", { name: "Dinner navigation" })
+}
+
+/** Settle sheet: record the open transfer. Photo is optional. */
+export async function recordPayment(
+  page: Page,
+  options?: { proofPath?: string }
+) {
+  const sheet = page.getByRole("dialog")
+  await expect(
+    sheet.getByRole("heading", { name: "Record this payment" })
+  ).toBeVisible()
+  if (options?.proofPath) {
+    await page
+      .getByTestId("payment-proof-gallery-input")
+      .setInputFiles(options.proofPath)
+    await expect(
+      sheet.getByRole("img", { name: "Transfer photo" })
+    ).toBeVisible()
+  } else {
+    await expect(
+      sheet.getByRole("button", { name: "From photos" })
+    ).toBeVisible()
+    await expect(
+      sheet.getByRole("img", { name: "Transfer photo" })
+    ).toHaveCount(0)
+  }
+  await sheet.getByRole("button", { name: "Record payment" }).click()
+  await expect(page.getByText("Payment recorded")).toBeVisible()
+  await expect(sheet).toBeHidden()
 }

@@ -3,7 +3,11 @@ import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
 import { getAuthUserId } from "@/server/auth-user.server"
-import { emptyCheckPayload } from "@/lib/dinner-split"
+import { emptyCheckPayload, unassignMemberFromItems } from "@/lib/dinner-split"
+import {
+  encodePaymentProof,
+  paymentProofBytesFromPayload,
+} from "@/lib/payment-proof"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
@@ -17,8 +21,11 @@ import {
   deleteExpenseSchema,
   deleteSettlementSchema,
   getRoomByCodeSchema,
+  getSettlementProofSchema,
   joinRoomSchema,
   recordSettlementSchema,
+  removeRoomMemberSchema,
+  renameRoomMemberSchema,
   renameRoomSchema,
   reorderExpensesSchema,
   updateExpenseSchema,
@@ -68,6 +75,12 @@ export type SettlementDto = {
   amountCents: number
   currency: string
   createdAt: string
+  hasProof: boolean
+}
+
+export type SettlementProofDto = {
+  mimeType: string
+  base64: string
 }
 
 export type CheckDto = {
@@ -271,6 +284,7 @@ function settlementToDto(settlement: {
   amountCents: number
   currency: string
   createdAt: Date
+  proofMimeType?: string | null
 }): SettlementDto {
   return {
     id: settlement.id,
@@ -281,6 +295,7 @@ function settlementToDto(settlement: {
     amountCents: settlement.amountCents,
     currency: settlement.currency,
     createdAt: settlement.createdAt.toISOString(),
+    hasProof: Boolean(settlement.proofMimeType),
   }
 }
 
@@ -376,9 +391,16 @@ async function loadRoomByCode(
       },
       settlements: {
         orderBy: { createdAt: "desc" },
-        include: {
-          fromMember: true,
-          toMember: true,
+        select: {
+          id: true,
+          fromMemberId: true,
+          toMemberId: true,
+          amountCents: true,
+          currency: true,
+          createdAt: true,
+          proofMimeType: true,
+          fromMember: { select: { name: true } },
+          toMember: { select: { name: true } },
         },
       },
       checks: {
@@ -534,6 +556,105 @@ export const addRoomMembers = createServerFn({ method: "POST" })
         data: toCreate.map((name) => ({ roomId: room.id, name })),
       })
     }
+
+    const loaded = await loadRoomByCode(data.code)
+    if (!loaded) throw new Error("Room not found")
+    return loaded
+  })
+
+/** Rename a guest on the dinner bill. Join-by-code still matches the new name. */
+export const renameRoomMember = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(renameRoomMemberSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("rename-member")
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      include: { members: true },
+    })
+    if (!room) throw new Error("Room not found")
+    const member = room.members.find((entry) => entry.id === data.memberId)
+    if (!member) throw new Error("Person not found")
+    const taken = room.members.some(
+      (entry) =>
+        entry.id !== member.id &&
+        entry.name.toLowerCase() === data.name.toLowerCase()
+    )
+    if (taken) throw new Error("Someone already has that name")
+    if (member.name !== data.name) {
+      await prisma.member.update({
+        where: { id: member.id },
+        data: { name: data.name },
+      })
+    }
+    const loaded = await loadRoomByCode(data.code)
+    if (!loaded) throw new Error("Room not found")
+    return loaded
+  })
+
+/**
+ * Take a guest off the dinner. Draft items they had go back to unassigned.
+ * Confirmed bills, payers, and open payments are blocked with a reason.
+ */
+export const removeRoomMember = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(removeRoomMemberSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("remove-member")
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      include: {
+        members: true,
+        checks: true,
+        expenses: { include: { shares: true } },
+        settlements: true,
+      },
+    })
+    if (!room) throw new Error("Room not found")
+    if (room.members.length <= 1) {
+      throw new Error("Keep at least one person")
+    }
+    const member = room.members.find((entry) => entry.id === data.memberId)
+    if (!member) throw new Error("Person not found")
+
+    const paidCheck = room.checks.some((check) => check.paidById === member.id)
+    const paidExpense = room.expenses.some(
+      (expense) => expense.paidById === member.id
+    )
+    if (paidCheck || paidExpense) {
+      throw new Error("This person paid. Pick someone else first.")
+    }
+
+    const onExpense = room.expenses.some((expense) =>
+      expense.shares.some((share) => share.memberId === member.id)
+    )
+    if (onExpense) {
+      throw new Error("Move the bill back to draft first")
+    }
+
+    const onSettlement = room.settlements.some(
+      (settlement) =>
+        settlement.fromMemberId === member.id ||
+        settlement.toMemberId === member.id
+    )
+    if (onSettlement) {
+      throw new Error("Undo their payments first")
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const check of room.checks) {
+        const parsed = checkPayloadSchema.safeParse(check.payload)
+        if (!parsed.success) continue
+        const items = unassignMemberFromItems(parsed.data.items, member.id)
+        if (JSON.stringify(items) === JSON.stringify(parsed.data.items)) {
+          continue
+        }
+        const payload: CheckPayloadInput = { ...parsed.data, items }
+        await tx.check.update({
+          where: { id: check.id },
+          data: { payload },
+        })
+      }
+      await tx.member.delete({ where: { id: member.id } })
+    })
 
     const loaded = await loadRoomByCode(data.code)
     if (!loaded) throw new Error("Room not found")
@@ -810,6 +931,16 @@ export const recordSettlement = createServerFn({ method: "POST" })
         ? data.currency
         : room.currency
 
+    let proof:
+      { proofBytes: Uint8Array<ArrayBuffer>; proofMimeType: string } | undefined
+    if (data.proof) {
+      const stored = paymentProofBytesFromPayload(data.proof)
+      proof = {
+        proofBytes: new Uint8Array(stored.bytes),
+        proofMimeType: stored.mimeType,
+      }
+    }
+
     const settlement = await prisma.settlement.create({
       data: {
         roomId: room.id,
@@ -817,6 +948,7 @@ export const recordSettlement = createServerFn({ method: "POST" })
         toMemberId: data.toMemberId,
         amountCents: data.amountCents,
         currency,
+        ...proof,
       },
       include: {
         fromMember: true,
@@ -825,6 +957,35 @@ export const recordSettlement = createServerFn({ method: "POST" })
     })
 
     return settlementToDto(settlement)
+  })
+
+export const getSettlementProof = createServerFn({ method: "GET" })
+  .validator((data: unknown) => parseOrThrow(getSettlementProofSchema, data))
+  .handler(async ({ data }): Promise<SettlementProofDto | null> => {
+    assertRateLimit(`proof:ip:${clientIp()}`, {
+      limit: 60,
+      windowMs: 60_000,
+      label: "payment photos",
+    })
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      select: { id: true },
+    })
+    if (!room) throw new Error("Trip not found")
+
+    const settlement = await prisma.settlement.findFirst({
+      where: { id: data.settlementId, roomId: room.id },
+      select: { proofBytes: true, proofMimeType: true },
+    })
+    if (!settlement?.proofBytes || settlement.proofBytes.length === 0) {
+      return null
+    }
+
+    const mimeType = settlement.proofMimeType ?? "image/jpeg"
+    return {
+      mimeType,
+      base64: encodePaymentProof(settlement.proofBytes),
+    }
   })
 
 export const deleteSettlement = createServerFn({ method: "POST" })

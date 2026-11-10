@@ -1,5 +1,9 @@
 import { z } from "zod"
 
+import {
+  PAYMENT_PROOF_MAX_BASE64_CHARS,
+  PAYMENT_PROOF_MIME_TYPES,
+} from "./payment-proof"
 import { normalizeRoomCode } from "./room-code"
 
 export const currencyCodeSchema = z
@@ -126,7 +130,11 @@ export const expenseCategorySchema = z
 
 export const createRoomSchema = z
   .object({
-    name: z.string().trim().min(1, "Give it a name").max(60, "Name is too long"),
+    name: z
+      .string()
+      .trim()
+      .min(1, "Give it a name")
+      .max(60, "Name is too long"),
     currency: currencyCodeSchema,
     currencies: z.array(currencyCodeSchema).optional().default([]),
     fxRates: z.record(currencyCodeSchema, z.number().positive()).optional(),
@@ -146,6 +154,17 @@ export const createRoomSchema = z
 export const addRoomMembersSchema = z.object({
   code: roomCodeSchema,
   names: z.array(memberNameSchema).min(1, "Add at least one name"),
+})
+
+export const renameRoomMemberSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
+  name: memberNameSchema,
+})
+
+export const removeRoomMemberSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
 })
 
 export const renameRoomSchema = z.object({
@@ -288,15 +307,32 @@ export const reorderExpensesSchema = z.object({
   expenseIds: z.array(z.string().min(1)).min(1, "Nothing to reorder"),
 })
 
+export const paymentProofSchema = z.object({
+  base64: z
+    .string()
+    .min(32, "Photo is too small")
+    .max(
+      PAYMENT_PROOF_MAX_BASE64_CHARS,
+      "Photo is too large (max ~1MB). Try a closer crop."
+    ),
+  mimeType: z.enum(PAYMENT_PROOF_MIME_TYPES),
+})
+
 export const recordSettlementSchema = z.object({
   code: roomCodeSchema,
   fromMemberId: z.string().min(1, "Pick who paid"),
   toMemberId: z.string().min(1, "Pick who received"),
   amountCents: z.number().int().positive("Enter a valid amount"),
   currency: currencyCodeSchema.optional(),
+  proof: paymentProofSchema.optional(),
 })
 
 export const deleteSettlementSchema = z.object({
+  code: roomCodeSchema,
+  settlementId: z.string().min(1, "Missing settlement"),
+})
+
+export const getSettlementProofSchema = z.object({
   code: roomCodeSchema,
   settlementId: z.string().min(1, "Missing settlement"),
 })
@@ -317,6 +353,8 @@ export const calibrateRoomFxSchema = z.object({
 
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
+export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>
+export type RemoveRoomMemberInput = z.input<typeof removeRoomMemberSchema>
 export type UpsertCheckInput = z.input<typeof upsertCheckSchema>
 export type ConfirmCheckInput = z.input<typeof confirmCheckSchema>
 export type DeleteCheckInput = z.input<typeof deleteCheckSchema>
@@ -328,5 +366,6 @@ export type DeleteExpenseInput = z.input<typeof deleteExpenseSchema>
 export type ReorderExpensesInput = z.input<typeof reorderExpensesSchema>
 export type RecordSettlementInput = z.input<typeof recordSettlementSchema>
 export type DeleteSettlementInput = z.input<typeof deleteSettlementSchema>
+export type GetSettlementProofInput = z.input<typeof getSettlementProofSchema>
 export type CalibrateRoomFxInput = z.input<typeof calibrateRoomFxSchema>
 export type ExpenseSplitInput = z.input<typeof expenseSplitSchema>
