@@ -15,6 +15,7 @@ import {
 } from "@hugeicons/core-free-icons"
 
 import { BillPeople } from "@/components/dinner/bill-people"
+import { DinnerNameField } from "@/components/dinner/dinner-name"
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { OcrReview } from "@/components/dinner/ocr-review"
@@ -435,6 +436,11 @@ export function CheckEditor({
       <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
         <EditorHeader title="Check the ticket" onBack={backHome} />
         <div className="mt-4 flex flex-col gap-5 pb-6">
+          <DinnerNameField
+            code={room.code}
+            name={room.name}
+            id="dinner-name-review"
+          />
           <div className="grid gap-2">
             <Label htmlFor="merchant">Place</Label>
             <Input
@@ -485,6 +491,11 @@ export function CheckEditor({
           </p>
         ) : null}
 
+        <DinnerNameField
+          code={room.code}
+          name={room.name}
+          id="dinner-name-assign"
+        />
         <div className="grid gap-1.5">
           <Label htmlFor="merchant-assign">Place</Label>
           <Input
