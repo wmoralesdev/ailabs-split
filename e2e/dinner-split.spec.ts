@@ -240,6 +240,7 @@ test.describe("dinner split", () => {
     await tripChip.click()
     await expect(tripChip).toHaveAttribute("aria-pressed", "true")
     await page.getByLabel("Trip name").fill("Weekend")
+    await page.getByLabel("Your name").fill("Ana")
     await page.getByRole("button", { name: "Create trip" }).click()
     await expect(page.getByText("Add at least two members")).toBeVisible()
   })

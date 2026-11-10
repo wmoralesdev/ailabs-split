@@ -1,7 +1,7 @@
 import { expect } from "@playwright/test"
 import type { Locator, Page } from "@playwright/test"
 
-import { E2E_USER_COOKIE } from "../src/lib/auth-session"
+import { E2E_NAME_COOKIE, E2E_USER_COOKIE } from "../src/lib/auth-session"
 import {
   COOKIE_CONSENT_KEY,
   COOKIE_CONSENT_VALUE,
@@ -29,18 +29,42 @@ export async function skipCookieBanner(page: Page) {
   )
 }
 
+type SignInE2eOptions = { userId?: string; displayName?: string }
+
 /** Playwright-only session cookie. Production ignores it unless E2E=1. */
-export async function signInE2e(page: Page, userId?: string): Promise<string> {
+export async function signInE2e(
+  page: Page,
+  userIdOrOptions?: string | SignInE2eOptions
+): Promise<string> {
+  const options =
+    typeof userIdOrOptions === "string"
+      ? { userId: userIdOrOptions }
+      : (userIdOrOptions ?? {})
   const id =
-    userId ?? `user_e2e_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`
-  await page.context().addCookies([
+    options.userId ??
+    `user_e2e_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`
+  const cookies: {
+    name: string
+    value: string
+    url: string
+    sameSite: "Lax"
+  }[] = [
     {
       name: E2E_USER_COOKIE,
       value: id,
       url: "http://localhost:3000",
       sameSite: "Lax",
     },
-  ])
+  ]
+  if (options.displayName) {
+    cookies.push({
+      name: E2E_NAME_COOKIE,
+      value: options.displayName,
+      url: "http://localhost:3000",
+      sameSite: "Lax",
+    })
+  }
+  await page.context().addCookies(cookies)
   return id
 }
 

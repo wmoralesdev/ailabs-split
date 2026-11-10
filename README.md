@@ -58,7 +58,7 @@ Offline: after opening a trip online once, you can add expenses without a connec
 TanStack Start → **Nitro** → Vercel (auto-detects `vercel` preset when `VERCEL=1`).
 
 1. Link the repo in Vercel (framework: Other / Nitro Build Output API)
-2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `OPENAI_API_KEY`, plus `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the existing ailabs.sv Clerk application
+2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `OPENAI_API_KEY`, plus `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the existing ailabs.sv Clerk application. Set `CLERK_SIGN_IN_URL=/sign-in`. Do **not** set `CLERK_SIGN_UP_URL` (that splits sign-in and sign-up; `/sign-up` is the same combined screen).
 3. Build: `pnpm build` (runs `prisma generate` + `vite build`)
 4. Run migrations against Neon once: `pnpm exec prisma migrate deploy`
 5. Point DNS `split.ailabs.sv` at the deployment

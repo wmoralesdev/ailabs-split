@@ -19,5 +19,5 @@ export const Route = createFileRoute("/sign-in")({
 })
 
 function SignInPage() {
-  return <ClerkAuthScreen mode="sign-in" />
+  return <ClerkAuthScreen />
 }

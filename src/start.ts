@@ -22,7 +22,6 @@ export const startInstance = createStart(() => ({
               "http://localhost:3000",
             ],
             signInUrl: "/sign-in",
-            signUpUrl: "/sign-up",
           }),
         ]
       : []),

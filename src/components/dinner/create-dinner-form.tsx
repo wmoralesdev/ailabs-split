@@ -8,6 +8,7 @@ import { z } from "zod"
 
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
+import { WithDisplayName } from "@/components/with-display-name"
 import {
   Field,
   FieldError,
@@ -18,6 +19,7 @@ import { Form, FormField } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import type { CompressedImage } from "@/lib/compress-image"
+import { nextCreatorName } from "@/lib/clerk-display-name"
 import {
   defaultDinnerName,
   getLastCurrency,
@@ -45,25 +47,53 @@ type DinnerValues = z.infer<typeof dinnerSchema>
 
 export function CreateDinnerForm({
   navigate,
+  displayName = "",
 }: {
   navigate: ReturnType<typeof useNavigate>
+  displayName?: string
+}) {
+  return (
+    <WithDisplayName serverName={displayName}>
+      {(resolved) => (
+        <CreateDinnerFields navigate={navigate} displayName={resolved} />
+      )}
+    </WithDisplayName>
+  )
+}
+
+function CreateDinnerFields({
+  navigate,
+  displayName,
+}: {
+  navigate: ReturnType<typeof useNavigate>
+  displayName: string
 }) {
   const form = useForm<DinnerValues>({
     resolver: zodResolver(dinnerSchema),
-    defaultValues: { currency: "USD", creatorName: "" },
+    defaultValues: { currency: "USD", creatorName: displayName },
   })
   const [editCurrency, setEditCurrency] = useState(false)
   const currency = form.watch("currency")
   const requireSignIn = useRequireSignIn()
+  const nameEdited = Boolean(form.formState.dirtyFields.creatorName)
 
   useEffect(() => {
-    const lastName = getLastName()
-    if (lastName && !form.getValues("creatorName")) {
-      form.setValue("creatorName", lastName)
-    }
     const lastCurrency = getLastCurrency()
     if (lastCurrency) form.setValue("currency", lastCurrency)
   }, [form])
+
+  useEffect(() => {
+    if (nameEdited) return
+    const next = nextCreatorName({
+      clerkName: displayName,
+      lastName: getLastName(),
+    })
+    if (!next || form.getValues("creatorName") === next) return
+    form.setValue("creatorName", next, {
+      shouldDirty: false,
+      shouldValidate: false,
+    })
+  }, [displayName, form, nameEdited])
 
   const mutation = useMutation({
     mutationFn: (data: {
