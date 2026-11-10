@@ -25,11 +25,15 @@ model Room {
   fxAdjustmentBps Int @default(0)
   // Calibration samples: [{ appCents, bankCents, expenseId? }].
   fxCalibrationSamples Json?
+  // Clerk user id of whoever created the room (null for anonymous creates).
+  ownerUserId String?
   createdAt   DateTime     @default(now())
   members     Member[]
   expenses    Expense[]
   settlements Settlement[]
   checks      Check[]
+
+  @@index([ownerUserId])
 }
 
 model Member {

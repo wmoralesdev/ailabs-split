@@ -1,6 +1,12 @@
 import { expect } from "@playwright/test"
 import type { Locator, Page } from "@playwright/test"
 
+import { E2E_USER_COOKIE } from "../src/lib/auth-session"
+import {
+  COOKIE_CONSENT_KEY,
+  COOKIE_CONSENT_VALUE,
+} from "../src/lib/cookie-consent"
+
 /** React 19 attach lags the `load` event; clicks before this are no-ops on SSR HTML. */
 export async function waitForHydration(page: Page) {
   await page.waitForFunction(() => {
@@ -14,7 +20,32 @@ export async function waitForHydration(page: Page) {
   })
 }
 
+export async function skipCookieBanner(page: Page) {
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value)
+    },
+    { key: COOKIE_CONSENT_KEY, value: COOKIE_CONSENT_VALUE }
+  )
+}
+
+/** Playwright-only session cookie. Production ignores it unless E2E=1. */
+export async function signInE2e(page: Page, userId?: string): Promise<string> {
+  const id =
+    userId ?? `user_e2e_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`
+  await page.context().addCookies([
+    {
+      name: E2E_USER_COOKIE,
+      value: id,
+      url: "http://localhost:3000",
+      sameSite: "Lax",
+    },
+  ])
+  return id
+}
+
 export async function openLanding(page: Page) {
+  await skipCookieBanner(page)
   await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
   await expect(page.getByRole("heading", { name: "Split" })).toBeVisible()
   await waitForHydration(page)
@@ -157,10 +188,16 @@ export async function assignQuantities(
 }
 
 export async function confirmCheck(page: Page) {
-  const confirm = page.getByRole("button", { name: "Confirm bill" })
+  const confirm = page.getByRole("button", {
+    name: "Confirm bill",
+    exact: true,
+  })
   await confirm.scrollIntoViewIfNeeded()
   await expect(confirm).toBeEnabled()
   await confirm.click()
+  await expect(
+    page.getByRole("navigation", { name: "Dinner navigation" })
+  ).toBeVisible()
   await expect(page.getByText("Confirmed").first()).toBeVisible()
 }
 

@@ -9,6 +9,7 @@ import {
 } from "openai"
 import { zodTextFormat } from "openai/helpers/zod"
 
+import { requireSignedInUserId } from "@/server/auth-user.server"
 import {
   RECEIPT_VISION_INSTRUCTIONS,
   draftFromExtract,
@@ -35,6 +36,13 @@ const ALLOWED_MIME = new Set([
 const MAX_BASE64_CHARS = 1_400_000
 const OCR_TIMEOUT_MS = 30_000
 const OCR_VISION_MODEL = "gpt-5-mini"
+
+async function claimRoomOwnerIfOpen(code: string, userId: string) {
+  await prisma.room.updateMany({
+    where: { code, ownerUserId: null },
+    data: { ownerUserId: userId },
+  })
+}
 
 function clientKey(): string {
   const forwarded = getRequestHeader("x-forwarded-for")
@@ -65,7 +73,7 @@ async function withTimeout<T>(
   }
 }
 
-/** Local and e2e stand-in for the vision call; only reachable with OCR_FIXTURE=1 and no key. */
+/** Local and e2e stand-in for the vision call; reachable when OCR_FIXTURE=1. */
 function fixtureDraft(mode: OcrScanMode): OcrDraft {
   const check = extractCheckDraft(CELESTE_IMPERIO_MD)
   switch (mode) {
@@ -142,9 +150,20 @@ export const scanReceipt = createServerFn({ method: "POST" })
     return { code, imageBase64, mimeType, mode }
   })
   .handler(async ({ data }): Promise<OcrDraft> => {
+    const userId = await requireSignedInUserId()
+    assertRateLimit(`ocr:user:${userId}`, {
+      limit: 8,
+      windowMs: 60_000,
+      label: "receipt scans",
+    })
+
+    if (process.env.OCR_FIXTURE === "1") {
+      await claimRoomOwnerIfOpen(data.code, userId)
+      return fixtureDraft(data.mode)
+    }
+
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      if (process.env.OCR_FIXTURE === "1") return fixtureDraft(data.mode)
       throw new Error("OPENAI_API_KEY is not configured")
     }
 
@@ -168,6 +187,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     if (!room) {
       throw new Error("Trip not found")
     }
+    await claimRoomOwnerIfOpen(data.code, userId)
 
     const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })
     try {

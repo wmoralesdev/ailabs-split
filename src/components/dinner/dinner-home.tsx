@@ -17,6 +17,7 @@ import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { memberLink } from "@/lib/member-storage"
 import { compressTicketNow, startPendingDinnerScan } from "@/lib/ticket-scan"
+import { useRequireSignIn } from "@/lib/use-auth-user"
 import { useOnlineStatus } from "@/lib/online-status"
 import {
   computeNetsWithSettlements,
@@ -171,6 +172,7 @@ export function DinnerHome({
 function StartBillCard({ code }: { code: string }) {
   const navigate = useNavigate()
   const [pending, setPending] = useState(false)
+  const requireSignIn = useRequireSignIn()
   return (
     <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
       <h2 id="ticket-heading" className="font-display text-lg font-semibold">
@@ -182,6 +184,7 @@ function StartBillCard({ code }: { code: string }) {
       <TicketPhotoPicker
         pending={pending}
         pendingLabel="Reading ticket…"
+        beforePick={requireSignIn}
         onFile={(file) => {
           if (!file) return
           setPending(true)

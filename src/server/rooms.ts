@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
+import { getAuthUserId } from "@/server/auth-user.server"
 import { emptyCheckPayload } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
@@ -81,6 +82,13 @@ export type CheckDto = {
   payload: CheckPayloadInput
   createdAt: string
   updatedAt: string
+}
+
+export type OwnedRoomDto = {
+  code: string
+  name: string
+  kind: "TRIP" | "DINNER"
+  createdAt: string
 }
 
 export type RoomDto = {
@@ -422,6 +430,7 @@ export const createRoom = createServerFn({ method: "POST" })
         ? [data.currency]
         : Array.from(new Set([data.currency, ...data.currencies]))
     const fxRates = kind === "DINNER" ? {} : (data.fxRates ?? {})
+    const ownerUserId = await getAuthUserId()
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = generateRoomCode(7)
@@ -434,6 +443,7 @@ export const createRoom = createServerFn({ method: "POST" })
             currency: data.currency,
             currencies,
             fxRates,
+            ...(ownerUserId ? { ownerUserId } : {}),
             members: {
               create: data.memberNames.map((memberName) => ({
                 name: memberName,
@@ -869,3 +879,22 @@ export const calibrateRoomFx = createServerFn({ method: "POST" })
     if (!updated) throw new Error("Trip not found")
     return updated
   })
+
+export const listMyRooms = createServerFn({ method: "GET" }).handler(
+  async (): Promise<OwnedRoomDto[]> => {
+    const userId = await getAuthUserId()
+    if (!userId) return []
+    const rooms = await prisma.room.findMany({
+      where: { ownerUserId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { code: true, name: true, kind: true, createdAt: true },
+    })
+    return rooms.map((room) => ({
+      code: room.code,
+      name: room.name,
+      kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+      createdAt: room.createdAt.toISOString(),
+    }))
+  }
+)

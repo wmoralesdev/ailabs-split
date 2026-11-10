@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 import { Link } from "@tanstack/react-router"
 
+import { AuthControls } from "@/components/auth-controls"
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
 import {
@@ -55,13 +56,14 @@ export function AppHeader({
         <Link
           to="/"
           search={{ stay: true }}
-          className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-full transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Split home"
         >
           <SiteLogo showWordmark={showWordmark} />
         </Link>
         <div className="flex items-center gap-1">
           {right}
+          <AuthControls />
           <ThemeToggle />
         </div>
       </div>
