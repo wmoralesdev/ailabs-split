@@ -6,10 +6,21 @@ export type CompressedImage = {
   bytesApprox: number
 }
 
-const MAX_EDGE = 1600
-/** Keep under server OCR base64 cap (~1.4M chars ≈ 1MB binary). */
-const TARGET_BYTES = 900_000
+/** Long edge for vision: enough for ticket type, small enough to upload fast. */
+const MAX_EDGE = 1280
+/** Keep well under the server OCR base64 cap (~1.4M chars ≈ 1MB binary). */
+const TARGET_BYTES = 480_000
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024
+
+function yieldToPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve())
+      return
+    }
+    setTimeout(resolve, 0)
+  })
+}
 
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -29,6 +40,29 @@ function loadImage(file: File): Promise<HTMLImageElement> {
     }
     image.src = url
   })
+}
+
+async function rasterize(file: File): Promise<ImageBitmap> {
+  let source: ImageBitmap
+  try {
+    source = await createImageBitmap(file)
+  } catch {
+    const image = await loadImage(file)
+    source = await createImageBitmap(image)
+  }
+
+  const scale = Math.min(1, MAX_EDGE / Math.max(source.width, source.height))
+  const width = Math.max(1, Math.round(source.width * scale))
+  const height = Math.max(1, Math.round(source.height * scale))
+  if (width === source.width && height === source.height) return source
+
+  const resized = await createImageBitmap(source, {
+    resizeWidth: width,
+    resizeHeight: height,
+    resizeQuality: "high",
+  })
+  source.close()
+  return resized
 }
 
 function canvasToJpegBlob(
@@ -65,7 +99,9 @@ async function blobToBase64(blob: Blob): Promise<string> {
  * Resize + JPEG-compress a phone photo in the browser before OCR upload.
  * Handles typical iPhone sizes (~8–12MB) without shipping a heavy library.
  */
-export async function compressImageForOcr(file: File): Promise<CompressedImage> {
+export async function compressImageForOcr(
+  file: File
+): Promise<CompressedImage> {
   if (!file.type.startsWith("image/") && file.type !== "") {
     throw new Error("Pick an image file (JPEG, PNG, or WebP)")
   }
@@ -73,38 +109,43 @@ export async function compressImageForOcr(file: File): Promise<CompressedImage> 
     throw new Error("Photo is too large (max 25MB). Take a closer shot.")
   }
 
-  const image = await loadImage(file)
-  const scale = Math.min(1, MAX_EDGE / Math.max(image.width, image.height))
-  const width = Math.max(1, Math.round(image.width * scale))
-  const height = Math.max(1, Math.round(image.height * scale))
+  await yieldToPaint()
+
+  const bitmap = await rasterize(file)
+  const width = bitmap.width
+  const height = bitmap.height
 
   const canvas = document.createElement("canvas")
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext("2d")
-  if (!ctx) throw new Error("Could not compress image")
+  if (!ctx) {
+    bitmap.close()
+    throw new Error("Could not compress image")
+  }
 
   ctx.fillStyle = "#ffffff"
   ctx.fillRect(0, 0, width, height)
-  ctx.drawImage(image, 0, 0, width, height)
+  ctx.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close()
 
-  let quality = 0.82
+  let quality = 0.74
   let blob = await canvasToJpegBlob(canvas, quality)
 
   while (blob.size > TARGET_BYTES && quality > 0.45) {
-    quality -= 0.12
+    quality -= 0.1
     blob = await canvasToJpegBlob(canvas, quality)
   }
 
-  // Still too big? shrink edges once more.
   if (blob.size > TARGET_BYTES) {
     const shrink = 0.75
     canvas.width = Math.max(1, Math.round(width * shrink))
     canvas.height = Math.max(1, Math.round(height * shrink))
     ctx.fillStyle = "#ffffff"
     ctx.fillRect(0, 0, canvas.width, canvas.height)
+    const image = await loadImage(file)
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
-    quality = 0.7
+    quality = 0.68
     blob = await canvasToJpegBlob(canvas, quality)
     while (blob.size > TARGET_BYTES && quality > 0.4) {
       quality -= 0.1

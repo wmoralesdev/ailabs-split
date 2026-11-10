@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { itemSplitSummary, tidyPlaceName } from "@/lib/dinner-labels"
 import {
   assignRestToMember,
@@ -47,6 +48,8 @@ import { compressImageForOcr } from "@/lib/compress-image"
 import { useOnlineStatus } from "@/lib/online-status"
 import { hasPendingTicket, takePendingTicket } from "@/lib/pending-ticket"
 import { checkPayloadFromOcr } from "@/lib/receipt-ocr"
+import type { OcrDraft } from "@/lib/receipt-ocr"
+import { hasPendingScan, takePendingScan } from "@/lib/ticket-scan"
 import { roomKeys } from "@/lib/room-query"
 import { formatMoney } from "@/lib/settle"
 import { cn } from "@/lib/utils"
@@ -91,7 +94,7 @@ export function CheckEditor({
   const [phase, setPhase] = useState<Phase>("assign")
   const itemNameRef = useRef<HTMLInputElement>(null)
   const [ocrPending, setOcrPending] = useState(
-    () => !check && hasPendingTicket(room.code)
+    () => !check && (hasPendingScan(room.code) || hasPendingTicket(room.code))
   )
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [newName, setNewName] = useState("")
@@ -205,37 +208,29 @@ export function CheckEditor({
     },
   })
 
-  async function onScan(file: File | null, nameFromTicket = false) {
-    if (!file) return
-    if (!onlineManager.isOnline()) {
-      setOcrPending(false)
-      toast.error("Scanning needs a connection")
-      return
+  function applyOcrDraft(draft: OcrDraft, nameFromTicket: boolean) {
+    const next = draft.check
+      ? checkPayloadFromOcr(draft.check)
+      : emptyCheckPayload()
+    setPayload(next)
+    const place = tidyPlaceName(draft.check?.merchant ?? draft.title ?? "")
+    if (place) setMerchant(place)
+    if (draft.check?.isPrecuenta) setIsPrecuenta(true)
+    setPhase(next.items.length > 0 ? "review" : "assign")
+    if (nameFromTicket && place) {
+      void renameRoom({ data: { code: room.code, name: place.slice(0, 60) } })
+        .then(invalidate)
+        .catch(() => undefined)
     }
+  }
+
+  async function awaitOcrDraft(
+    result: Promise<OcrDraft>,
+    nameFromTicket: boolean
+  ) {
     setOcrPending(true)
     try {
-      const compressed = await compressImageForOcr(file)
-      const draft = await scanReceipt({
-        data: {
-          code: room.code,
-          imageBase64: compressed.base64,
-          mimeType: compressed.mimeType,
-          mode: "dinner",
-        },
-      })
-      const next = draft.check
-        ? checkPayloadFromOcr(draft.check)
-        : emptyCheckPayload()
-      setPayload(next)
-      const place = tidyPlaceName(draft.check?.merchant ?? draft.title ?? "")
-      if (place) setMerchant(place)
-      if (draft.check?.isPrecuenta) setIsPrecuenta(true)
-      setPhase(next.items.length > 0 ? "review" : "assign")
-      if (nameFromTicket && place) {
-        void renameRoom({ data: { code: room.code, name: place.slice(0, 60) } })
-          .then(invalidate)
-          .catch(() => undefined)
-      }
+      applyOcrDraft(await result, nameFromTicket)
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not read ticket"
@@ -245,10 +240,38 @@ export function CheckEditor({
     }
   }
 
+  async function onScan(file: File | null, nameFromTicket = false) {
+    if (!file) return
+    if (!onlineManager.isOnline()) {
+      setOcrPending(false)
+      toast.error("Scanning needs a connection")
+      return
+    }
+    const compressed = compressImageForOcr(file)
+    await awaitOcrDraft(
+      compressed.then((image) =>
+        scanReceipt({
+          data: {
+            code: room.code,
+            imageBase64: image.base64,
+            mimeType: image.mimeType,
+            mode: "dinner",
+          },
+        })
+      ),
+      nameFromTicket
+    )
+  }
+
   const pendingTaken = useRef(false)
   useEffect(() => {
     if (check || pendingTaken.current) return
     pendingTaken.current = true
+    const scan = takePendingScan(room.code)
+    if (scan) {
+      void awaitOcrDraft(scan.result, scan.nameFromTicket)
+      return
+    }
     const ticket = takePendingTicket(room.code)
     if (ticket) void onScan(ticket.file, ticket.nameFromTicket)
     // Runs once: the photo handed over from the previous screen.
@@ -383,7 +406,7 @@ export function CheckEditor({
         className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2"
         aria-busy
       >
-        <EditorHeader title="Reading ticket…" onBack={backHome} />
+        <EditorHeader title="Reading ticket…" pending onBack={backHome} />
         <p className="mt-1 text-[15px] text-muted-foreground" role="status">
           Pulling the items, tip and total off the photo.
         </p>
@@ -1099,9 +1122,11 @@ function ItemCard({
 function EditorHeader({
   title,
   onBack,
+  pending = false,
 }: {
   title: string
   onBack: () => void
+  pending?: boolean
 }) {
   return (
     <div className="flex items-center gap-1">
@@ -1115,7 +1140,8 @@ function EditorHeader({
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
       </Button>
-      <h1 className="min-w-0 truncate font-display text-[22px] font-bold tracking-tight">
+      <h1 className="flex min-w-0 items-center gap-2 truncate font-display text-[22px] font-bold tracking-tight">
+        {pending ? <Spinner className="size-5 shrink-0" /> : null}
         {title}
       </h1>
     </div>
