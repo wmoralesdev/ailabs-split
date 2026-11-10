@@ -5,6 +5,8 @@ import {
   BIBLIOTECA_CAFE_MD,
   CELESTE_IMPERIO_MD,
   PUPUSERIA_PANCHIMALCO_MD,
+  PUPUSERIA_PANCHIMALCO_PRETICKET_MD,
+  UNIT_DIVIDES_TOTAL_MD,
 } from "./receipt-ocr-fixtures"
 import {
   checkPayloadFromOcr,
@@ -99,6 +101,116 @@ describe("extractCheckDraft", () => {
     expect(split.tipCents).toBe(0)
     expect(split.totalCents).toBe(8475)
     expect(split.totalCents).not.toBe(8475 + 848)
+  })
+
+  it("parses the Panchimalco PRE-TICKET CNT column into qty, not the name", () => {
+    const draft = extractCheckDraft(PUPUSERIA_PANCHIMALCO_PRETICKET_MD)
+    expect(draft.isPrecuenta).toBe(true)
+    expect(draft.totalCents).toBe(6000)
+    expect(draft.subtotalCents).toBe(6000)
+    expect(draft.tip?.amountCents).toBe(0)
+    expect(draft.tip?.percentHint).toBe(0)
+
+    const expected = [
+      ["Frijol/Queso pq", 8, 140, 1120],
+      ["Revuelta pq", 10, 140, 1400],
+      ["Chicharron/Frijol pq", 1, 140, 140],
+      ["Frijol pq", 1, 140, 140],
+      ["Queso/Ajo pq", 2, 175, 350],
+      ["Queso/Espinaca pq", 1, 175, 175],
+      ["Chocolate/leche", 1, 225, 225],
+      ["Orden de chorizo", 1, 525, 525],
+      ["Yuca frita", 2, 450, 900],
+      ["Soda vidrio", 6, 125, 750],
+      ["Soda lata", 1, 150, 150],
+      ["Del valle", 1, 125, 125],
+    ] as const
+
+    expect(draft.items).toHaveLength(expected.length)
+    for (const [name, quantity, unitPriceCents, amountCents] of expected) {
+      const item = draft.items.find((row) => row.name === name)
+      expect(item, name).toMatchObject({
+        name,
+        quantity,
+        unitPriceCents,
+        amountCents,
+      })
+    }
+
+    expect(draft.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
+    expect(
+      draft.items
+        .filter((item) => item.quantity === 1)
+        .every((item) => !/^\d+\s/.test(item.name))
+    ).toBe(true)
+    expect(draft.items.reduce((sum, item) => sum + item.amountCents, 0)).toBe(
+      6000
+    )
+
+    const payload = checkPayloadFromOcr(draft)
+    const frijol = payload.items.find((item) => item.name === "Frijol/Queso pq")
+    expect(frijol?.quantity).toBe(8)
+    expect(frijol?.name).toBe("Frijol/Queso pq")
+    expect(payload.tip.amountCents).toBe(0)
+    expect(computeDinnerSplit(payload).totalCents).toBe(6000)
+  })
+
+  it.each([
+    "CNT PRODUCTO P.UNI TOTAL",
+    "QTY ITEM UNIT TOTAL",
+    "QUANTITY DESCRIPTION PRICE TOTAL",
+    "AMT PRODUCT P.UNI TOTAL",
+    "AMOUNT ITEM PRICE TOTAL",
+    "CANT DESCRIPCION P.UNIT TOTAL",
+    "CANTIDAD DESCRIPCION PRECIO TOTAL",
+  ])("reads quantity from a %s column, not the name", (header) => {
+    const draft = extractCheckDraft(`
+CAFE
+${header}
+4 Tacos 2.50 $10.00
+TOTAL $10.00
+`)
+    expect(draft.items).toHaveLength(1)
+    expect(draft.items[0]).toMatchObject({
+      name: "Tacos",
+      quantity: 4,
+      unitPriceCents: 250,
+      amountCents: 1000,
+    })
+  })
+
+  it("infers quantity when unit price divides the line total with no CNT", () => {
+    const draft = extractCheckDraft(UNIT_DIVIDES_TOTAL_MD)
+    expect(draft.isPrecuenta).toBe(true)
+    expect(draft.tip?.amountCents).toBe(0)
+    expect(draft.totalCents).toBe(2010)
+    expect(draft.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Frijol/Queso pq",
+          quantity: 8,
+          unitPriceCents: 140,
+          amountCents: 1120,
+        }),
+        expect.objectContaining({
+          name: "Soda vidrio",
+          quantity: 6,
+          unitPriceCents: 125,
+          amountCents: 750,
+        }),
+        expect.objectContaining({
+          name: "Frijol pq",
+          quantity: 1,
+          unitPriceCents: 140,
+          amountCents: 140,
+        }),
+      ])
+    )
+    expect(draft.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
   })
 
   it("parses Celeste continuation modifiers and printed propina", () => {
