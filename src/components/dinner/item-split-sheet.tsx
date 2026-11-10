@@ -477,11 +477,11 @@ export function ItemSplitSheet({
               </p>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
               {tab === "EQUAL" && members.length > 1 ? (
                 <button
                   type="button"
-                  className="person-chip person-chip-ghost"
+                  className="item-everyone mt-0 min-h-11 w-auto"
                   onClick={() =>
                     setEqualIds(new Set(members.map((member) => member.id)))
                   }
@@ -492,7 +492,7 @@ export function ItemSplitSheet({
               {previousItem ? (
                 <button
                   type="button"
-                  className="person-chip person-chip-ghost"
+                  className="item-everyone mt-0 min-h-11 w-auto"
                   onClick={copyPrevious}
                 >
                   Same as last item

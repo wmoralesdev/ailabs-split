@@ -539,6 +539,11 @@ export function CheckEditor({
               >
                 Assign rest to me
               </button>
+            ) : payload.items.length > 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                {payload.items.length}{" "}
+                {payload.items.length === 1 ? "item" : "items"}
+              </p>
             ) : null}
           </div>
           {payload.items.length > 0 ? (
@@ -1078,14 +1083,8 @@ function ItemCard({
   }
 
   return (
-    <li
-      className={cn("overflow-hidden", unassigned && "bg-destructive/[0.04]")}
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-      >
+    <li className={cn("item-row", unassigned && "item-row-unassigned")}>
+      <button type="button" onClick={onOpen} className="item-row-main">
         <span className="min-w-0">
           <LineQtyName
             name={item.name}
@@ -1114,24 +1113,26 @@ function ItemCard({
         </span>
       </button>
       {members.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+        <div className="item-row-assign">
           {inlineEditable ? (
             <>
-              {members.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="person-chip"
-                  aria-pressed={selected.has(member.id)}
-                  onClick={() => onToggle(member.id)}
-                >
-                  {member.name}
-                </button>
-              ))}
+              <div className="item-row-chips">
+                {members.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    className="person-chip"
+                    aria-pressed={selected.has(member.id)}
+                    onClick={() => onToggle(member.id)}
+                  >
+                    {member.name}
+                  </button>
+                ))}
+              </div>
               {members.length > 2 ? (
                 <button
                   type="button"
-                  className="person-chip person-chip-ghost"
+                  className="item-everyone"
                   aria-pressed={everyone}
                   onClick={onEveryone}
                 >
@@ -1140,11 +1141,7 @@ function ItemCard({
               ) : null}
             </>
           ) : (
-            <button
-              type="button"
-              className="person-chip person-chip-ghost"
-              onClick={onOpen}
-            >
+            <button type="button" className="item-everyone" onClick={onOpen}>
               Custom split · edit
             </button>
           )}

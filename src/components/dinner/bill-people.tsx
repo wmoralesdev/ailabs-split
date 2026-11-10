@@ -269,8 +269,9 @@ export function BillPeople({
       </form>
       {members.length > 1 ? (
         <div className="mt-4 grid gap-2">
-          <Label>Paid by</Label>
+          <Label htmlFor="bill-paid-by">Paid by</Label>
           <MemberPicker
+            id="bill-paid-by"
             members={members}
             value={paidById}
             onChange={onPaidByChange}
