@@ -45,12 +45,14 @@ test("edit and remove a guest on the dinner bill", async ({
 
   const benSheet = await openPersonSheet(page, "Ben")
   await expect(benSheet.getByLabel("Name")).toHaveValue("Ben")
+  await expect(benSheet.getByRole("button", { name: "Save" })).toBeDisabled()
   await expect(
     benSheet.getByRole("button", { name: "Remove from bill" })
   ).toBeVisible()
   await shot(page, "edit-sheet.png")
   await benSheet.getByLabel("Name").fill("Benjamin")
-  await benSheet.getByRole("button", { name: "Save name" }).click()
+  await expect(benSheet.getByRole("button", { name: "Save" })).toBeEnabled()
+  await benSheet.getByRole("button", { name: "Save" }).click()
   await expect(benSheet).toBeHidden()
   await expect(
     page.getByRole("button", { name: "Edit Benjamin", exact: true })
@@ -64,11 +66,13 @@ test("edit and remove a guest on the dinner bill", async ({
   await assignEqual(page, "Pizza Margherita", ["Ana", "Benjamin", "Cam"])
 
   const camSheet = await openPersonSheet(page, "Cam")
+  await expect(camSheet.getByText("1 item · $24.00")).toBeVisible()
+  await camSheet.getByRole("button", { name: "Remove from bill" }).click()
   await expect(
-    camSheet.getByText("They're taken off any dishes they're on.")
+    camSheet.getByText("Remove Cam? His item goes back to unassigned.")
   ).toBeVisible()
   await shot(page, "remove-sheet.png")
-  await camSheet.getByRole("button", { name: "Remove from bill" }).click()
+  await camSheet.getByRole("button", { name: "Remove", exact: true }).click()
   await expect(camSheet).toBeHidden()
   await expect(
     page.getByRole("button", { name: "Edit Cam", exact: true })
@@ -83,12 +87,7 @@ test("edit and remove a guest on the dinner bill", async ({
   await expect(
     pizza.getByRole("button", { name: "Cam", exact: true })
   ).toHaveCount(0)
-  await expect(
-    pizza.getByRole("button", { name: "Ana", exact: true })
-  ).toHaveAttribute("aria-pressed", "true")
-  await expect(
-    pizza.getByRole("button", { name: "Benjamin", exact: true })
-  ).toHaveAttribute("aria-pressed", "true")
+  await expect(pizza.getByText("Who had this?")).toBeVisible()
   await shot(page, "after-remove.png")
 
   const anaSheet = await openPersonSheet(page, "Ana")

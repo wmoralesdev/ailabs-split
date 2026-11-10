@@ -14,6 +14,7 @@ import {
   splitLineItem,
   ticketTip,
   tipCentsFromPercent,
+  unassignItemsForMember,
   unassignMemberFromItems,
   withForcedPrintedTotal,
 } from "./dinner-split"
@@ -476,6 +477,21 @@ describe("unassign a person from items", () => {
         { memberId: "cam", quantity: 1 },
       ],
     })
+  })
+
+  it("marks every dish they were on as unassigned", () => {
+    const [next] = unassignItemsForMember(
+      [
+        item({
+          id: "pizza",
+          name: "Pizza",
+          amountCents: 2400,
+          split: { mode: "EQUAL", memberIds: ["ana", "ben", "cam"] },
+        }),
+      ],
+      "ben"
+    )
+    expect(next.split).toEqual({ mode: "UNASSIGNED" })
   })
 })
 

@@ -9,7 +9,11 @@ import { MemberPicker } from "@/components/member-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { itemSplitMemberIds, unassignMemberFromItems } from "@/lib/dinner-split"
+import {
+  memberAssignedItems,
+  replaceMemberInItems,
+  unassignItemsForMember,
+} from "@/lib/dinner-split"
 import type { LineItem } from "@/lib/dinner-split"
 import { mergeNames } from "@/lib/landing-prefs"
 import { roomKeys } from "@/lib/room-query"
@@ -117,25 +121,69 @@ export function BillPeople({
   })
 
   const removeMutation = useMutation({
-    mutationFn: async () => {
-      if (!editingId) throw new Error("Person not found")
-      onItemsChange(unassignMemberFromItems(items, editingId))
-      return removeRoomMember({
-        data: { code: room.code, memberId: editingId },
+    mutationFn: async (snapshot: {
+      memberId: string
+      name: string
+      items: LineItem[]
+    }) => {
+      onItemsChange(unassignItemsForMember(snapshot.items, snapshot.memberId))
+      await removeRoomMember({
+        data: { code: room.code, memberId: snapshot.memberId },
       })
+      return snapshot
     },
-    onSuccess: async () => {
+    onMutate: () => {
       setEditingId(null)
+    },
+    onSuccess: async (snapshot) => {
       await queryClient.invalidateQueries({
         queryKey: roomKeys.room(room.code),
       })
+      toast.success(`${snapshot.name} removed`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void restorePerson(snapshot)
+          },
+        },
+      })
     },
-    onError: (error) => {
+    onError: (error, snapshot) => {
+      onItemsChange(snapshot.items)
       toast.error(
         error instanceof Error ? error.message : "Could not remove this person"
       )
     },
   })
+
+  async function restorePerson(snapshot: {
+    memberId: string
+    name: string
+    items: LineItem[]
+  }) {
+    try {
+      const nextRoom = await addRoomMembers({
+        data: { code: room.code, names: [snapshot.name] },
+      })
+      const created = nextRoom.members.find(
+        (entry) => entry.name.toLowerCase() === snapshot.name.toLowerCase()
+      )
+      if (!created) throw new Error("Could not undo")
+      queryClient.setQueriesData(
+        { queryKey: roomKeys.room(room.code) },
+        (current: RoomDto | null | undefined) => {
+          if (!current) return nextRoom
+          return { ...current, members: nextRoom.members }
+        }
+      )
+      onItemsChange(
+        replaceMemberInItems(snapshot.items, snapshot.memberId, created.id)
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not undo")
+    }
+  }
 
   function submit() {
     const taken = new Set(members.map((member) => member.name.toLowerCase()))
@@ -149,9 +197,11 @@ export function BillPeople({
   }
 
   const saving = renameMutation.isPending || removeMutation.isPending
-  const assigned =
-    editingId != null &&
-    items.some((item) => itemSplitMemberIds(item.split).includes(editingId))
+  const assignedItems = editing ? memberAssignedItems(items, editing.id) : []
+  const assignedAmountCents = assignedItems.reduce(
+    (sum, item) => sum + item.amountCents,
+    0
+  )
   const blockReason = editing
     ? removeBlockReason({
         memberId: editing.id,
@@ -231,13 +281,22 @@ export function BillPeople({
         member={editing}
         open={editingId != null}
         saving={saving}
-        assigned={assigned}
+        assignedCount={assignedItems.length}
+        assignedAmountCents={assignedAmountCents}
+        currency={room.currency}
         blockReason={blockReason}
         onOpenChange={(open) => {
           if (!open && !saving) setEditingId(null)
         }}
         onRename={(name) => renameMutation.mutate(name)}
-        onRemove={() => removeMutation.mutate()}
+        onRemove={() => {
+          if (!editing) return
+          removeMutation.mutate({
+            memberId: editing.id,
+            name: editing.name,
+            items,
+          })
+        }}
       />
     </section>
   )

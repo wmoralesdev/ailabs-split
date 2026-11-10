@@ -104,7 +104,7 @@ export async function openPersonSheet(page: Page, name: string) {
   await expect(
     sheet.getByRole("heading", { name: "On this bill" })
   ).toBeVisible()
-  await expect(sheet.getByRole("button", { name: "Save name" })).toBeVisible()
+  await expect(sheet.getByRole("button", { name: "Save" })).toBeVisible()
   await expect(sheet).toHaveCSS("opacity", "1")
   return sheet
 }

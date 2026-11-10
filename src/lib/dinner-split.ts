@@ -758,3 +758,76 @@ export function unassignMemberFromItems(
     split: unassignMemberFromSplit(item.split, memberId),
   }))
 }
+
+/** Items this person is on go fully unassigned when they leave the bill. */
+export function unassignItemsForMember(
+  items: LineItem[],
+  memberId: string
+): LineItem[] {
+  return items.map((item) =>
+    itemSplitMemberIds(item.split).includes(memberId)
+      ? { ...item, split: { mode: "UNASSIGNED" } }
+      : item
+  )
+}
+
+export function memberAssignedItems(
+  items: LineItem[],
+  memberId: string
+): LineItem[] {
+  return items.filter((item) =>
+    itemSplitMemberIds(item.split).includes(memberId)
+  )
+}
+
+export function replaceMemberInSplit(
+  split: ItemSplit,
+  fromId: string,
+  toId: string
+): ItemSplit {
+  switch (split.mode) {
+    case "UNASSIGNED":
+      return split
+    case "EQUAL":
+      return {
+        mode: "EQUAL",
+        memberIds: split.memberIds.map((id) => (id === fromId ? toId : id)),
+      }
+    case "PARTS":
+      return {
+        mode: "PARTS",
+        parts: split.parts.map((part) =>
+          part.memberId === fromId ? { ...part, memberId: toId } : part
+        ),
+      }
+    case "QUANTITY":
+      return {
+        mode: "QUANTITY",
+        shares: split.shares.map((share) =>
+          share.memberId === fromId ? { ...share, memberId: toId } : share
+        ),
+      }
+    case "AMOUNT":
+      return {
+        mode: "AMOUNT",
+        shares: split.shares.map((share) =>
+          share.memberId === fromId ? { ...share, memberId: toId } : share
+        ),
+      }
+    default: {
+      const _never: never = split
+      return _never
+    }
+  }
+}
+
+export function replaceMemberInItems(
+  items: LineItem[],
+  fromId: string,
+  toId: string
+): LineItem[] {
+  return items.map((item) => ({
+    ...item,
+    split: replaceMemberInSplit(item.split, fromId, toId),
+  }))
+}
