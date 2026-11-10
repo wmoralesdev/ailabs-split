@@ -1,7 +1,9 @@
 /**
  * Raster Open Graph / apple-touch images for Split.
- * Dark canvas + Split wordmark + print-style halftone of a torn ticket
- * (same language as the in-app wash, not the Ai Labs molecule).
+ *
+ * Dark navy + Split’s print-style halftone ticket bars. Official Ai Labs
+ * isotype from public/brand (not redrawn). “Split” is HTML text in Google’s
+ * Plus Jakarta Sans Bold. Apple-touch is the official mark from ailabs.sv.
  */
 import { chromium } from "@playwright/test"
 import fs from "node:fs"
@@ -9,13 +11,20 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const fontFile = path.join(
-  root,
-  "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2"
-)
-const fontData = fs.readFileSync(fontFile).toString("base64")
+const isoPath = path.join(root, "public/brand/ailabs-iso-light.svg")
+const FONT_URL =
+  "https://fonts.gstatic.com/s/plusjakartasans/v12/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_TknNSg.ttf"
 
-const DRAW = (kind) => {
+const isoSvg = fs.readFileSync(isoPath)
+const isoUri = `data:image/svg+xml;base64,${isoSvg.toString("base64")}`
+
+const fontBuf = Buffer.from(await (await fetch(FONT_URL)).arrayBuffer())
+if (fontBuf.length < 1000) {
+  throw new Error("Could not download Plus Jakarta Sans from Google Fonts")
+}
+const fontUri = `data:font/ttf;base64,${fontBuf.toString("base64")}`
+
+const DRAW_HALFTONE = (shiftX) => {
   const NAVY = "#0B0A12"
   const PAPER = "#F5F4F8"
   const PURPLE = "#614AFC"
@@ -81,31 +90,20 @@ const DRAW = (kind) => {
   ctx.fillStyle = NAVY
   ctx.fillRect(0, 0, w, h)
 
-  const cell = kind === "icon" ? 7 : 11
-  const maxDot = cell * (kind === "icon" ? 0.4 : 0.46)
+  const cell = 11
+  const maxDot = cell * 0.46
   const step = cell / 2
 
   for (let row = 0; row * step <= h + cell; row++) {
     const y = row * step
     const offset = row % 2 ? step : 0
     for (let x = offset; x <= w + cell; x += cell) {
-      const nx =
-        kind === "icon"
-          ? (x - w * 0.5) / (w * 0.42)
-          : (x - w * 0.5) / (w * 0.52)
-      const ny =
-        kind === "icon"
-          ? (y - h * 0.5) / (h * 0.42)
-          : (y - h * 0.5) / (h * 0.52)
+      const nx = (x - w * (0.5 + shiftX)) / (w * 0.52)
+      const ny = (y - h * 0.5) / (h * 0.52)
       const gx = x / w
       const gy = y / h
-      let tone = 0
-      if (kind === "icon") {
-        tone = ticketTone(nx, ny)
-      } else {
-        const fade = smoothstep(0.38, 0.56, gx)
-        tone = Math.max(washTone(gx, gy) * fade, ticketTone(nx, ny))
-      }
+      const fade = smoothstep(0.38, 0.56, gx)
+      const tone = Math.max(washTone(gx, gy) * fade, ticketTone(nx, ny))
       if (tone < 0.06) continue
       const radius = maxDot * Math.pow(tone, 0.85)
       if (radius < 0.35) continue
@@ -120,38 +118,108 @@ const DRAW = (kind) => {
       ctx.fill()
     }
   }
+}
 
-  if (kind !== "icon") {
-    ctx.fillStyle = PAPER
-    ctx.font = "700 76px 'Plus Jakarta Sans', system-ui, sans-serif"
-    ctx.textBaseline = "alphabetic"
-    const y = kind === "square" ? h - 96 : h - 78
-    ctx.fillText("Split", 72, y)
-  }
+function pageHtml(width, height, square) {
+  const markH = square ? 88 : 72
+  const typePx = square ? 92 : 76
+  const pad = square ? 80 : 72
+  return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("${fontUri}") format("truetype");
+}
+html, body {
+  margin: 0;
+  background: #0B0A12;
+}
+.frame {
+  position: relative;
+  width: ${width}px;
+  height: ${height}px;
+  overflow: hidden;
+  background: #0B0A12;
+}
+canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.lockup {
+  position: absolute;
+  left: ${pad}px;
+  bottom: ${square ? 88 : 64}px;
+  display: flex;
+  align-items: center;
+  gap: ${square ? 22 : 18}px;
+  z-index: 2;
+}
+.lockup img {
+  height: ${markH}px;
+  width: auto;
+  display: block;
+}
+.lockup .name {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 700;
+  font-size: ${typePx}px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #f5f4f8;
+  font-synthesis: none;
+}
+</style>
+</head>
+<body>
+  <div class="frame">
+    <canvas id="c" width="${width}" height="${height}"></canvas>
+    <div class="lockup">
+      <img src="${isoUri}" alt="Ai Labs" width="${Math.round((markH * 278) / 324)}" height="${markH}">
+      <span class="name">Split</span>
+    </div>
+  </div>
+</body>
+</html>`
 }
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ deviceScaleFactor: 1 })
-await page.addStyleTag({
-  content: `@font-face{font-family:'Plus Jakarta Sans';src:url(data:font/woff2;base64,${fontData}) format('woff2');font-weight:200 800;font-style:normal;font-display:block;} html,body{margin:0;background:#0B0A12} canvas{display:block}`,
-})
 
-async function shoot(kind, outPath, width, height) {
+async function shoot(outPath, width, height, square) {
   await page.setViewportSize({ width, height })
-  await page.setContent(
-    `<canvas id="c" width="${width}" height="${height}"></canvas>`,
-    { waitUntil: "load" }
-  )
-  await page.addStyleTag({
-    content: `@font-face{font-family:'Plus Jakarta Sans';src:url(data:font/woff2;base64,${fontData}) format('woff2');font-weight:200 800;font-style:normal;font-display:block;} html,body{margin:0;background:#0B0A12} canvas{display:block}`,
+  await page.setContent(pageHtml(width, height, square), { waitUntil: "load" })
+  await page.evaluate(async () => {
+    await document.fonts.load("700 76px 'Plus Jakarta Sans'")
+    await document.fonts.ready
+    const img = document.querySelector(".lockup img")
+    if (img) await img.decode()
   })
-  await page.evaluate(() => document.fonts.ready).catch(() => undefined)
-  await page.evaluate(DRAW, kind)
-  await page.screenshot({ path: outPath, type: "png", omitBackground: false })
+  const used = await page.evaluate(() => {
+    const span = document.querySelector(".name")
+    const face = span ? getComputedStyle(span).fontFamily : ""
+    const loaded = [...document.fonts].map((f) => `${f.family} ${f.status}`)
+    return { face, loaded, text: span?.textContent }
+  })
+  if (!/Plus Jakarta Sans/i.test(used.face)) {
+    throw new Error(`Split is not Plus Jakarta Sans: ${JSON.stringify(used)}`)
+  }
+  await page.evaluate(DRAW_HALFTONE, square ? 0.06 : 0.16)
+  await page.locator(".frame").screenshot({
+    path: outPath,
+    type: "png",
+    omitBackground: false,
+  })
 }
 
 const publicDir = path.join(root, "public")
-const mediaDir = "/cursor/stores/self/media/shadcn-improve-scan"
+const mediaDir = "/cursor/stores/self/media/og-jakarta"
 fs.mkdirSync(publicDir, { recursive: true })
 fs.mkdirSync(mediaDir, { recursive: true })
 fs.mkdirSync(path.join(publicDir, "icons"), { recursive: true })
@@ -161,9 +229,9 @@ const square = path.join(publicDir, "og-image-square.png")
 const apple = path.join(publicDir, "apple-touch-icon.png")
 const appleIcons = path.join(publicDir, "icons", "apple-touch-icon.png")
 
-await shoot("og", og, 1200, 630)
-await shoot("square", square, 1200, 1200)
-await shoot("icon", apple, 180, 180)
+await shoot(og, 1200, 630, false)
+await shoot(square, 1200, 1200, true)
+
 fs.copyFileSync(apple, appleIcons)
 fs.copyFileSync(og, path.join(mediaDir, "og-image.png"))
 fs.copyFileSync(square, path.join(mediaDir, "og-image-square.png"))
@@ -173,3 +241,5 @@ await browser.close()
 console.log("wrote", og)
 console.log("wrote", square)
 console.log("wrote", apple)
+console.log("Split set in Plus Jakarta Sans (Google Fonts Bold)")
+console.log("Ai Labs mark from", isoPath)
