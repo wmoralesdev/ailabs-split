@@ -106,6 +106,18 @@ describe("normalizeOcrItemQty", () => {
       quantity: 1,
       unitPriceCents: 500,
     })
+    expect(
+      normalizeOcrItemQty({
+        name: "8xbox",
+        quantity: 1,
+        unitPriceCents: 500,
+        amountCents: 500,
+      })
+    ).toEqual({
+      name: "8xbox",
+      quantity: 1,
+      unitPriceCents: 500,
+    })
   })
 
   it("keeps a correct quantity and does not double the prefix", () => {
@@ -113,6 +125,75 @@ describe("normalizeOcrItemQty", () => {
       normalizeOcrItemQty({
         name: "8 × Frijol/Queso pq",
         quantity: 8,
+        unitPriceCents: 140,
+        amountCents: 1120,
+      })
+    ).toEqual({
+      name: "Frijol/Queso pq",
+      quantity: 8,
+      unitPriceCents: 140,
+    })
+  })
+
+  it("peels N×name with no space when unit × N equals the line total", () => {
+    expect(
+      normalizeOcrItemQty({
+        name: "8×Frijol/Queso pq",
+        quantity: 1,
+        unitPriceCents: 140,
+        amountCents: 1120,
+      })
+    ).toEqual({
+      name: "Frijol/Queso pq",
+      quantity: 8,
+      unitPriceCents: 140,
+    })
+    expect(
+      normalizeOcrItemQty({
+        name: "10xRevuelta pq",
+        quantity: 1,
+        unitPriceCents: 140,
+        amountCents: 1400,
+      })
+    ).toEqual({
+      name: "Revuelta pq",
+      quantity: 10,
+      unitPriceCents: 140,
+    })
+  })
+
+  it("strips a CNT/qty/amt/cantidad alias glued onto the name", () => {
+    expect(
+      normalizeOcrItemQty({
+        name: "CNT 8 × Frijol/Queso pq",
+        quantity: 1,
+        unitPriceCents: 140,
+        amountCents: 1120,
+      })
+    ).toEqual({
+      name: "Frijol/Queso pq",
+      quantity: 8,
+      unitPriceCents: 140,
+    })
+    expect(
+      normalizeOcrItemQty({
+        name: "cantidad 10 Revuelta pq",
+        quantity: 1,
+        unitPriceCents: 140,
+        amountCents: 1400,
+      })
+    ).toEqual({
+      name: "Revuelta pq",
+      quantity: 10,
+      unitPriceCents: 140,
+    })
+  })
+
+  it("prefers the leading N when it explains the total over a wrong quantity", () => {
+    expect(
+      normalizeOcrItemQty({
+        name: "8×Frijol/Queso pq",
+        quantity: 2,
         unitPriceCents: 140,
         amountCents: 1120,
       })
