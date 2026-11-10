@@ -3,7 +3,11 @@ import type { Locator } from "@playwright/test"
 import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
-import { openDinnerCreate, waitForHydration } from "./dinner-helpers"
+import {
+  openDinnerCreate,
+  signInE2e,
+  waitForHydration,
+} from "./dinner-helpers"
 
 const TICKET_PATH = path.resolve(
   "/cursor/stores/self/docs/tickets/celeste-imperio.jpg"
@@ -73,6 +77,7 @@ test.describe("scan drop and OCR wait", () => {
     mkdirSync(SHOTS, { recursive: true })
 
     await page.setViewportSize({ width: 1280, height: 800 })
+    await signInE2e(page)
     await openDinnerCreate(page)
     await page.getByLabel("Your name").fill("Ana")
 

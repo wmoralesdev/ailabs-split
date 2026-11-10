@@ -47,6 +47,7 @@ import {
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
 import { useOnlineStatus } from "@/lib/online-status"
+import { useRequireSignIn } from "@/lib/use-auth-user"
 import { hasPendingTicket, takePendingTicket } from "@/lib/pending-ticket"
 import { checkPayloadFromOcr } from "@/lib/receipt-ocr"
 import type { OcrDraft } from "@/lib/receipt-ocr"
@@ -78,6 +79,7 @@ export function CheckEditor({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isOnline = useOnlineStatus()
+  const requireSignIn = useRequireSignIn()
   const fd = currencyFractionDigits(room.currency)
 
   const [checkId, setCheckId] = useState<string | null>(check?.id ?? null)
@@ -163,12 +165,15 @@ export function CheckEditor({
       return saved
     },
     onSuccess: async (saved, confirmAfter) => {
-      await invalidate()
       if (confirmAfter) {
         toast.success("Bill confirmed")
+        // Leave /check before invalidate; the index route redirects to the
+        // saved bill and would win a race against this home navigation.
         await navigate({ to: "/r/$code", params: { code: room.code } })
+        await invalidate()
         return
       }
+      await invalidate()
       toast.success("Draft saved")
       if (!check) {
         await navigate({
@@ -468,6 +473,7 @@ export function CheckEditor({
             pending={ocrPending}
             title="Add the ticket"
             hint="Take a photo or pick one from your gallery. Or type the items in below."
+            beforePick={requireSignIn}
             onFile={(file) => void onScan(file)}
           />
         ) : null}

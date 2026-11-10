@@ -50,6 +50,7 @@ import { compressImageForOcr } from "@/lib/compress-image"
 import { rememberLastCurrency, resolveLastCurrency } from "@/lib/last-currency"
 import { useOnlineStatus } from "@/lib/online-status"
 import { useRoomIdentity } from "@/lib/room-identity"
+import { useRequireSignIn } from "@/lib/use-auth-user"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { roomQueryOptions } from "@/lib/room-query"
 import { redistributeAmounts } from "@/lib/amount-split"
@@ -168,6 +169,7 @@ function AddExpenseForm({
   )
 
   const isOnline = useOnlineStatus()
+  const requireSignIn = useRequireSignIn()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -642,6 +644,7 @@ function AddExpenseForm({
               pendingLabel="Reading receipt…"
               title="Receipt (optional)"
               hint="Take a photo or pick one from your gallery."
+              beforePick={requireSignIn}
               onFile={(file) => void onScan(file)}
             />
           ) : null}

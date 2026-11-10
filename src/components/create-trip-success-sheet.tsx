@@ -79,7 +79,7 @@ export function CreateTripSuccessSheet({
           <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
             {isDinner
               ? "Add the bill now. Send the code whenever, people join from the link."
-              : "Send the code so everyone can join. No accounts."}
+              : "Send the code so everyone can join."}
           </SheetDescription>
         </SheetHeader>
 

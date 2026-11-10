@@ -10,11 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as RCodeRouteImport } from './routes/r.$code'
+import { Route as SignInSsoCallbackRouteImport } from './routes/sign-in_.sso-callback'
 import { Route as RCodeIndexRouteImport } from './routes/r.$code/index'
-import { Route as RCodeSettleRouteImport } from './routes/r.$code/settle'
-import { Route as RCodeNewRouteImport } from './routes/r.$code/new'
 import { Route as RCodeCheckRouteImport } from './routes/r.$code/check'
+import { Route as RCodeNewRouteImport } from './routes/r.$code/new'
+import { Route as RCodeSettleRouteImport } from './routes/r.$code/settle'
 import { Route as RCodeCheckIndexRouteImport } from './routes/r.$code/check.index'
 import { Route as RCodeCheckCheckIdRouteImport } from './routes/r.$code/check.$checkId'
 
@@ -23,9 +26,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RCodeRoute = RCodeRouteImport.update({
   id: '/r/$code',
   path: '/r/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInSsoCallbackRoute = SignInSsoCallbackRouteImport.update({
+  id: '/sign-in_/sso-callback',
+  path: '/sign-in/sso-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RCodeIndexRoute = RCodeIndexRouteImport.update({
@@ -33,9 +51,9 @@ const RCodeIndexRoute = RCodeIndexRouteImport.update({
   path: '/',
   getParentRoute: () => RCodeRoute,
 } as any)
-const RCodeSettleRoute = RCodeSettleRouteImport.update({
-  id: '/settle',
-  path: '/settle',
+const RCodeCheckRoute = RCodeCheckRouteImport.update({
+  id: '/check',
+  path: '/check',
   getParentRoute: () => RCodeRoute,
 } as any)
 const RCodeNewRoute = RCodeNewRouteImport.update({
@@ -43,9 +61,9 @@ const RCodeNewRoute = RCodeNewRouteImport.update({
   path: '/new',
   getParentRoute: () => RCodeRoute,
 } as any)
-const RCodeCheckRoute = RCodeCheckRouteImport.update({
-  id: '/check',
-  path: '/check',
+const RCodeSettleRoute = RCodeSettleRouteImport.update({
+  id: '/settle',
+  path: '/settle',
   getParentRoute: () => RCodeRoute,
 } as any)
 const RCodeCheckIndexRoute = RCodeCheckIndexRouteImport.update({
@@ -61,7 +79,10 @@ const RCodeCheckCheckIdRoute = RCodeCheckCheckIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
   '/r/$code': typeof RCodeRouteWithChildren
+  '/sign-in/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/settle': typeof RCodeSettleRoute
@@ -71,6 +92,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/sign-in/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code': typeof RCodeIndexRoute
@@ -80,7 +104,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
   '/r/$code': typeof RCodeRouteWithChildren
+  '/sign-in_/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/settle': typeof RCodeSettleRoute
@@ -92,7 +119,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/sign-in'
+    | '/sign-up'
     | '/r/$code'
+    | '/sign-in/sso-callback'
     | '/r/$code/check'
     | '/r/$code/new'
     | '/r/$code/settle'
@@ -102,6 +132,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/sign-in'
+    | '/sign-up'
+    | '/sign-in/sso-callback'
     | '/r/$code/new'
     | '/r/$code/settle'
     | '/r/$code'
@@ -110,7 +143,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/sign-in'
+    | '/sign-up'
     | '/r/$code'
+    | '/sign-in_/sso-callback'
     | '/r/$code/check'
     | '/r/$code/new'
     | '/r/$code/settle'
@@ -121,7 +157,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
   RCodeRoute: typeof RCodeRouteWithChildren
+  SignInSsoCallbackRoute: typeof SignInSsoCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,11 +172,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/r/$code': {
       id: '/r/$code'
       path: '/r/$code'
       fullPath: '/r/$code'
       preLoaderRoute: typeof RCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in_/sso-callback': {
+      id: '/sign-in_/sso-callback'
+      path: '/sign-in/sso-callback'
+      fullPath: '/sign-in/sso-callback'
+      preLoaderRoute: typeof SignInSsoCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/r/$code/': {
@@ -147,11 +207,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RCodeIndexRouteImport
       parentRoute: typeof RCodeRoute
     }
-    '/r/$code/settle': {
-      id: '/r/$code/settle'
-      path: '/settle'
-      fullPath: '/r/$code/settle'
-      preLoaderRoute: typeof RCodeSettleRouteImport
+    '/r/$code/check': {
+      id: '/r/$code/check'
+      path: '/check'
+      fullPath: '/r/$code/check'
+      preLoaderRoute: typeof RCodeCheckRouteImport
       parentRoute: typeof RCodeRoute
     }
     '/r/$code/new': {
@@ -161,11 +221,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RCodeNewRouteImport
       parentRoute: typeof RCodeRoute
     }
-    '/r/$code/check': {
-      id: '/r/$code/check'
-      path: '/check'
-      fullPath: '/r/$code/check'
-      preLoaderRoute: typeof RCodeCheckRouteImport
+    '/r/$code/settle': {
+      id: '/r/$code/settle'
+      path: '/settle'
+      fullPath: '/r/$code/settle'
+      preLoaderRoute: typeof RCodeSettleRouteImport
       parentRoute: typeof RCodeRoute
     }
     '/r/$code/check/': {
@@ -217,17 +277,21 @@ const RCodeRouteWithChildren = RCodeRoute._addFileChildren(RCodeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
   RCodeRoute: RCodeRouteWithChildren,
+  SignInSsoCallbackRoute: SignInSsoCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

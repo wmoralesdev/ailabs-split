@@ -6,6 +6,7 @@ import {
   addPeople,
   confirmCheck,
   createDinner,
+  signInE2e,
   waitForHydration,
 } from "./dinner-helpers"
 
@@ -34,6 +35,7 @@ for (const scheme of ["light", "dark"] as const) {
     const shot = (name: string) =>
       page.screenshot({ path: path.join(dir, `${scheme}-${name}.png`) })
 
+    await signInE2e(page)
     await createDinner(page, "Ana")
     await shot("01-dinner-home-no-bill")
 

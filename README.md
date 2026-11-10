@@ -1,6 +1,6 @@
 # Split
 
-Trip cost PWA — rooms, expenses, balances, optional receipt OCR. No accounts.
+Trip cost PWA — rooms, expenses, balances, optional receipt OCR. Sign in to keep yours and scan tickets.
 
 Host: `split.ailabs.sv`
 
@@ -43,14 +43,14 @@ pnpm dev
 4. **/r/$code/new** — fast add expense; optional scan (scan needs network)
 5. **/r/$code/settle** — “X owes Y $Z” transfers
 
-Room code is the only access control. Your display name is how you reclaim yourself across devices; localStorage only remembers the last pick on that browser.
+Join-by-code stays open for guests. Sign in (Clerk, same app as ailabs.sv) to keep dinners and trips across devices and to scan tickets.
 
 Offline: after opening a trip online once, you can add expenses without a connection. They sync when you’re back online (header sync icon shows status).
 
 ## Cost / connection hygiene
 
 - Postgres: one shared `pg` Pool per isolate (`PG_POOL_MAX=1`), short idle timeout, Neon **pooled** `DATABASE_URL`
-- OCR: requires a real room code, IP + room rate limits, ~1MB image cap, 30s timeout; OpenAI vision structured JSON
+- OCR: requires a signed-in user, a real room code, IP + room + user rate limits, ~1MB image cap, 30s timeout; OpenAI vision structured JSON
 - Writes (create/join/add expense): light per-IP rate limits
 
 ## Deploy
@@ -58,7 +58,7 @@ Offline: after opening a trip online once, you can add expenses without a connec
 TanStack Start → **Nitro** → Vercel (auto-detects `vercel` preset when `VERCEL=1`).
 
 1. Link the repo in Vercel (framework: Other / Nitro Build Output API)
-2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `OPENAI_API_KEY`
+2. Set env: `DATABASE_URL` (Neon pooled), optional `DIRECT_URL`, optional `OPENAI_API_KEY`, plus `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the existing ailabs.sv Clerk application
 3. Build: `pnpm build` (runs `prisma generate` + `vite build`)
 4. Run migrations against Neon once: `pnpm exec prisma migrate deploy`
 5. Point DNS `split.ailabs.sv` at the deployment

@@ -27,6 +27,7 @@ import {
 } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
 import { markInstallEligible } from "@/lib/pwa-install"
+import { useRequireSignIn } from "@/lib/use-auth-user"
 import { compressTicketNow, startPendingDinnerScan } from "@/lib/ticket-scan"
 import { createRoom } from "@/server/rooms"
 
@@ -53,6 +54,7 @@ export function CreateDinnerForm({
   })
   const [editCurrency, setEditCurrency] = useState(false)
   const currency = form.watch("currency")
+  const requireSignIn = useRequireSignIn()
 
   useEffect(() => {
     const lastName = getLastName()
@@ -195,7 +197,7 @@ export function CreateDinnerForm({
         <TicketPhotoPicker
           pending={mutation.isPending}
           pendingLabel={scanning ? "Reading ticket…" : "Starting…"}
-          beforePick={nameReady}
+          beforePick={() => nameReady() && requireSignIn()}
           onFile={(file) => {
             if (!file) return
             void form.handleSubmit((values) => start(values, file))()

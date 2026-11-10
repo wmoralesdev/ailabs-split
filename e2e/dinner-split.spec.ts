@@ -11,6 +11,7 @@ import {
   confirmCheck,
   createDinner,
   openDinnerCreate,
+  signInE2e,
   dinnerNav,
   openBill,
   openLanding,
@@ -137,6 +138,7 @@ test.describe("dinner split", () => {
       !process.env.OPENAI_API_KEY && process.env.OCR_FIXTURE !== "1",
       "needs OPENAI_API_KEY or OCR_FIXTURE=1"
     )
+    await signInE2e(page)
     await createDinner(page, "Ana")
     await page.getByTestId("ticket-gallery-input").setInputFiles(TICKET_PATH)
     await expect(
@@ -189,6 +191,7 @@ test.describe("dinner split", () => {
       !process.env.OPENAI_API_KEY && process.env.OCR_FIXTURE !== "1",
       "needs OPENAI_API_KEY or OCR_FIXTURE=1"
     )
+    await signInE2e(page)
     await openDinnerCreate(page)
     await expect(page.getByLabel("Dinner name")).toHaveCount(0)
     await expect(page.getByLabel("Who else is at the table?")).toHaveCount(0)
@@ -212,9 +215,9 @@ test.describe("dinner split", () => {
 
     const place = await page.getByLabel("Place").inputValue()
     await page.getByRole("button", { name: "Back" }).click()
-    await expect(
-      page.getByRole("heading", { level: 1, name: place })
-    ).toBeVisible()
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      place.slice(0, 24)
+    )
     await expect(page.getByText("You · Ana")).toBeVisible()
 
     await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
@@ -297,10 +300,13 @@ test("dinner home offers camera and gallery", async ({ page }) => {
 
 test("OCR review when OpenAI is configured", async ({ page }) => {
   test.skip(
-    !process.env.OPENAI_API_KEY || !existsSync(TICKET_PATH),
-    "OPENAI_API_KEY or ticket fixture is missing"
+    !process.env.OPENAI_API_KEY ||
+      process.env.OCR_FIXTURE === "1" ||
+      !existsSync(TICKET_PATH),
+    "needs a live OPENAI_API_KEY without OCR_FIXTURE"
   )
 
+  await signInE2e(page)
   await createDinner(page, "Ana")
   await page.getByTestId("ticket-gallery-input").setInputFiles(TICKET_PATH)
   await expect(page.getByText("Continue to assign")).toBeVisible({

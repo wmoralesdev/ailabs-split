@@ -14,6 +14,8 @@ const nitroPublicDir =
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  // Public Clerk key only — never add a prefix that would leak CLERK_SECRET_KEY.
+  envPrefix: ["VITE_", "CLERK_PUBLISHABLE_"],
   plugins: [
     ...(process.env.E2E ? [] : [devtools()]),
     tailwindcss(),
@@ -38,7 +40,7 @@ const config = defineConfig({
       manifest: {
         name: "Split",
         short_name: "Split",
-        description: "Split trip costs. No accounts.",
+        description: "Split dinners and trips. Scan a ticket, settle up.",
         theme_color: "#f5f4f8",
         background_color: "#f5f4f8",
         display: "standalone",

@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import type { IconSvgElement } from "@hugeicons/react"
 import { Airplane01Icon, Restaurant01Icon } from "@hugeicons/core-free-icons"
 
+import { AuthControls } from "@/components/auth-controls"
 import { CreateDinnerForm } from "@/components/dinner/create-dinner-form"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { NameListInput } from "@/components/name-list-input"
@@ -16,6 +17,7 @@ import { RecentTripsList } from "@/components/recent-trips-list"
 import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { YourRoomsList } from "@/components/your-rooms-list"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -53,8 +55,9 @@ import {
   createRoom,
   getRoomByCode,
   joinRoom,
+  listMyRooms,
 } from "@/server/rooms"
-import type { RoomDto } from "@/server/rooms"
+import type { OwnedRoomDto, RoomDto } from "@/server/rooms"
 
 type LandingSearch = {
   stay?: boolean
@@ -63,6 +66,10 @@ type LandingSearch = {
 }
 
 export const Route = createFileRoute("/")({
+  loader: async ({ context }): Promise<{ yours: OwnedRoomDto[] }> => {
+    if (!context.userId) return { yours: [] }
+    return { yours: await listMyRooms() }
+  },
   validateSearch: (search: Record<string, unknown>): LandingSearch => {
     const tabRaw =
       typeof search.tab === "string" ? search.tab.toLowerCase() : ""
@@ -100,6 +107,7 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
+  const { yours } = Route.useLoaderData()
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
   const [kind, setKind] = useState<RoomKind>("TRIP")
@@ -161,7 +169,10 @@ function LandingPage() {
     <PageShell innerClassName="flex min-h-dvh flex-col pt-2">
       <header className="flex h-11 items-center justify-between">
         <SiteLogo showWordmark={false} markClassName="size-7" />
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <AuthControls />
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="animate-rise mt-3">
@@ -225,6 +236,7 @@ function LandingPage() {
         </TabsContent>
       </Tabs>
       <div className="pb-safe pb-10">
+        <YourRoomsList rooms={yours} />
         <RecentTripsList />
       </div>
     </PageShell>
