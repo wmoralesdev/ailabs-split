@@ -16,7 +16,7 @@ import { dinnerBill } from "@/lib/dinner-bill"
 import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { memberLink } from "@/lib/member-storage"
-import { setPendingTicket } from "@/lib/pending-ticket"
+import { compressTicketNow, startPendingDinnerScan } from "@/lib/ticket-scan"
 import { useOnlineStatus } from "@/lib/online-status"
 import {
   computeNetsWithSettlements,
@@ -170,6 +170,7 @@ export function DinnerHome({
 
 function StartBillCard({ code }: { code: string }) {
   const navigate = useNavigate()
+  const [pending, setPending] = useState(false)
   return (
     <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
       <h2 id="ticket-heading" className="font-display text-lg font-semibold">
@@ -179,10 +180,16 @@ function StartBillCard({ code }: { code: string }) {
         Items and the printed total fill in from the photo.
       </p>
       <TicketPhotoPicker
-        pending={false}
+        pending={pending}
+        pendingLabel="Reading ticket…"
         onFile={(file) => {
           if (!file) return
-          setPendingTicket(code, { file, nameFromTicket: false })
+          setPending(true)
+          startPendingDinnerScan({
+            code,
+            image: compressTicketNow(file),
+            nameFromTicket: false,
+          })
           void navigate({ to: "/r/$code/check", params: { code } })
         }}
         className="mt-3.5"

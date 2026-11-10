@@ -19,7 +19,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "E2E=1 VITE_E2E=1 pnpm exec vite dev --port 3000",
+    command: "E2E=1 VITE_E2E=1 OCR_FIXTURE=1 pnpm exec vite dev --port 3000",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

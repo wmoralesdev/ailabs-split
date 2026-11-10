@@ -9,14 +9,15 @@ import { z } from "zod"
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Form, FormField } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import type { CompressedImage } from "@/lib/compress-image"
 import {
   defaultDinnerName,
   getLastCurrency,
@@ -25,8 +26,8 @@ import {
   rememberName,
 } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
-import { setPendingTicket } from "@/lib/pending-ticket"
 import { markInstallEligible } from "@/lib/pwa-install"
+import { compressTicketNow, startPendingDinnerScan } from "@/lib/ticket-scan"
 import { createRoom } from "@/server/rooms"
 
 const NAME_REQUIRED = "Write your name so the others know who paid"
@@ -67,6 +68,7 @@ export function CreateDinnerForm({
       creatorName: string
       currency: string
       ticket: File | null
+      compressed?: Promise<CompressedImage>
     }) =>
       createRoom({
         data: {
@@ -80,9 +82,10 @@ export function CreateDinnerForm({
     onSuccess: async (room, variables) => {
       rememberMember(room.code, room.members[0].id)
       markInstallEligible()
-      if (variables.ticket) {
-        setPendingTicket(room.code, {
-          file: variables.ticket,
+      if (variables.ticket && variables.compressed) {
+        startPendingDinnerScan({
+          code: room.code,
+          image: variables.compressed,
           nameFromTicket: true,
         })
         await navigate({ to: "/r/$code/check", params: { code: room.code } })
@@ -101,7 +104,13 @@ export function CreateDinnerForm({
     const creatorName = values.creatorName.trim()
     rememberName(creatorName)
     rememberCurrency(values.currency)
-    mutation.mutate({ creatorName, currency: values.currency, ticket })
+    const compressed = ticket ? compressTicketNow(ticket) : undefined
+    mutation.mutate({
+      creatorName,
+      currency: values.currency,
+      ticket,
+      compressed,
+    })
   }
 
   /** Synchronous so the file picker still opens inside the tap. */
@@ -115,40 +124,44 @@ export function CreateDinnerForm({
     return false
   }
 
+  const scanning = mutation.isPending && Boolean(mutation.variables.ticket)
+
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((values) => start(values, null))}
         className="flex flex-col gap-4"
       >
-        <FormField
-          control={form.control}
-          name="creatorName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Your name</FormLabel>
-              <FormControl>
+        <FieldGroup className="gap-4">
+          <FormField
+            control={form.control}
+            name="creatorName"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid || undefined}>
+                <FieldLabel htmlFor="creator-name">Your name</FieldLabel>
                 <Input
+                  id="creator-name"
                   placeholder="Ana"
                   autoComplete="given-name"
                   enterKeyHint="done"
+                  aria-invalid={fieldState.invalid}
                   {...field}
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                {fieldState.error ? (
+                  <FieldError>{fieldState.error.message}</FieldError>
+                ) : null}
+              </Field>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name="currency"
-          render={({ field }) => (
-            <FormItem>
-              {editCurrency ? (
-                <>
-                  <FormLabel>Currency</FormLabel>
-                  <FormControl>
+          <FormField
+            control={form.control}
+            name="currency"
+            render={({ field }) => (
+              <Field>
+                {editCurrency ? (
+                  <>
+                    <FieldLabel>Currency</FieldLabel>
                     <BaseCurrencyPicker
                       value={field.value}
                       onChange={(next) => {
@@ -156,34 +169,32 @@ export function CreateDinnerForm({
                         setEditCurrency(false)
                       }}
                     />
-                  </FormControl>
-                </>
-              ) : (
-                <div className="-mt-1 flex min-h-11 items-center justify-between gap-3">
-                  <p className="text-[15px] text-muted-foreground">
-                    Paying in{" "}
-                    <span className="font-semibold text-foreground">
-                      {currency}
-                    </span>
-                  </p>
-                  <button
-                    type="button"
-                    className="text-action text-[15px]"
-                    onClick={() => setEditCurrency(true)}
-                  >
-                    Change currency
-                  </button>
-                </div>
-              )}
-            </FormItem>
-          )}
-        />
+                  </>
+                ) : (
+                  <div className="-mt-1 flex min-h-11 items-center justify-between gap-3">
+                    <p className="text-[15px] text-muted-foreground">
+                      Paying in{" "}
+                      <span className="font-semibold text-foreground">
+                        {currency}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      className="text-action text-[15px]"
+                      onClick={() => setEditCurrency(true)}
+                    >
+                      Change currency
+                    </button>
+                  </div>
+                )}
+              </Field>
+            )}
+          />
+        </FieldGroup>
 
         <TicketPhotoPicker
           pending={mutation.isPending}
-          pendingLabel={
-            mutation.variables?.ticket ? "Opening ticket…" : "Starting…"
-          }
+          pendingLabel={scanning ? "Reading ticket…" : "Starting…"}
           beforePick={nameReady}
           onFile={(file) => {
             if (!file) return
@@ -195,8 +206,9 @@ export function CreateDinnerForm({
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="text-action self-center text-[15px]"
+          className="text-action gap-1.5 self-center text-[15px]"
         >
+          {mutation.isPending && !scanning ? <Spinner /> : null}
           Create without a ticket
         </button>
       </form>
