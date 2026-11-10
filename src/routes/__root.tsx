@@ -17,9 +17,12 @@ import appCss from "../styles.css?url"
 // Applies the persisted theme before paint to avoid a flash / hydration jump.
 const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('split-theme');var d=t==='dark'||((!t||t==='system')&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();`
 
+const SITE_ORIGIN = "https://split.ailabs.sv"
 const SITE_TITLE = "Split — trip costs, no accounts"
 const SITE_DESCRIPTION =
   "Split trip costs with a trip code. No accounts, no fuss."
+const OG_IMAGE = `${SITE_ORIGIN}/og-image.png`
+const OG_ALT = "Split — scan a ticket, tap who had what"
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
@@ -50,19 +53,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { name: "apple-mobile-web-app-status-bar-style", content: "default" },
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Split" },
+        { property: "og:url", content: `${SITE_ORIGIN}/` },
         { property: "og:title", content: SITE_TITLE },
         { property: "og:description", content: SITE_DESCRIPTION },
-        { property: "og:image", content: "/og.svg" },
+        { property: "og:image", content: OG_IMAGE },
+        { property: "og:image:type", content: "image/png" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: OG_ALT },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: SITE_TITLE },
         { name: "twitter:description", content: SITE_DESCRIPTION },
-        { name: "twitter:image", content: "/og.svg" },
+        { name: "twitter:image", content: OG_IMAGE },
+        { name: "twitter:image:alt", content: OG_ALT },
       ],
       links: [
         { rel: "stylesheet", href: appCss },
         { rel: "manifest", href: "/manifest.webmanifest" },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-        { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+        { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
+        {
+          rel: "apple-touch-icon",
+          href: `${SITE_ORIGIN}/apple-touch-icon.png`,
+          sizes: "180x180",
+        },
       ],
     }),
     notFoundComponent: () => (

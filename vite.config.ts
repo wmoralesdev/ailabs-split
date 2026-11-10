@@ -27,7 +27,14 @@ const config = defineConfig({
       injectRegister: false,
       // Default `dist` would 404 the SW once Nitro remaps the public root.
       outDir: nitroPublicDir,
-      includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
+      includeAssets: [
+        "favicon.svg",
+        "favicon.ico",
+        "apple-touch-icon.png",
+        "og-image.png",
+        "og-image-square.png",
+        "icons/apple-touch-icon.png",
+      ],
       manifest: {
         name: "Split",
         short_name: "Split",
