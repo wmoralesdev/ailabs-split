@@ -239,7 +239,9 @@ test("OCR review when OpenAI is configured", async ({ page }) => {
   })
   await expect(page.getByText(/POLLO CHIPOTLE/i).first()).toBeVisible()
   await expect(page.getByText(/ONZ/i).first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "Tip" }).first()).toBeVisible()
+  await expect(
+    page.getByRole("combobox", { name: /What is .*POLLO CHIPOTLE/i }).first()
+  ).toBeVisible()
   await page.getByRole("button", { name: "Continue to assign" }).click()
   await expect(
     page.getByRole("button", { name: "Confirm check" })

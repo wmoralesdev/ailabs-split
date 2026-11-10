@@ -1,6 +1,10 @@
-import { formatMoney } from "@/lib/settle"
-import type { Adjustment, CheckPayload, LineItem } from "@/lib/dinner-split"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon, Delete02Icon } from "@hugeicons/core-free-icons"
+
+import { Button } from "@/components/ui/button"
+import type { CheckPayload, LineItem } from "@/lib/dinner-split"
 import { emptyTip, itemToAdjustment, ticketTip } from "@/lib/dinner-split"
+import { formatMoney } from "@/lib/settle"
 import { cn } from "@/lib/utils"
 
 type Reclass = "item" | "modifier" | "fee" | "tax" | "tip" | "ignore"
@@ -88,153 +92,174 @@ export function OcrReview({
   const noted = payload.notedTotalCents
   const delta = noted == null ? null : noted - itemSum - payload.tip.amountCents
 
+  const hasTip = payload.tip.source !== "NONE"
+  const hasPrinted = payload.notedSubtotalCents != null || noted != null
+
   return (
     <div className="flex flex-col gap-5">
-      <ul className="divide-y divide-border/60">
-        {payload.items.map((item, index) => (
-          <li key={item.id} className="py-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">
-                  {item.quantity > 1 ? `${item.quantity} × ` : ""}
-                  {item.name}
-                </p>
-                {item.modifiers.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    {item.modifiers.join(" · ")}
-                  </p>
-                ) : null}
-                {item.confidence != null && item.confidence < 0.7 ? (
-                  <p className="text-xs text-destructive">Low confidence</p>
-                ) : null}
-              </div>
-              <p className="text-sm font-semibold tabular-nums">
-                {formatMoney(item.amountCents, currency)}
-              </p>
-            </div>
-            <ReclassRow
+      <section aria-label="Lines on the ticket">
+        <p className="group-label">
+          {payload.items.length}{" "}
+          {payload.items.length === 1 ? "line" : "lines"} · change any that
+          aren’t food or drink
+        </p>
+        <ul className="group-list">
+          {payload.items.map((item, index) => (
+            <ReviewRow
+              key={item.id}
+              name={`${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}`}
+              detail={
+                item.modifiers.length > 0 ? item.modifiers.join(" · ") : null
+              }
+              lowConfidence={item.confidence != null && item.confidence < 0.7}
+              amount={formatMoney(item.amountCents, currency)}
               current="item"
+              options={
+                index > 0
+                  ? ITEM_OPTIONS
+                  : ITEM_OPTIONS.filter((option) => option !== "modifier")
+              }
               onPick={(kind) => reclassItem(index, kind)}
             />
-          </li>
-        ))}
-      </ul>
+          ))}
+          {payload.adjustments.map((adjustment) => (
+            <ReviewRow
+              key={adjustment.id}
+              name={adjustment.name}
+              amount={formatMoney(adjustment.amountCents, currency)}
+              current={adjustment.kind === "TAX" ? "tax" : "fee"}
+              options={[
+                adjustment.kind === "TAX" ? "tax" : "fee",
+                "item",
+                "tip",
+                "ignore",
+              ]}
+              onPick={(kind) => reclassAdjustment(adjustment.id, kind)}
+            />
+          ))}
+        </ul>
+      </section>
 
-      {payload.adjustments.map((adjustment) => (
-        <AdjustmentReview
-          key={adjustment.id}
-          adjustment={adjustment}
-          currency={currency}
-          onPick={(kind) => reclassAdjustment(adjustment.id, kind)}
-        />
-      ))}
-
-      {payload.tip.source !== "NONE" ? (
-        <div className="flex items-baseline justify-between gap-3 border-t border-border/70 pt-3">
-          <p className="text-sm font-medium">
-            Tip
-            {payload.tip.percent != null ? ` ${payload.tip.percent}%` : ""}
-          </p>
-          <p className="text-sm font-semibold tabular-nums">
-            {formatMoney(payload.tip.amountCents, currency)}
-          </p>
-        </div>
+      {hasTip || hasPrinted ? (
+        <section aria-label="Printed totals">
+          <ul className="group-list">
+            {hasTip ? (
+              <li className="group-row justify-between pr-1">
+                <span>
+                  Tip
+                  <span className="text-muted-foreground">
+                    {payload.tip.percent != null
+                      ? ` · ${payload.tip.percent}%`
+                      : " · on ticket"}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-semibold tabular-nums">
+                    {formatMoney(payload.tip.amountCents, currency)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove printed tip"
+                    onClick={() => onChange({ ...payload, tip: emptyTip() })}
+                  >
+                    <HugeiconsIcon
+                      icon={Delete02Icon}
+                      size={16}
+                      strokeWidth={2}
+                    />
+                  </Button>
+                </span>
+              </li>
+            ) : null}
+            {payload.notedSubtotalCents != null ? (
+              <Row
+                label="Printed subtotal"
+                value={formatMoney(payload.notedSubtotalCents, currency)}
+              />
+            ) : null}
+            {noted != null ? (
+              <Row label="Printed total" value={formatMoney(noted, currency)} />
+            ) : null}
+          </ul>
+          {delta != null && delta !== 0 ? (
+            <p className="group-footer font-medium text-destructive">
+              The lines are off the printed total by{" "}
+              {formatMoney(Math.abs(delta), currency)}. You can still assign.
+            </p>
+          ) : null}
+        </section>
       ) : null}
-
-      <div className="flex flex-col gap-1 border-t border-border/70 pt-3 text-sm">
-        {payload.notedSubtotalCents != null ? (
-          <Row
-            label="Printed subtotal"
-            value={formatMoney(payload.notedSubtotalCents, currency)}
-          />
-        ) : null}
-        {noted != null ? (
-          <Row label="Printed total" value={formatMoney(noted, currency)} />
-        ) : null}
-        {delta != null && delta !== 0 ? (
-          <p className="text-xs font-medium text-destructive">
-            OCR is off by {formatMoney(Math.abs(delta), currency)}. You can
-            still assign.
-          </p>
-        ) : null}
-        <button
-          type="button"
-          className="mt-1 text-left text-sm font-medium text-muted-foreground"
-          onClick={() => onChange({ ...payload, tip: emptyTip() })}
-        >
-          Clear printed tip
-        </button>
-      </div>
     </div>
   )
 }
 
-function AdjustmentReview({
-  adjustment,
-  currency,
-  onPick,
-}: {
-  adjustment: Adjustment
-  currency: string
-  onPick: (kind: Reclass) => void
-}) {
-  return (
-    <div className="border-t border-border/70 py-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-medium">{adjustment.name}</p>
-        <p className="text-sm font-semibold tabular-nums">
-          {formatMoney(adjustment.amountCents, currency)}
-        </p>
-      </div>
-      <ReclassRow
-        current={adjustment.kind === "TAX" ? "tax" : "fee"}
-        onPick={onPick}
-      />
-    </div>
-  )
+const RECLASS_LABEL: Record<Reclass, string> = {
+  item: "Item",
+  modifier: "Part of the line above",
+  fee: "Fee",
+  tax: "Tax",
+  tip: "Tip",
+  ignore: "Not on the bill",
 }
 
-function ReclassRow({
+const ITEM_OPTIONS: Reclass[] = ["item", "modifier", "fee", "tax", "tip", "ignore"]
+
+function ReviewRow({
+  name,
+  detail = null,
+  lowConfidence = false,
+  amount,
   current,
+  options,
   onPick,
 }: {
+  name: string
+  detail?: string | null
+  lowConfidence?: boolean
+  amount: string
   current: Reclass
+  options: Reclass[]
   onPick: (kind: Reclass) => void
 }) {
-  const options: Array<{ id: Reclass; label: string }> = [
-    { id: "item", label: "Item" },
-    { id: "modifier", label: "Modifier" },
-    { id: "fee", label: "Fee" },
-    { id: "tax", label: "Tax" },
-    { id: "tip", label: "Tip" },
-    { id: "ignore", label: "Ignore" },
-  ]
+  const label = RECLASS_LABEL[current]
   return (
-    <div className="mt-2 flex flex-wrap gap-1">
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          onClick={() => onPick(option.id)}
-          className={cn(
-            "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-            current === option.id
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <li className="flex items-start justify-between gap-3 px-4 pt-2.5 pb-1">
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-medium">{name}</p>
+        {detail ? (
+          <p className="text-[13px] text-muted-foreground">{detail}</p>
+        ) : null}
+        <label className="relative -ml-1 inline-flex min-h-9 items-center gap-0.5 rounded-md px-1 text-[13px] text-muted-foreground focus-within:ring-2 focus-within:ring-ring">
+          <span className={cn(lowConfidence && "text-destructive")}>
+            {lowConfidence ? `${label} · check this one` : label}
+          </span>
+          <HugeiconsIcon icon={ArrowDown01Icon} size={14} strokeWidth={2} />
+          <select
+            aria-label={`What is ${name}?`}
+            value={current}
+            onChange={(event) => onPick(event.target.value as Reclass)}
+            className="absolute inset-0 cursor-pointer opacity-0"
+          >
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {RECLASS_LABEL[option]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="pt-px text-[15px] font-semibold tabular-nums">{amount}</p>
+    </li>
   )
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
+    <li className="group-row justify-between">
       <span className="text-muted-foreground">{label}</span>
       <span className="tabular-nums">{value}</span>
-    </div>
+    </li>
   )
 }

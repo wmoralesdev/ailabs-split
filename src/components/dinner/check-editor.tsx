@@ -403,7 +403,7 @@ export function CheckEditor({
     return (
       <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
         <EditorHeader title="Check the ticket" onBack={backHome} />
-        <div className="mt-5 flex flex-col gap-5">
+        <div className="mt-4 flex flex-col gap-5 pb-6">
           <div className="grid gap-2">
             <Label htmlFor="merchant">Place</Label>
             <Input
@@ -1038,7 +1038,7 @@ function ItemCard({
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted"
+        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <span className="min-w-0">
           <span className="block text-[15px] font-semibold">
