@@ -69,14 +69,15 @@ export async function addPeople(page: Page, names: string[]) {
   }
 }
 
-export async function startManualCheck(page: Page) {
+/** Opens the dinner's one bill: "Enter items by hand" before it exists, the tab bar after. */
+export async function openBill(page: Page) {
   const manual = page.getByRole("link", { name: "Enter items by hand" })
-  const newCheck = page.getByRole("link", { name: "New check" })
-  await expect(manual.or(newCheck).first()).toBeVisible()
+  const bill = dinnerNav(page).getByRole("link", { name: "Open the bill" })
+  await expect(manual.or(bill).first()).toBeVisible()
   if (await manual.isVisible()) {
     await manual.click()
   } else {
-    await newCheck.click()
+    await bill.click()
   }
   await waitForHydration(page)
   await expect(page.getByLabel("Place")).toBeVisible()
@@ -156,7 +157,7 @@ export async function assignQuantities(
 }
 
 export async function confirmCheck(page: Page) {
-  const confirm = page.getByRole("button", { name: "Confirm check" })
+  const confirm = page.getByRole("button", { name: "Confirm bill" })
   await confirm.scrollIntoViewIfNeeded()
   await expect(confirm).toBeEnabled()
   await confirm.click()
@@ -171,8 +172,4 @@ export function itemCard(page: Page, itemName: string): Locator {
 
 export function dinnerNav(page: Page): Locator {
   return page.getByRole("navigation", { name: "Dinner navigation" })
-}
-
-export function checksHeading(page: Page): Locator {
-  return page.getByRole("heading", { name: "Checks" })
 }

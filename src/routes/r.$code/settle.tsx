@@ -325,7 +325,7 @@ function SettlePage() {
             <p className="mt-0.5 text-[15px] text-muted-foreground">
               {room.expenses.length === 0
                 ? room.kind === "DINNER"
-                  ? "Confirm a check to see who owes what."
+                  ? "Confirm the bill to see who owes what."
                   : "Add an expense to get started."
                 : "Everyone is square."}
             </p>

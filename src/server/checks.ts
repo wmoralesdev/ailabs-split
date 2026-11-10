@@ -2,10 +2,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
-import {
-  computeDinnerSplit,
-  expenseSharesFromDinner,
-} from "@/lib/dinner-split"
+import { computeDinnerSplit, expenseSharesFromDinner } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import {
@@ -77,7 +74,9 @@ async function materializeExpense(input: {
 
   if (input.expenseId) {
     const expense = await prisma.$transaction(async (tx) => {
-      await tx.expenseShare.deleteMany({ where: { expenseId: input.expenseId! } })
+      await tx.expenseShare.deleteMany({
+        where: { expenseId: input.expenseId! },
+      })
       return await tx.expense.update({
         where: { id: input.expenseId! },
         data: {
@@ -143,9 +142,20 @@ export const upsertCheck = createServerFn({ method: "POST" })
       throw new Error("Payer is not in this dinner")
     }
 
-    if (data.checkId) {
+    // A dinner is one bill: a second create lands on the bill that is already there.
+    const checkId =
+      data.checkId ??
+      (
+        await prisma.check.findFirst({
+          where: { roomId: room.id },
+          orderBy: { createdAt: "asc" },
+          select: { id: true },
+        })
+      )?.id
+
+    if (checkId) {
       const existing = await prisma.check.findFirst({
-        where: { id: data.checkId, roomId: room.id },
+        where: { id: checkId, roomId: room.id },
       })
       if (!existing) throw new Error("Check not found")
 
@@ -314,4 +324,3 @@ export const deleteCheck = createServerFn({ method: "POST" })
     }
     return { checkId: data.checkId }
   })
-

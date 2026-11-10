@@ -14,9 +14,9 @@ import {
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
+import { BillPeople } from "@/components/dinner/bill-people"
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { OcrReview } from "@/components/dinner/ocr-review"
-import { MemberPicker } from "@/components/member-picker"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -161,7 +161,7 @@ export function CheckEditor({
     onSuccess: async (saved, confirmAfter) => {
       await invalidate()
       if (confirmAfter) {
-        toast.success("Check confirmed")
+        toast.success("Bill confirmed")
         await navigate({ to: "/r/$code", params: { code: room.code } })
         return
       }
@@ -186,7 +186,7 @@ export function CheckEditor({
     },
     onSuccess: async () => {
       await invalidate()
-      toast.success("Check deleted")
+      toast.success("Bill deleted")
       await navigate({ to: "/r/$code", params: { code: room.code } })
     },
     onError: (error) => {
@@ -436,10 +436,7 @@ export function CheckEditor({
 
   return (
     <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
-      <EditorHeader
-        title={checkId ? merchant || "Check" : "New check"}
-        onBack={backHome}
-      />
+      <EditorHeader title={merchant.trim() || "The bill"} onBack={backHome} />
 
       <div className="mt-3 flex flex-col gap-6 pb-6">
         {payload.items.length === 0 && isOnline ? (
@@ -467,16 +464,12 @@ export function CheckEditor({
           />
         </div>
 
-        {room.members.length > 1 ? (
-          <div className="grid gap-2">
-            <Label>Paid by</Label>
-            <MemberPicker
-              members={room.members}
-              value={paidById}
-              onChange={setPaidById}
-            />
-          </div>
-        ) : null}
+        <BillPeople
+          code={room.code}
+          members={room.members}
+          paidById={paidById}
+          onPaidByChange={setPaidById}
+        />
 
         <section aria-labelledby="items-heading">
           <div className="flex items-baseline justify-between gap-3">
@@ -486,7 +479,7 @@ export function CheckEditor({
             >
               Items
             </h2>
-            {unassignedCount > 0 && room.members.length > 1 ? (
+            {unassignedCount > 0 ? (
               <button
                 type="button"
                 className="min-h-11 text-[15px] font-medium text-primary"
@@ -501,7 +494,7 @@ export function CheckEditor({
               </button>
             ) : null}
           </div>
-          {room.members.length > 1 && payload.items.length > 0 ? (
+          {payload.items.length > 0 ? (
             <p className="text-[13px] leading-snug text-muted-foreground">
               Tap who shared each item. Tap the item for parts or amounts.
             </p>
@@ -910,12 +903,12 @@ export function CheckEditor({
                 variant="ghost"
                 className="w-full text-destructive hover:text-destructive"
                 onClick={() => {
-                  if (window.confirm("Delete this check?")) {
+                  if (window.confirm("Delete this bill?")) {
                     deleteMutation.mutate()
                   }
                 }}
               >
-                Delete check
+                Delete bill
               </Button>
             ) : null}
           </div>
@@ -947,7 +940,7 @@ export function CheckEditor({
           disabled={!split.canConfirm || saveMutation.isPending}
           onClick={() => saveMutation.mutate(true)}
         >
-          {saveMutation.isPending ? "Saving…" : "Confirm check"}
+          {saveMutation.isPending ? "Saving…" : "Confirm bill"}
         </Button>
       </div>
 
@@ -1030,10 +1023,7 @@ function ItemCard({
 
   return (
     <li
-      className={cn(
-        "overflow-hidden",
-        unassigned && members.length > 1 && "bg-destructive/[0.04]"
-      )}
+      className={cn("overflow-hidden", unassigned && "bg-destructive/[0.04]")}
     >
       <button
         type="button"
@@ -1065,7 +1055,7 @@ function ItemCard({
           {formatMoney(item.amountCents, currency)}
         </span>
       </button>
-      {members.length > 1 ? (
+      {members.length > 0 ? (
         <div className="flex flex-wrap gap-1.5 px-4 pb-3">
           {inlineEditable ? (
             <>

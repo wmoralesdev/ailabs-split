@@ -1,9 +1,7 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Add01Icon,
   ArrowRight01Icon,
   Copy01Icon,
   Link01Icon,
@@ -12,26 +10,19 @@ import { toast } from "sonner"
 
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { copyText } from "@/lib/invite-link"
-import { initials } from "@/lib/dinner-labels"
+import { dinnerBill } from "@/lib/dinner-bill"
 import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
-import { mergeNames } from "@/lib/landing-prefs"
 import { memberLink } from "@/lib/member-storage"
 import { setPendingTicket } from "@/lib/pending-ticket"
 import { useOnlineStatus } from "@/lib/online-status"
-import { roomKeys } from "@/lib/room-query"
 import {
   computeNetsWithSettlements,
   formatMoney,
   simplifyTransfers,
 } from "@/lib/settle"
-import { cn } from "@/lib/utils"
-import { addRoomMembers } from "@/server/rooms"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
 export function DinnerHome({
@@ -47,6 +38,7 @@ export function DinnerHome({
 }) {
   const online = useOnlineStatus()
   const me = room.members.find((member) => member.id === memberId)
+  const bill = dinnerBill(room.checks)
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
 
   const nets = useMemo(() => {
@@ -70,10 +62,6 @@ export function DinnerHome({
   }, [room])
 
   const transfers = useMemo(() => simplifyTransfers(nets), [nets])
-  const confirmedTotalCents = room.expenses.reduce(
-    (sum, expense) => sum + expense.amountCents,
-    0
-  )
 
   async function copyCode() {
     await copyText(room.code)
@@ -103,12 +91,16 @@ export function DinnerHome({
           </h1>
         </header>
 
-        <PositionCard
-          room={room}
-          memberId={memberId}
-          transfers={transfers}
-          confirmedTotalCents={confirmedTotalCents}
-        />
+        {bill ? (
+          <BillCard
+            room={room}
+            bill={bill}
+            memberId={memberId}
+            transfers={transfers}
+          />
+        ) : (
+          <StartBillCard code={room.code} />
+        )}
 
         <section className="mt-6" aria-labelledby="people-heading">
           <div className="flex items-baseline justify-between gap-3">
@@ -118,22 +110,31 @@ export function DinnerHome({
             >
               People
             </h2>
-            <p className="text-[13px] text-muted-foreground">
-              {room.members.length}{" "}
-              {room.members.length === 1 ? "person" : "people"}
-            </p>
+            <button
+              type="button"
+              onClick={() => void copyCode()}
+              className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+              aria-label={`Copy dinner code ${room.code}`}
+            >
+              <span className="font-display tracking-widest text-foreground">
+                {room.code}
+              </span>
+              <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={2} />
+              {copied === "code" ? "Copied" : "Copy"}
+            </button>
           </div>
-          <ul className="mt-2 flex flex-wrap gap-1.5">
+          <ul className="flex flex-wrap gap-1.5" aria-label="At the table">
             {room.members.map((member) => (
               <li key={member.id} className="person-chip">
                 {member.name}
               </li>
             ))}
           </ul>
-          <InlineAddPeople
-            code={room.code}
-            existing={room.members.map((member) => member.name)}
-          />
+          <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+            {room.members.length}{" "}
+            {room.members.length === 1 ? "person" : "people"} · the table joins
+            with the code, or add them on the bill.
+          </p>
           <div className="mt-3 flex h-11 items-center gap-1 rounded-xl bg-card pr-1.5 pl-3.5">
             <p className="min-w-0 flex-1 truncate text-[15px]">
               You · {me?.name ?? "Unknown"}
@@ -162,108 +163,70 @@ export function DinnerHome({
             </Button>
           </div>
         </section>
-
-        <section className="mt-6" aria-labelledby="checks-heading">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2
-              id="checks-heading"
-              className="font-display text-lg font-semibold"
-            >
-              Checks
-            </h2>
-            <button
-              type="button"
-              onClick={() => void copyCode()}
-              className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground"
-              aria-label={`Copy dinner code ${room.code}`}
-            >
-              <span className="font-display tracking-widest text-foreground">
-                {room.code}
-              </span>
-              <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={2} />
-              {copied === "code" ? "Copied" : "Copy"}
-            </button>
-          </div>
-          {room.checks.length === 0 ? (
-            <p className="mt-1 text-[15px] text-muted-foreground">
-              None yet. Share the code so the table can join.
-            </p>
-          ) : (
-            <ul className="group-list mt-1">
-              {room.checks.map((check) => (
-                <CheckRow key={check.id} check={check} room={room} />
-              ))}
-            </ul>
-          )}
-          {room.checks.length > 0 ? (
-            <Link
-              to="/r/$code/check"
-              params={{ code: room.code }}
-              className="split-cta-tinted mt-3 w-full"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-              New check
-            </Link>
-          ) : null}
-        </section>
       </main>
     </PullToRefresh>
   )
 }
 
-function PositionCard({
+function StartBillCard({ code }: { code: string }) {
+  const navigate = useNavigate()
+  return (
+    <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
+      <h2 id="ticket-heading" className="font-display text-lg font-semibold">
+        Split the ticket
+      </h2>
+      <p className="mt-0.5 text-[15px] text-muted-foreground">
+        Items and the printed total fill in from the photo.
+      </p>
+      <TicketPhotoPicker
+        pending={false}
+        onFile={(file) => {
+          if (!file) return
+          setPendingTicket(code, { file, nameFromTicket: false })
+          void navigate({ to: "/r/$code/check", params: { code } })
+        }}
+        className="mt-3.5"
+      />
+      <Link
+        to="/r/$code/check"
+        params={{ code }}
+        className="mt-1 flex min-h-11 items-center justify-center text-[15px] font-medium text-primary transition-colors hover:text-foreground"
+      >
+        Enter items by hand
+      </Link>
+    </section>
+  )
+}
+
+function BillCard({
   room,
+  bill,
   memberId,
   transfers,
-  confirmedTotalCents,
 }: {
   room: RoomDto
+  bill: CheckDto
   memberId: string
   transfers: ReturnType<typeof simplifyTransfers>
-  confirmedTotalCents: number
 }) {
-  const navigate = useNavigate()
-  if (room.checks.length === 0) {
-    return (
-      <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
-        <h2 id="ticket-heading" className="font-display text-lg font-semibold">
-          Split the ticket
-        </h2>
-        <p className="mt-0.5 text-[15px] text-muted-foreground">
-          Items and the printed total fill in from the photo.
-        </p>
-        <TicketPhotoPicker
-          pending={false}
-          onFile={(file) => {
-            if (!file) return
-            setPendingTicket(room.code, { file, nameFromTicket: false })
-            void navigate({ to: "/r/$code/check", params: { code: room.code } })
-          }}
-          className="mt-3.5"
-        />
-        <Link
-          to="/r/$code/check"
-          params={{ code: room.code }}
-          className="mt-1 flex min-h-11 items-center justify-center text-[15px] font-medium text-primary transition-colors hover:text-foreground"
-        >
-          Enter items by hand
-        </Link>
-      </section>
-    )
-  }
-
+  const split = computeDinnerSplit({
+    items: bill.payload.items,
+    adjustments: bill.payload.adjustments,
+    tip: bill.payload.tip,
+    notedTotalCents: bill.payload.notedTotalCents,
+  })
+  const confirmed = bill.status === "CONFIRMED"
   const iOwe = transfers.filter((transfer) => transfer.fromId === memberId)
   const owedToMe = transfers.filter((transfer) => transfer.toId === memberId)
   const oweCents = iOwe.reduce((sum, t) => sum + t.amountCents, 0)
   const owedCents = owedToMe.reduce((sum, t) => sum + t.amountCents, 0)
-  const confirmedCount = room.checks.filter(
-    (check) => check.status === "CONFIRMED"
-  ).length
-  const draft = room.checks.find((check) => check.status !== "CONFIRMED")
 
   let headline: string
   let detail: string
-  if (oweCents > 0) {
+  if (!confirmed) {
+    headline = "Draft in progress"
+    detail = "Assign every item, then confirm to see who owes what."
+  } else if (oweCents > 0) {
     headline = `You owe ${formatMoney(oweCents, room.currency)}`
     detail =
       iOwe.length === 1
@@ -279,160 +242,70 @@ function PositionCard({
     headline = "You're square"
     detail = `${transfers.length} ${transfers.length === 1 ? "payment" : "payments"} left between others`
   } else {
-    headline = confirmedCount > 0 ? "Everyone is square" : "Draft in progress"
-    detail =
-      confirmedCount > 0
-        ? "Nothing left to pay."
-        : "Confirm the check to see who owes what."
+    headline = "Everyone is square"
+    detail = "Nothing left to pay."
   }
 
-  return (
-    <section className="surface mt-4 p-4" aria-label="Your balance">
-      <p className="eyebrow">
-        {formatMoney(confirmedTotalCents, room.currency)} confirmed ·{" "}
-        {confirmedCount} {confirmedCount === 1 ? "check" : "checks"}
-      </p>
-      <p className="mt-1 font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums">
-        {headline}
-      </p>
-      <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
-      {confirmedCount === 0 && draft ? (
-        <Link
-          to="/r/$code/check/$checkId"
-          params={{ code: room.code, checkId: draft.id }}
-          className="split-cta mt-3.5 w-full"
-        >
-          Assign the items
-          <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
-        </Link>
-      ) : transfers.length > 0 ? (
-        <Link
-          to="/r/$code/settle"
-          params={{ code: room.code }}
-          className="split-cta mt-3.5 w-full"
-        >
-          {oweCents > 0 ? "Pay and mark it done" : "See who owes what"}
-          <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
-        </Link>
-      ) : null}
-    </section>
-  )
-}
-
-function InlineAddPeople({
-  code,
-  existing,
-}: {
-  code: string
-  existing: string[]
-}) {
-  const queryClient = useQueryClient()
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [draft, setDraft] = useState("")
-
-  const mutation = useMutation({
-    mutationFn: (names: string[]) => addRoomMembers({ data: { code, names } }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not add people"
-      )
-    },
-  })
-
-  function submit() {
-    const taken = new Set(existing.map((name) => name.toLowerCase()))
-    const names = mergeNames([], draft).filter(
-      (name) => !taken.has(name.toLowerCase())
-    )
-    setDraft("")
-    inputRef.current?.focus()
-    if (names.length === 0) return
-    mutation.mutate(names)
-  }
+  const status = confirmed
+    ? "Confirmed"
+    : bill.isPrecuenta
+      ? "Precuenta · draft"
+      : "Draft"
 
   return (
-    <form
-      className="mt-2.5 flex flex-col gap-2"
-      onSubmit={(event) => {
-        event.preventDefault()
-        submit()
-      }}
-    >
-      <Label htmlFor="dinner-add-person" className="sr-only">
-        Add people
-      </Label>
-      <div className="flex gap-2">
-        <Input
-          ref={inputRef}
-          id="dinner-add-person"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Add a name, then Enter"
-          autoComplete="off"
-          enterKeyHint="done"
-          className="flex-1"
-        />
-        <Button
-          type="submit"
-          variant="outline"
-          className="shrink-0 border-transparent bg-card px-4 text-primary disabled:text-muted-foreground"
-          disabled={!draft.trim() || mutation.isPending}
-        >
-          Add
-        </Button>
+    <section className="mt-4" aria-labelledby="bill-heading">
+      <div className="surface p-4">
+        <p className="eyebrow">
+          <span id="bill-heading">The bill</span> ·{" "}
+          {formatMoney(split.totalCents, bill.currency)} · {status}
+        </p>
+        <p className="mt-1 font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums">
+          {headline}
+        </p>
+        <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
+        {!confirmed ? (
+          <Link
+            to="/r/$code/check/$checkId"
+            params={{ code: room.code, checkId: bill.id }}
+            className="split-cta mt-3.5 w-full"
+          >
+            Assign the items
+            <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
+          </Link>
+        ) : transfers.length > 0 ? (
+          <Link
+            to="/r/$code/settle"
+            params={{ code: room.code }}
+            className="split-cta mt-3.5 w-full"
+          >
+            {oweCents > 0 ? "Pay and mark it done" : "See who owes what"}
+            <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
+          </Link>
+        ) : null}
       </div>
-    </form>
-  )
-}
-
-function CheckRow({ check, room }: { check: CheckDto; room: RoomDto }) {
-  const split = computeDinnerSplit({
-    items: check.payload.items,
-    adjustments: check.payload.adjustments,
-    tip: check.payload.tip,
-    notedTotalCents: check.payload.notedTotalCents,
-  })
-  const confirmed = check.status === "CONFIRMED"
-
-  return (
-    <li>
       <Link
         to="/r/$code/check/$checkId"
-        params={{ code: room.code, checkId: check.id }}
-        className="group-row-hit w-full text-left"
+        params={{ code: room.code, checkId: bill.id }}
+        className="group-list group-row-hit mt-2.5 w-full text-left"
       >
-        <Avatar className="size-8 shrink-0">
-          <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-            {initials(check.paidByName)}
-          </AvatarFallback>
-        </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold">{check.merchant}</p>
+          <p className="truncate text-[15px] font-semibold">{bill.merchant}</p>
           <p className="truncate text-[13px] text-muted-foreground">
-            {check.paidByName} paid · {formatRelativeTime(check.createdAt)}
+            {bill.paidByName} paid · {bill.payload.items.length}{" "}
+            {bill.payload.items.length === 1 ? "line" : "lines"} ·{" "}
+            {formatRelativeTime(bill.createdAt)}
           </p>
         </div>
-        <div className="shrink-0 text-right">
-          <p className="text-[15px] font-semibold tabular-nums">
-            {formatMoney(split.totalCents, check.currency)}
-          </p>
-          <p
-            className={cn(
-              "text-[13px] font-medium",
-              confirmed ? "text-muted-foreground" : "text-primary"
-            )}
-          >
-            {confirmed
-              ? "Confirmed"
-              : check.isPrecuenta
-                ? "Precuenta · draft"
-                : "Draft"}
-          </p>
-        </div>
+        <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+          {formatMoney(split.totalCents, bill.currency)}
+        </span>
+        <HugeiconsIcon
+          icon={ArrowRight01Icon}
+          size={16}
+          strokeWidth={2}
+          className="shrink-0 text-muted-foreground"
+        />
       </Link>
-    </li>
+    </section>
   )
 }

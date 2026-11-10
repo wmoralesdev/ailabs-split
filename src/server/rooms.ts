@@ -568,7 +568,7 @@ export const addExpense = createServerFn({ method: "POST" })
     })
     if (!room) throw new Error("Trip not found")
     if (room.kind === "DINNER") {
-      throw new Error("Dinner charges are added from a check")
+      throw new Error("Dinner charges are added from the bill")
     }
 
     const memberIds = new Set(room.members.map((member) => member.id))
@@ -638,7 +638,7 @@ export const updateExpense = createServerFn({ method: "POST" })
     })
     if (!room) throw new Error("Trip not found")
     if (room.kind === "DINNER") {
-      throw new Error("Dinner charges are edited from the check")
+      throw new Error("Dinner charges are edited from the bill")
     }
 
     const existing = await prisma.expense.findFirst({
@@ -709,7 +709,7 @@ export const deleteExpense = createServerFn({ method: "POST" })
     })
     if (!room) throw new Error("Trip not found")
     if (room.kind === "DINNER") {
-      throw new Error("Dinner charges are deleted from the check")
+      throw new Error("Dinner charges are deleted from the bill")
     }
 
     const existing = await prisma.expense.findFirst({

@@ -3,13 +3,14 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   Home01Icon,
+  Invoice03Icon,
   MoneyExchange01Icon,
 } from "@hugeicons/core-free-icons"
 import type { IconSvgElement } from "@hugeicons/react"
 
 import { cn } from "@/lib/utils"
 
-/** Fixed bottom navigation for a trip: Home · Add · Settle. */
+/** Fixed bottom navigation: Home · Add (a trip) or the bill (a dinner) · Settle. */
 export function RoomTabBar({
   code,
   kind = "TRIP",
@@ -47,10 +48,10 @@ export function RoomTabBar({
             <Link
               to="/r/$code/check"
               params={{ code }}
-              aria-label="Add check"
+              aria-label="Open the bill"
               className="-mt-4 inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
             >
-              <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
+              <HugeiconsIcon icon={Invoice03Icon} size={22} strokeWidth={2} />
             </Link>
           ) : (
             <Link

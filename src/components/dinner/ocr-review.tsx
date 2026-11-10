@@ -1,13 +1,14 @@
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowDown01Icon, Delete02Icon } from "@hugeicons/core-free-icons"
+import { Delete02Icon } from "@hugeicons/core-free-icons"
 
+import { LineKindPicker } from "@/components/dinner/line-kind-picker"
+import type { LineKind } from "@/components/dinner/line-kind-picker"
 import { Button } from "@/components/ui/button"
 import type { CheckPayload, LineItem } from "@/lib/dinner-split"
 import { emptyTip, itemToAdjustment, ticketTip } from "@/lib/dinner-split"
 import { formatMoney } from "@/lib/settle"
-import { cn } from "@/lib/utils"
 
-type Reclass = "item" | "modifier" | "fee" | "tax" | "tip" | "ignore"
+type Reclass = LineKind
 
 export function OcrReview({
   payload,
@@ -76,7 +77,11 @@ export function OcrReview({
         confidence: adjustment.confidence,
         split: { mode: "UNASSIGNED" },
       }
-      onChange({ ...payload, items: [...payload.items, item], adjustments: rest })
+      onChange({
+        ...payload,
+        items: [...payload.items, item],
+        adjustments: rest,
+      })
       return
     }
     if (kind === "tip") {
@@ -99,9 +104,8 @@ export function OcrReview({
     <div className="flex flex-col gap-5">
       <section aria-label="Lines on the ticket">
         <p className="group-label">
-          {payload.items.length}{" "}
-          {payload.items.length === 1 ? "line" : "lines"} · change any that
-          aren’t food or drink
+          {payload.items.length} {payload.items.length === 1 ? "line" : "lines"}{" "}
+          · change any that aren’t food or drink
         </p>
         <ul className="group-list">
           {payload.items.map((item, index) => (
@@ -195,16 +199,14 @@ export function OcrReview({
   )
 }
 
-const RECLASS_LABEL: Record<Reclass, string> = {
-  item: "Item",
-  modifier: "Part of the line above",
-  fee: "Fee",
-  tax: "Tax",
-  tip: "Tip",
-  ignore: "Not on the bill",
-}
-
-const ITEM_OPTIONS: Reclass[] = ["item", "modifier", "fee", "tax", "tip", "ignore"]
+const ITEM_OPTIONS: Reclass[] = [
+  "item",
+  "modifier",
+  "fee",
+  "tax",
+  "tip",
+  "ignore",
+]
 
 function ReviewRow({
   name,
@@ -223,7 +225,6 @@ function ReviewRow({
   options: Reclass[]
   onPick: (kind: Reclass) => void
 }) {
-  const label = RECLASS_LABEL[current]
   return (
     <li className="flex items-start justify-between gap-3 px-4 pt-2.5 pb-1">
       <div className="min-w-0 flex-1">
@@ -231,24 +232,14 @@ function ReviewRow({
         {detail ? (
           <p className="text-[13px] text-muted-foreground">{detail}</p>
         ) : null}
-        <label className="relative -ml-1 inline-flex min-h-9 items-center gap-0.5 rounded-md px-1 text-[13px] text-muted-foreground has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring">
-          <span className={cn(lowConfidence && "text-destructive")}>
-            {lowConfidence ? `${label} · check this one` : label}
-          </span>
-          <HugeiconsIcon icon={ArrowDown01Icon} size={14} strokeWidth={2} />
-          <select
-            aria-label={`What is ${name}?`}
-            value={current}
-            onChange={(event) => onPick(event.target.value as Reclass)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          >
-            {options.map((option) => (
-              <option key={option} value={option}>
-                {RECLASS_LABEL[option]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <LineKindPicker
+          lineName={name}
+          amount={amount}
+          current={current}
+          options={options}
+          lowConfidence={lowConfidence}
+          onPick={onPick}
+        />
       </div>
       <p className="pt-px text-[15px] font-semibold tabular-nums">{amount}</p>
     </li>
