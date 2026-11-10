@@ -189,3 +189,56 @@ Fecha: 01/11/2026 12:21 PM
 465186
 Order No 73
 `
+
+/** San Salvador Pastaria, Mesa M11. Last extras sit on top of the footer. */
+export const PASTARIA_MESA_M11_MD = `
+MESAS
+Pastaria
+9a. C. pte y 87 Av. Nte, Col Escalón, Ctro. Com.
+Torre Futura, #4 y 5, San Salvador
+Emp.ANGEL CORTEZ
+Mesa M11
+Clientes 6
+Cant. Descripcion Precio Total
+7 PASTARIA MEALXL 15.90 55.65
+3 INSALATA CAESAR AYCE 0.00 0.00
+4 PAST ALFREDO AYCE 0.00 0.00
+3 BRUSC BASIL PEPPERONI A 0.00 0.00
+YCE
+2 CREMA DI POMODORO 0.00 0.00
+1 PAST PUTTANESCA AYCE 0.00 0.00
+1 PIZZA FORMAGGIO AYCE 0.00 0.00
+1 PANINI CAPRESE AYCE 0.00 0.00
+1 PIZZA PEPPERONI AYCE 0.00 0.00
+2 CREMA DI PORRO I PATATE 0.00 0.00
+AYCE
+1 PIZZA JAMON AYCE 0.00 0.00
+1 PIZZA CHICK BITS AYCE 0.00 0.00
+6 LIMONADA LUNCH 0.00 0.00
+1 TE CUPON 0.00 0.00
+2 PAN ALMUERZO CENA 1.00 1.00
+1 PAST 4 FORMAGGI AYCE 0.00 0.00
+Subtotal: $56.65
+Propina (10%): $5.67
+Total: $62.32
+ESTADO: ACTIVO
+¡Gracias por su visita!
+ORDEN #: 037946
+Fecha: 10-11-2026 12:53 p. m.
+`
+
+/** Same Pastaria body, but the wrap carries the prices on the continuation line. */
+export const PASTARIA_WRAPPED_BEFORE_PRICES_MD = `
+Pastaria
+Cant. Descripcion Precio Total
+7 PASTARIA MEALXL 15.90 55.65
+3 BRUSC BASIL PEPPERONI A
+YCE 0.00 0.00
+2 CREMA DI PORRO I PATATE
+AYCE 0.00 0.00
+2 PAN ALMUERZO CENA 1.00 1.00
+1 PAST 4 FORMAGGI AYCE 0.00 0.00
+Subtotal: $56.65
+Propina (10%): $5.67
+Total: $62.32
+`

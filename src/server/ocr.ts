@@ -21,7 +21,10 @@ import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { extractCheckDraft } from "@/lib/receipt-ocr"
 import type { OcrDraft } from "@/lib/receipt-ocr"
-import { CELESTE_IMPERIO_MD } from "@/lib/receipt-ocr-fixtures"
+import {
+  CELESTE_IMPERIO_MD,
+  PASTARIA_MESA_M11_MD,
+} from "@/lib/receipt-ocr-fixtures"
 import { normalizeRoomCode } from "@/lib/room-code"
 
 const ALLOWED_MIME = new Set([
@@ -34,8 +37,9 @@ const ALLOWED_MIME = new Set([
 
 /** ~1MB binary ≈ 1.37MB base64 — keep OCR payloads small and cheap. */
 const MAX_BASE64_CHARS = 1_400_000
-const OCR_TIMEOUT_MS = 30_000
+const OCR_TIMEOUT_MS = 45_000
 const OCR_VISION_MODEL = "gpt-5-mini"
+const OCR_MAX_OUTPUT_TOKENS = 16_384
 
 async function claimRoomOwnerIfOpen(code: string, userId: string) {
   await prisma.room.updateMany({
@@ -74,8 +78,16 @@ async function withTimeout<T>(
 }
 
 /** Local and e2e stand-in for the vision call; reachable when OCR_FIXTURE=1. */
+function fixtureMarkdown(): string {
+  const requested = getRequestHeader("x-ocr-fixture")?.trim().toLowerCase()
+  if (requested === "pastaria" || process.env.OCR_FIXTURE === "pastaria") {
+    return PASTARIA_MESA_M11_MD
+  }
+  return CELESTE_IMPERIO_MD
+}
+
 function fixtureDraft(mode: OcrScanMode): OcrDraft {
-  const check = extractCheckDraft(CELESTE_IMPERIO_MD)
+  const check = extractCheckDraft(fixtureMarkdown())
   switch (mode) {
     case "trip":
       return {
@@ -195,7 +207,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
         client.responses.parse({
           model: OCR_VISION_MODEL,
           reasoning: { effort: "low" },
-          max_output_tokens: 4096,
+          max_output_tokens: OCR_MAX_OUTPUT_TOKENS,
           instructions: RECEIPT_VISION_INSTRUCTIONS,
           input: [
             {
@@ -205,7 +217,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
                   type: "input_text",
                   text:
                     data.mode === "dinner"
-                      ? "Extract this restaurant ticket."
+                      ? "Extract this restaurant ticket. Include every item through the last row above Subtotal, including $0.00 AYCE and small extras such as pan."
                       : "Extract merchant, date, and payable total from this receipt.",
                 },
                 {

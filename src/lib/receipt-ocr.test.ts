@@ -4,6 +4,8 @@ import { computeDinnerSplit } from "./dinner-split"
 import {
   BIBLIOTECA_CAFE_MD,
   CELESTE_IMPERIO_MD,
+  PASTARIA_MESA_M11_MD,
+  PASTARIA_WRAPPED_BEFORE_PRICES_MD,
   PUPUSERIA_PANCHIMALCO_MD,
   PUPUSERIA_PANCHIMALCO_PRETICKET_MD,
   UNIT_DIVIDES_TOTAL_MD,
@@ -12,6 +14,7 @@ import {
   checkPayloadFromOcr,
   extractCheckDraft,
   extractDraft,
+  mergeOcrCheckItems,
 } from "./receipt-ocr"
 
 describe("extractDraft", () => {
@@ -229,5 +232,83 @@ TOTAL $10.00
     expect(draft.items.reduce((sum, item) => sum + item.amountCents, 0)).toBe(
       4440
     )
+  })
+
+  it("keeps Pastaria pan above the footer, $0 AYCE, and wrapped names", () => {
+    const draft = extractCheckDraft(PASTARIA_MESA_M11_MD)
+    expect(draft.merchant).toMatch(/pastaria/i)
+    expect(draft.guestCountPrinted).toBe(6)
+    expect(draft.items.length).not.toBe(6)
+    expect(draft.subtotalCents).toBe(5665)
+    expect(draft.tip?.amountCents).toBe(567)
+    expect(draft.tip?.percentHint).toBe(10)
+    expect(draft.totalCents).toBe(6232)
+    expect(draft.fees).toEqual([])
+
+    const pan = draft.items.find((item) => /pan almuerzo cena/i.test(item.name))
+    expect(pan).toMatchObject({
+      quantity: 2,
+      amountCents: 100,
+    })
+    const meal = draft.items.find((item) => /pastaria mealxl/i.test(item.name))
+    expect(meal).toMatchObject({ quantity: 7, amountCents: 5565 })
+    const salad = draft.items.find((item) => /insalata caesar/i.test(item.name))
+    expect(salad).toMatchObject({ quantity: 3, amountCents: 0 })
+    const bruschetta = draft.items.find((item) =>
+      /brusc basil pepperoni/i.test(item.name)
+    )
+    expect(bruschetta?.name).toMatch(/ayce/i)
+    expect(bruschetta?.quantity).toBe(3)
+    const porro = draft.items.find((item) =>
+      /crema di porro i patate/i.test(item.name)
+    )
+    expect(porro?.name).toMatch(/ayce/i)
+    const formaggi = draft.items.find((item) =>
+      /past 4 formaggi/i.test(item.name)
+    )
+    expect(formaggi).toMatchObject({ quantity: 1, amountCents: 0 })
+    expect(draft.items.at(-1)?.name).toMatch(/formaggi/i)
+    expect(draft.items.some((item) => /^yce$/i.test(item.name))).toBe(false)
+    expect(draft.items.reduce((sum, item) => sum + item.amountCents, 0)).toBe(
+      5665
+    )
+
+    const payload = checkPayloadFromOcr(draft)
+    expect(payload.tip.source).toBe("TICKET")
+    expect(payload.tip.amountCents).toBe(567)
+    expect(computeDinnerSplit(payload).tipCents).toBe(567)
+    expect(computeDinnerSplit(payload).totalCents).toBe(6232)
+  })
+
+  it("joins wrapped names when prices sit on the continuation line", () => {
+    const draft = extractCheckDraft(PASTARIA_WRAPPED_BEFORE_PRICES_MD)
+    const bruschetta = draft.items.find((item) =>
+      /brusc basil pepperoni/i.test(item.name)
+    )
+    expect(bruschetta?.name).toMatch(/ayce/i)
+    expect(bruschetta?.amountCents).toBe(0)
+    expect(
+      draft.items.find((item) => /pan almuerzo cena/i.test(item.name))
+        ?.amountCents
+    ).toBe(100)
+    expect(draft.totalCents).toBe(6232)
+  })
+})
+
+describe("mergeOcrCheckItems", () => {
+  it("appends last extras the vision list dropped", () => {
+    const parsed = extractCheckDraft(PASTARIA_MESA_M11_MD)
+    const truncated = parsed.items.filter(
+      (item) => !/pan almuerzo|formaggi/i.test(item.name)
+    )
+    expect(truncated.some((item) => /pan almuerzo/i.test(item.name))).toBe(
+      false
+    )
+    const merged = mergeOcrCheckItems(truncated, parsed.items)
+    expect(merged.find((item) => /pan almuerzo cena/i.test(item.name))).toEqual(
+      expect.objectContaining({ quantity: 2, amountCents: 100 })
+    )
+    expect(merged.find((item) => /formaggi/i.test(item.name))).toBeTruthy()
+    expect(merged).toHaveLength(parsed.items.length)
   })
 })

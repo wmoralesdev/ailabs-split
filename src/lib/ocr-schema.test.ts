@@ -9,9 +9,11 @@ import {
 } from "./ocr-schema"
 import type { ReceiptExtract } from "./ocr-schema"
 import { PUPUSERIA_PANCHIMALCO_LIVE_EXTRACT } from "./panchimalco-live-ocr"
+import { PASTARIA_MESA_M11_LIVE_EXTRACT } from "./pastaria-live-ocr"
 import {
   BIBLIOTECA_CAFE_MD,
   CELESTE_IMPERIO_MD,
+  PASTARIA_MESA_M11_MD,
   PUPUSERIA_PANCHIMALCO_MD,
   PUPUSERIA_PANCHIMALCO_PRETICKET_MD,
   UNIT_DIVIDES_TOTAL_MD,
@@ -114,6 +116,7 @@ describe("draftFromExtract", () => {
   it("treats missing tip as absent, not 10%", () => {
     const extract = extractFromParsed(extractCheckDraft(BIBLIOTECA_CAFE_MD))
     extract.tip = null
+    extract.rawText = extract.rawText.replace(/PROPINA[^\n]*\n/i, "")
     const check = checkFromExtract(extract, extract.rawText)
     expect(check.tip).toBeUndefined()
     expect(checkPayloadFromOcr(check).tip.source).toBe("NONE")
@@ -237,6 +240,14 @@ describe("RECEIPT_VISION_INSTRUCTIONS", () => {
     expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/Frijol\/Queso pq/)
     expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/PRE-TICKET/)
   })
+
+  it("tells the model to keep last extras, $0 AYCE, and wrapped names", () => {
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/last one immediately above/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/AYCE/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/PAN ALMUERZO CENA/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/wrapped onto the next line/)
+    expect(RECEIPT_VISION_INSTRUCTIONS).toMatch(/Propina \(10%\)/)
+  })
 })
 
 describe("parseReceiptExtract", () => {
@@ -249,5 +260,75 @@ describe("parseReceiptExtract", () => {
 
   it("rejects objects that are missing items", () => {
     expect(parseReceiptExtract({ title: "Cafe" })).toBeNull()
+  })
+})
+
+describe("checkFromExtract Pastaria recovery", () => {
+  it("keeps $0 AYCE rows from vision", () => {
+    const parsed = extractCheckDraft(PASTARIA_MESA_M11_MD)
+    const extract = extractFromParsed(parsed)
+    const check = checkFromExtract(extract, extract.rawText)
+    expect(
+      check.items.filter((item) => item.amountCents === 0).length
+    ).toBeGreaterThan(8)
+    expect(
+      check.items.find((item) => /insalata caesar/i.test(item.name))
+        ?.amountCents
+    ).toBe(0)
+  })
+
+  it("recovers pan and footer totals when vision stops before Subtotal", () => {
+    const parsed = extractCheckDraft(PASTARIA_MESA_M11_MD)
+    const extract = extractFromParsed(parsed)
+    extract.items = extract.items.filter(
+      (item) => !/pan almuerzo|formaggi|te cupon/i.test(item.name)
+    )
+    extract.tip = null
+    extract.subtotalCents = null
+    extract.totalCents = null
+    extract.merchant = null
+    extract.title = null
+
+    const check = checkFromExtract(extract, extract.rawText)
+    const pan = check.items.find((item) => /pan almuerzo cena/i.test(item.name))
+    expect(pan).toMatchObject({ quantity: 2, amountCents: 100 })
+    expect(check.items.find((item) => /formaggi/i.test(item.name))).toBeTruthy()
+    expect(check.tip?.amountCents).toBe(567)
+    expect(check.tip?.percentHint).toBe(10)
+    expect(check.subtotalCents).toBe(5665)
+    expect(check.totalCents).toBe(6232)
+    expect(check.merchant).toMatch(/pastaria/i)
+    expect(check.guestCountPrinted).toBe(6)
+    expect(check.items.length).not.toBe(6)
+
+    const payload = checkPayloadFromOcr(check)
+    expect(payload.tip.amountCents).toBe(567)
+    expect(computeDinnerSplit(payload).totalCents).toBe(6232)
+  })
+
+  it("keeps live gpt-5-mini Pastaria pan, $0 AYCE, and printed propina", () => {
+    const check = checkFromExtract(
+      PASTARIA_MESA_M11_LIVE_EXTRACT,
+      PASTARIA_MESA_M11_LIVE_EXTRACT.rawText
+    )
+    expect(check.items).toHaveLength(16)
+    expect(
+      check.items.find((item) => item.name === "PAN ALMUERZO CENA")
+    ).toMatchObject({ quantity: 2, amountCents: 100 })
+    expect(
+      check.items.find((item) => item.name === "INSALATA CAESAR AYCE")
+        ?.amountCents
+    ).toBe(0)
+    expect(
+      check.items.find((item) => item.name === "BRUSC BASIL PEPPERONI AYCE")
+    ).toBeTruthy()
+    expect(check.items.at(-1)?.name).toBe("PAST 4 FORMAGGI AYCE")
+    expect(check.tip?.amountCents).toBe(567)
+    expect(check.tip?.percentHint).toBe(10)
+    expect(check.subtotalCents).toBe(5665)
+    expect(check.totalCents).toBe(6232)
+    expect(check.guestCountPrinted).toBe(6)
+    expect(check.items.length).not.toBe(check.guestCountPrinted)
+    expect(check.fees).toEqual([])
   })
 })
