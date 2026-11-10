@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { normalizeOcrItemQty } from "@/lib/ocr-qty"
+import { extractCheckDraft, mergeOcrCheckItems } from "@/lib/receipt-ocr"
 import type { OcrCheckDraft, OcrDraft, OcrNamedAmount } from "@/lib/receipt-ocr"
 
 /** Vision items are model-read, not a deterministic OCR parse. */
@@ -16,7 +17,7 @@ const itemSchema = z.object({
   name: z
     .string()
     .describe(
-      "Product name only — no quantity, no '8 ×', no CNT/QTY/AMT prefix, no size/modifier suffixes. Example: Frijol/Queso pq"
+      "Product name only — no quantity, no '8 ×', no CNT/QTY/AMT prefix, no size/modifier suffixes. Join a name wrapped onto the next line (BRUSC BASIL PEPPERONI A + YCE → BRUSC BASIL PEPPERONI AYCE). Example: Frijol/Queso pq"
     ),
   quantity: z
     .number()
@@ -29,7 +30,11 @@ const itemSchema = z.object({
     .describe(
       "P.UNI / P.UNIT / unit price in cents if printed; otherwise null. Example: 1.40 → 140"
     ),
-  amountCents: z.number().describe("Line total in cents"),
+  amountCents: z
+    .number()
+    .describe(
+      "Line total in cents. 0 is valid for AYCE or complimentary rows — still include the row"
+    ),
   modifiers: z
     .array(z.string())
     .describe("Nested lines like ** 16 ONZ, RES, VAS — not separate items"),
@@ -63,7 +68,11 @@ export const receiptExtractSchema = z.object({
     .number()
     .nullable()
     .describe("Invitados / clientes atendidos if printed"),
-  items: z.array(itemSchema),
+  items: z
+    .array(itemSchema)
+    .describe(
+      "Every product row from the first item through the last row immediately above Subtotal, Propina, Total, ESTADO, or the footer. Include $0.00 AYCE lines, wrapped names, and small extras (pan, pan almuerzo, garlic bread, cubiertos). Do not stop early."
+    ),
   subtotalCents: z.number().nullable(),
   totalCents: z
     .number()
@@ -86,11 +95,15 @@ export const RECEIPT_VISION_INSTRUCTIONS = `Extract a restaurant or receipt phot
 
 Amounts are integer cents (4.10 → 410). Nested modifiers like ** 16 ONZ or RES/VAS belong on the previous item, not as their own items.
 
+Read every product row through the last one immediately above Subtotal / Propina / Total / ESTADO / footer. Do not stop after a block of $0.00 AYCE lines, and do not treat the last extras as footer. Prefer a complete items array over a long rawText.
+
+Include all of: $0.00 AYCE / complimentary rows; names wrapped onto the next line (join "BRUSC BASIL PEPPERONI A" + "YCE"); small extras just above the footer such as pan, pan almuerzo cena, garlic bread, or cubiertos. Example: \`2 PAN ALMUERZO CENA  1.00  1.00\` is an item (quantity 2, amountCents 100), not a fee and not skippable.
+
 Quantity lives in \`quantity\`, never in \`name\`. If unit price (P.UNI / P.UNIT / similar) differs from the line TOTAL and the total divides evenly by the unit, that quotient is quantity — even when no count is printed. A leading column labeled CNT, QTY, QUANTITY, AMT, AMOUNT, CANT, CANTIDAD, or similar is also quantity. Example: \`8 Frijol/Queso pq  1.40  $11.20\` or \`Frijol/Queso pq  1.40  $11.20\` → name "Frijol/Queso pq", quantity 8, unitPriceCents 140, amountCents 1120. Do not write "8 × Frijol/Queso pq". If quantity is 1, the name is only the product (\`Chicharron/Frijol pq\`), never prefixed with "1 ×".
 
-Do not invent tip, tax, IVA, or fees — only footer lines that are printed. PROPINA 0% or $0.00 means tip amountCents 0 and percentHint 0, never 10%. If no tip line exists, tip is null.
+Do not invent tip, tax, IVA, or fees — only footer lines that are printed. PROPINA 0% or $0.00 means tip amountCents 0 and percentHint 0, never 10%. If a Propina / tip amount is printed (e.g. Propina (10%) $5.67), include it. If no tip line exists, tip is null.
 
-Gravado that matches the subtotal is not extra tax. Ignore Invitados, CLIENTES ATENDIDOS, MESA, MESERO, Order No, NIT, Caja.
+Gravado that matches the subtotal is not extra tax. Ignore Invitados, CLIENTES ATENDIDOS, Clientes, MESA, MESERO, Order No, NIT, Caja — printed guest count is not the dining group and not an item.
 
 isPrecuenta is true for PRECUENTA, PRE-TICKET, or NO VALIDO COMO TICKET. rawText is a transcription of what you can read, not a paraphrase. If the photo is unreadable, return empty items and whatever rawText you can see.`
 
@@ -118,7 +131,7 @@ export function checkFromExtract(
   extract: ReceiptExtract,
   rawText: string
 ): OcrCheckDraft {
-  const items: OcrCheckDraft["items"] = []
+  const visionItems: OcrCheckDraft["items"] = []
   for (const row of extract.items) {
     const name = row.name.trim()
     const amountCents = Math.round(row.amountCents)
@@ -131,7 +144,7 @@ export function checkFromExtract(
       amountCents,
     })
     if (!normalized.name) continue
-    items.push({
+    visionItems.push({
       name: normalized.name,
       quantity: normalized.quantity,
       unitPriceCents: normalized.unitPriceCents,
@@ -143,10 +156,15 @@ export function checkFromExtract(
     })
   }
 
+  const parsed = extractCheckDraft(rawText)
+  const items = mergeOcrCheckItems(visionItems, parsed.items)
+
   const tipAmount =
     extract.tip && Number.isFinite(extract.tip.amountCents)
       ? Math.round(extract.tip.amountCents)
-      : undefined
+      : parsed.tip && Number.isFinite(parsed.tip.amountCents)
+        ? parsed.tip.amountCents
+        : undefined
 
   const tax = namedAmounts(extract.tax)
   const fees = namedAmounts(extract.fees)
@@ -156,17 +174,22 @@ export function checkFromExtract(
   }))
 
   return {
-    merchant: nonempty(extract.merchant) ?? nonempty(extract.title),
-    date: nonempty(extract.date),
-    isPrecuenta: extract.isPrecuenta === true,
-    guestCountPrinted: extract.guestCountPrinted,
+    merchant:
+      nonempty(extract.merchant) ??
+      nonempty(extract.title) ??
+      nonempty(parsed.merchant),
+    date: nonempty(extract.date) ?? nonempty(parsed.date),
+    isPrecuenta: extract.isPrecuenta === true || parsed.isPrecuenta === true,
+    guestCountPrinted: extract.guestCountPrinted ?? parsed.guestCountPrinted,
     items,
     subtotalCents:
       extract.subtotalCents == null
-        ? undefined
+        ? parsed.subtotalCents
         : Math.round(extract.subtotalCents),
     totalCents:
-      extract.totalCents == null ? undefined : Math.round(extract.totalCents),
+      extract.totalCents == null
+        ? parsed.totalCents
+        : Math.round(extract.totalCents),
     tip:
       tipAmount == null
         ? undefined
@@ -174,7 +197,7 @@ export function checkFromExtract(
             amountCents: Math.max(0, tipAmount),
             percentHint:
               extract.tip?.percentHint == null
-                ? undefined
+                ? parsed.tip?.percentHint
                 : extract.tip.percentHint,
             confidence: VISION_CONFIDENCE,
           },

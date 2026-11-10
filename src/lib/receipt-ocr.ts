@@ -1,8 +1,4 @@
-import {
-  emptyCheckPayload,
-  emptyTip,
-  ticketTip,
-} from "@/lib/dinner-split"
+import { emptyCheckPayload, emptyTip, ticketTip } from "@/lib/dinner-split"
 import type { CheckPayload, LineItem } from "@/lib/dinner-split"
 import { normalizeOcrItemQty } from "@/lib/ocr-qty"
 import { parseAmountToCents } from "@/lib/settle"
@@ -153,10 +149,9 @@ const SKIP_LINE =
   /^(invitados|clientes atendidos|mesa:?|mesas$|mesero|caja(?:\s+no)?\.?|pague en caja|gracias|order no|cambio|vuelto|tel:?$|fecha(?:\s+de)?|atendido por|ticket$|no valido|precuenta|pre-ticket|preticket|doscientos|f\s*:|cant\s+descript|cnt\s+producto|cant\s+descripcion|hora\b|#\s*no valido)/i
 
 const FOOTER_LINE =
-  /^(sub\s*total|subtotal|sub\s*vta|subnosujetas|sub\s*no\s*sujetas|propina|tip\b|iva\b|tax\b|impuesto|descuento|discount|total(?:\s|$)|total ventas)/i
+  /^(sub\s*total|subtotal|sub\s*vta|subnosujetas|sub\s*no\s*sujetas|propina|tip\b|iva\b|tax\b|impuesto|descuento|discount|total\b)/i
 
-const FISCAL_NAME =
-  /gravad|nosujet|no sujet|sub vta|ventas gravadas|exento/i
+const FISCAL_NAME = /gravad|nosujet|no sujet|sub vta|ventas gravadas|exento/i
 
 const MONEY_AT_END =
   /(?:\$\s*)?(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d+[.,]\d{2})[A-Za-z]?\s*$/
@@ -268,10 +263,15 @@ function footerKind(line: string): string | null {
   if (/servicio|service|late\s*night|delivery|cargo|recargo|fee/i.test(line)) {
     return "fee"
   }
-  if (/total\s+a\s+pagar|total\s+pagar|grand\s+total|amount\s+due/i.test(line)) {
+  if (
+    /total\s+a\s+pagar|total\s+pagar|grand\s+total|amount\s+due/i.test(line)
+  ) {
     return "total"
   }
-  if (/^total\b|total ventas/i.test(line) && !/sub\s*total|subtotal/i.test(line)) {
+  if (
+    /^total\b|total ventas/i.test(line) &&
+    !/sub\s*total|subtotal/i.test(line)
+  ) {
     return "total"
   }
   if (/sub\s*total|subtotal/i.test(line) && !FISCAL_NAME.test(line)) {
@@ -290,11 +290,171 @@ function lastMoneyOnLine(line: string): number | null {
 
 function guestCountFrom(text: string): number | null {
   const match = text.match(
-    /(?:invitados|clientes atendidos)\s*:?\s*(\d+)/i
+    /(?:invitados|clientes(?:\s+atendidos)?)\s*:?\s*(\d+)/i
   )
   if (!match) return null
   const value = Number.parseInt(match[1], 10)
   return Number.isFinite(value) ? value : null
+}
+
+const NAME_WRAP_MAX = 40
+
+function foldItemName(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+function joinWrapName(base: string, wrap: string): string {
+  const left = base.trim()
+  const right = wrap.trim()
+  if (/a$/i.test(left) && /^yce$/i.test(right)) return `${left}${right}`
+  return `${left} ${right}`
+}
+
+function moneySuffix(line: string): string {
+  const { rest } = peelMoneyFromEnd(line)
+  return line.slice(rest.length).trim()
+}
+
+function isNameWrapFragment(line: string): boolean {
+  if (
+    FOOTER_LINE.test(line) ||
+    SKIP_LINE.test(line) ||
+    isQtyColumnHeader(line) ||
+    isModifierLine(line)
+  ) {
+    return false
+  }
+  if (peelMoneyFromEnd(line).amounts.length > 0) return false
+  if (/^\d+\s+\S/.test(line)) return false
+  if (line.length === 0 || line.length > NAME_WRAP_MAX) return false
+  return /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(line)
+}
+
+function looksLikeItemLine(line: string): boolean {
+  if (
+    FOOTER_LINE.test(line) ||
+    SKIP_LINE.test(line) ||
+    isQtyColumnHeader(line)
+  ) {
+    return false
+  }
+  const { rest, amounts } = peelMoneyFromEnd(line)
+  if (amounts.length > 0 && rest.length > 0) return true
+  return /^\d+\s+\S/.test(line)
+}
+
+/** Join a wrapped product name onto the priced row so the last extras stay items. */
+function stitchWrappedItemLines(lines: string[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]
+    const next = lines[i + 1]
+    if (!next || !looksLikeItemLine(line)) {
+      out.push(line)
+      continue
+    }
+
+    const current = peelMoneyFromEnd(line)
+    const following = peelMoneyFromEnd(next)
+
+    if (current.amounts.length > 0 && isNameWrapFragment(next)) {
+      out.push(
+        `${joinWrapName(current.rest, next)} ${moneySuffix(line)}`
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      i += 1
+      continue
+    }
+
+    if (
+      current.amounts.length === 0 &&
+      following.amounts.length > 0 &&
+      !FOOTER_LINE.test(next) &&
+      !SKIP_LINE.test(next) &&
+      !/^\d+\s+\S/.test(following.rest)
+    ) {
+      out.push(
+        `${joinWrapName(line, following.rest)} ${moneySuffix(next)}`
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      i += 1
+      continue
+    }
+
+    out.push(line)
+  }
+  return out
+}
+
+function namesOverlap(left: string, right: string): boolean {
+  const a = foldItemName(left)
+  const b = foldItemName(right)
+  if (!a || !b) return false
+  if (a === b) return true
+  if (a.length < 6 || b.length < 6) return false
+  return a.includes(b) || b.includes(a)
+}
+
+/**
+ * Union vision rows with the line parser so last extras, $0 AYCE, and
+ * wrapped names survive when the model stops early.
+ */
+export function mergeOcrCheckItems(
+  vision: OcrCheckItem[],
+  parsed: OcrCheckItem[]
+): OcrCheckItem[] {
+  if (parsed.length === 0) return vision
+  if (vision.length === 0) return parsed
+
+  const skeleton = parsed.length >= vision.length ? parsed : vision
+  const overlay = parsed.length >= vision.length ? vision : parsed
+  const used = new Set<number>()
+
+  function matchIndex(item: OcrCheckItem): number {
+    let best = -1
+    let bestScore = 0
+    overlay.forEach((other, index) => {
+      if (used.has(index) || other.amountCents !== item.amountCents) return
+      let score = 0
+      if (foldItemName(item.name) === foldItemName(other.name)) score = 3
+      else if (namesOverlap(item.name, other.name)) score = 2
+      if (score > bestScore) {
+        bestScore = score
+        best = index
+      }
+    })
+    return best
+  }
+
+  const merged = skeleton.map((item) => {
+    const index = matchIndex(item)
+    if (index < 0) return item
+    used.add(index)
+    const other = overlay[index]
+    return {
+      name: item.name.length >= other.name.length ? item.name : other.name,
+      quantity: Math.max(item.quantity ?? 1, other.quantity ?? 1),
+      unitPriceCents: item.unitPriceCents ?? other.unitPriceCents,
+      amountCents: item.amountCents,
+      modifiers:
+        item.modifiers.length >= other.modifiers.length
+          ? item.modifiers
+          : other.modifiers,
+      confidence: Math.max(item.confidence, other.confidence),
+    }
+  })
+
+  overlay.forEach((item, index) => {
+    if (!used.has(index)) merged.push(item)
+  })
+  return merged
 }
 
 /**
@@ -302,7 +462,7 @@ function guestCountFrom(text: string): number | null {
  * Nested `** 16 ONZ` and `RES`/`VAS` become modifiers, not items.
  */
 export function extractCheckDraft(markdown: string): OcrCheckDraft {
-  const lines = normalizeOcrLines(markdown)
+  const lines = stitchWrappedItemLines(normalizeOcrLines(markdown))
   const items: OcrCheckItem[] = []
   const tax: OcrNamedAmount[] = []
   const fees: OcrNamedAmount[] = []
