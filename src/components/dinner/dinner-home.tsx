@@ -4,10 +4,12 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowRight01Icon,
   Copy01Icon,
+  Edit02Icon,
   Link01Icon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { RenameDinnerSheet } from "@/components/dinner/dinner-name"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
@@ -41,6 +43,7 @@ export function DinnerHome({
   const me = room.members.find((member) => member.id === memberId)
   const bill = dinnerBill(room.checks)
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
+  const [renameOpen, setRenameOpen] = useState(false)
 
   const nets = useMemo(() => {
     return computeNetsWithSettlements(
@@ -87,10 +90,32 @@ export function DinnerHome({
             <span aria-hidden>·</span>
             <span>{room.currency}</span>
           </div>
-          <h1 className="mt-0.5 font-display text-[28px] leading-tight font-bold tracking-tight">
-            {room.name}
+          <h1 className="mt-0.5">
+            <button
+              type="button"
+              onClick={() => setRenameOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={`Rename ${room.name}`}
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="min-w-0 flex-1 font-display text-[28px] leading-tight font-bold tracking-tight">
+                {room.name}
+              </span>
+              <HugeiconsIcon
+                icon={Edit02Icon}
+                size={18}
+                strokeWidth={2}
+                className="shrink-0 text-muted-foreground"
+              />
+            </button>
           </h1>
         </header>
+        <RenameDinnerSheet
+          open={renameOpen}
+          onOpenChange={setRenameOpen}
+          code={room.code}
+          name={room.name}
+        />
 
         {bill ? (
           <BillCard

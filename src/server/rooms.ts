@@ -661,7 +661,7 @@ export const removeRoomMember = createServerFn({ method: "POST" })
     return loaded
   })
 
-/** Dinner rooms start with a fallback name; the scanned ticket's place replaces it. */
+/** Anyone in the room can rename it. Scan-first dinner create still fills the fallback from the ticket place. */
 export const renameRoom = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(renameRoomSchema, data))
   .handler(async ({ data }): Promise<RoomDto> => {
