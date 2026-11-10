@@ -640,7 +640,7 @@ function AddExpenseForm({
             <TicketPhotoPicker
               pending={ocrPending}
               pendingLabel="Reading receipt…"
-              title="Scan ticket (optional)"
+              title="Receipt (optional)"
               hint="Take a photo or pick one from your gallery."
               onFile={(file) => void onScan(file)}
             />

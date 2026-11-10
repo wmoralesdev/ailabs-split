@@ -13,12 +13,8 @@ test("offers camera and gallery pickers", () => {
   const onFile = vi.fn()
   render(<TicketPhotoPicker pending={false} onFile={onFile} />)
 
-  expect(
-    screen.getByRole("button", { name: "Take photo" })
-  ).toBeTruthy()
-  expect(
-    screen.getByRole("button", { name: "From gallery" })
-  ).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Scan ticket" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "From gallery" })).toBeTruthy()
 
   const camera = screen.getByTestId("ticket-camera-input")
   const gallery = screen.getByTestId("ticket-gallery-input")
@@ -37,4 +33,21 @@ test("gallery input forwards a chosen file", () => {
   })
   expect(onFile).toHaveBeenCalledTimes(1)
   expect(onFile.mock.calls[0]?.[0]).toBe(file)
+})
+
+test("beforePick can keep the picker closed", () => {
+  const beforePick = vi.fn(() => false)
+  render(
+    <TicketPhotoPicker pending={false} onFile={vi.fn()} beforePick={beforePick} />
+  )
+  const gallery = screen.getByTestId("ticket-gallery-input")
+  const click = vi.spyOn(gallery, "click")
+  fireEvent.click(screen.getByRole("button", { name: "From gallery" }))
+  expect(beforePick).toHaveBeenCalledTimes(1)
+  expect(click).not.toHaveBeenCalled()
+})
+
+test("shows the pending label on the scan button", () => {
+  render(<TicketPhotoPicker pending onFile={vi.fn()} />)
+  expect(screen.getByRole("button", { name: "Reading ticket…" })).toBeTruthy()
 })

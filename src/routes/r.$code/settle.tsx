@@ -532,7 +532,7 @@ function TransferCard({
         </div>
         <p className="min-w-0 truncate text-[15px] font-medium">{sentence}</p>
       </div>
-      <p className="mt-2 font-display text-[34px] leading-none font-bold tracking-tight tabular-nums">
+      <p className="mt-2 font-display text-[26px] leading-none font-bold tracking-tight tabular-nums">
         {formatMoney(transfer.amountCents, currency)}
       </p>
       <div className="mt-4 flex gap-2">

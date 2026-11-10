@@ -21,11 +21,7 @@ export async function openLanding(page: Page) {
   await expect(page.getByRole("button", { name: "Create trip" })).toBeVisible()
 }
 
-export async function createDinner(
-  page: Page,
-  name: string,
-  creator: string
-): Promise<string> {
+export async function openDinnerCreate(page: Page) {
   await openLanding(page)
   const dinnerChip = page
     .getByRole("group", { name: "Mode" })
@@ -38,19 +34,26 @@ export async function createDinner(
       timeout: 2_000,
     })
   }).toPass({ timeout: 20_000 })
-  await expect(
-    page.getByRole("button", { name: "Create dinner" })
-  ).toBeVisible()
-  await page.getByLabel("Dinner name").fill(name)
+  await expect(page.getByRole("button", { name: "Scan ticket" })).toBeVisible()
+}
+
+/** The no-ticket path: lands on dinner home with the day's fallback name. */
+export async function createDinner(
+  page: Page,
+  creator: string
+): Promise<{ code: string; name: string }> {
+  await openDinnerCreate(page)
   await page.getByLabel("Your name").fill(creator)
-  await page.getByRole("button", { name: "Create dinner" }).click()
-  await expect(page.getByText("Dinner ready")).toBeVisible()
-  const code = (await page.locator("[data-room-code]").innerText()).trim()
+  await page.getByRole("button", { name: "Create without a ticket" }).click()
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: /(breakfast|lunch|dinner)$/,
+  })
+  await expect(heading).toBeVisible()
+  await expect(page.getByText("Dinner ready")).toHaveCount(0)
+  const code = new URL(page.url()).pathname.split("/")[2] ?? ""
   expect(code.length).toBeGreaterThanOrEqual(6)
-  await page.getByRole("button", { name: "Continue to dinner" }).click()
-  await expect(page.getByRole("heading", { name })).toBeVisible()
-  await expect(page.getByText("Dinner", { exact: true }).first()).toBeVisible()
-  return code
+  return { code, name: (await heading.innerText()).trim() }
 }
 
 export async function addPeople(page: Page, names: string[]) {
@@ -67,7 +70,7 @@ export async function addPeople(page: Page, names: string[]) {
 }
 
 export async function startManualCheck(page: Page) {
-  const manual = page.getByRole("link", { name: "Enter bill manually" })
+  const manual = page.getByRole("link", { name: "Enter items by hand" })
   const newCheck = page.getByRole("link", { name: "New check" })
   await expect(manual.or(newCheck).first()).toBeVisible()
   if (await manual.isVisible()) {

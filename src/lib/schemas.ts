@@ -148,6 +148,11 @@ export const addRoomMembersSchema = z.object({
   names: z.array(memberNameSchema).min(1, "Add at least one name"),
 })
 
+export const renameRoomSchema = z.object({
+  code: roomCodeSchema,
+  name: z.string().trim().min(1, "Give it a name").max(60, "Name is too long"),
+})
+
 export const upsertCheckSchema = z.object({
   code: roomCodeSchema,
   checkId: z.string().min(1).optional(),

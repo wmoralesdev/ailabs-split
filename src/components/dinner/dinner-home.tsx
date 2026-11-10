@@ -1,18 +1,17 @@
 import { useMemo, useRef, useState } from "react"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowRight01Icon,
-  Camera01Icon,
   Copy01Icon,
   Link01Icon,
-  PencilEdit02Icon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { PullToRefresh } from "@/components/pull-to-refresh"
+import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +22,7 @@ import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { mergeNames } from "@/lib/landing-prefs"
 import { memberLink } from "@/lib/member-storage"
+import { setPendingTicket } from "@/lib/pending-ticket"
 import { useOnlineStatus } from "@/lib/online-status"
 import { roomKeys } from "@/lib/room-query"
 import {
@@ -186,7 +186,7 @@ export function DinnerHome({
           </div>
           {room.checks.length === 0 ? (
             <p className="mt-1 text-[15px] text-muted-foreground">
-              Nothing yet. Scan the ticket or type the items in.
+              None yet. Share the code so the table can join.
             </p>
           ) : (
             <ul className="group-list mt-1">
@@ -222,32 +222,32 @@ function PositionCard({
   transfers: ReturnType<typeof simplifyTransfers>
   confirmedTotalCents: number
 }) {
+  const navigate = useNavigate()
   if (room.checks.length === 0) {
     return (
-      <section className="surface mt-4 p-4">
-        <p className="font-display text-lg font-semibold">Add the bill</p>
+      <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
+        <h2 id="ticket-heading" className="font-display text-lg font-semibold">
+          Split the ticket
+        </h2>
         <p className="mt-0.5 text-[15px] text-muted-foreground">
-          Take a photo or pick one from your gallery.
+          Items and the printed total fill in from the photo.
         </p>
-        <div className="mt-3.5 flex flex-col gap-2">
-          <Link
-            to="/r/$code/check"
-            params={{ code: room.code }}
-            search={{ scan: true }}
-            className="split-cta"
-          >
-            <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
-            Scan ticket
-          </Link>
-          <Link
-            to="/r/$code/check"
-            params={{ code: room.code }}
-            className="split-cta-tinted"
-          >
-            <HugeiconsIcon icon={PencilEdit02Icon} size={18} strokeWidth={2} />
-            Enter bill manually
-          </Link>
-        </div>
+        <TicketPhotoPicker
+          pending={false}
+          onFile={(file) => {
+            if (!file) return
+            setPendingTicket(room.code, { file, nameFromTicket: false })
+            void navigate({ to: "/r/$code/check", params: { code: room.code } })
+          }}
+          className="mt-3.5"
+        />
+        <Link
+          to="/r/$code/check"
+          params={{ code: room.code }}
+          className="mt-1 flex min-h-11 items-center justify-center text-[15px] font-medium text-primary transition-colors hover:text-foreground"
+        >
+          Enter items by hand
+        </Link>
       </section>
     )
   }
@@ -259,6 +259,7 @@ function PositionCard({
   const confirmedCount = room.checks.filter(
     (check) => check.status === "CONFIRMED"
   ).length
+  const draft = room.checks.find((check) => check.status !== "CONFIRMED")
 
   let headline: string
   let detail: string
@@ -295,7 +296,16 @@ function PositionCard({
         {headline}
       </p>
       <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
-      {transfers.length > 0 ? (
+      {confirmedCount === 0 && draft ? (
+        <Link
+          to="/r/$code/check/$checkId"
+          params={{ code: room.code, checkId: draft.id }}
+          className="split-cta mt-3.5 w-full"
+        >
+          Assign the items
+          <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
+        </Link>
+      ) : transfers.length > 0 ? (
         <Link
           to="/r/$code/settle"
           params={{ code: room.code }}

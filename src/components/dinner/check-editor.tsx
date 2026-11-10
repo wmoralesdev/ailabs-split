@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   onlineManager,
@@ -21,7 +21,8 @@ import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { itemSplitSummary } from "@/lib/dinner-labels"
+import { Skeleton } from "@/components/ui/skeleton"
+import { itemSplitSummary, tidyPlaceName } from "@/lib/dinner-labels"
 import {
   assignRestToMember,
   computedTotalWithoutPrintedForce,
@@ -44,6 +45,7 @@ import {
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
 import { useOnlineStatus } from "@/lib/online-status"
+import { hasPendingTicket, takePendingTicket } from "@/lib/pending-ticket"
 import { checkPayloadFromOcr } from "@/lib/receipt-ocr"
 import { roomKeys } from "@/lib/room-query"
 import { formatMoney } from "@/lib/settle"
@@ -55,6 +57,7 @@ import {
   revertCheck,
   upsertCheck,
 } from "@/server/checks"
+import { renameRoom } from "@/server/rooms"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
 type Phase = "review" | "assign"
@@ -67,7 +70,6 @@ export function CheckEditor({
   room: RoomDto
   selfMemberId: string
   check: CheckDto | null
-  startWithScan?: boolean
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -88,7 +90,9 @@ export function CheckEditor({
   )
   const [phase, setPhase] = useState<Phase>("assign")
   const itemNameRef = useRef<HTMLInputElement>(null)
-  const [ocrPending, setOcrPending] = useState(false)
+  const [ocrPending, setOcrPending] = useState(
+    () => !check && hasPendingTicket(room.code)
+  )
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [newName, setNewName] = useState("")
   const [newQty, setNewQty] = useState(1)
@@ -201,9 +205,10 @@ export function CheckEditor({
     },
   })
 
-  async function onScan(file: File | null) {
+  async function onScan(file: File | null, nameFromTicket = false) {
     if (!file) return
     if (!onlineManager.isOnline()) {
+      setOcrPending(false)
       toast.error("Scanning needs a connection")
       return
     }
@@ -222,11 +227,15 @@ export function CheckEditor({
         ? checkPayloadFromOcr(draft.check)
         : emptyCheckPayload()
       setPayload(next)
-      if (draft.check?.merchant) setMerchant(draft.check.merchant)
-      else if (draft.title) setMerchant(draft.title)
+      const place = tidyPlaceName(draft.check?.merchant ?? draft.title ?? "")
+      if (place) setMerchant(place)
       if (draft.check?.isPrecuenta) setIsPrecuenta(true)
       setPhase(next.items.length > 0 ? "review" : "assign")
-      toast.success("Ticket scanned")
+      if (nameFromTicket && place) {
+        void renameRoom({ data: { code: room.code, name: place.slice(0, 60) } })
+          .then(invalidate)
+          .catch(() => undefined)
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not read ticket"
@@ -235,6 +244,15 @@ export function CheckEditor({
       setOcrPending(false)
     }
   }
+
+  const pendingTaken = useRef(false)
+  useEffect(() => {
+    if (check || pendingTaken.current) return
+    pendingTaken.current = true
+    const ticket = takePendingTicket(room.code)
+    if (ticket) void onScan(ticket.file, ticket.nameFromTicket)
+    // Runs once: the photo handed over from the previous screen.
+  }, [])
 
   function addManualItem() {
     const amountCents = atmDigitsToCents(newAmount, fd)
@@ -359,11 +377,33 @@ export function CheckEditor({
   const backHome = () =>
     void navigate({ to: "/r/$code", params: { code: room.code } })
 
+  if (ocrPending && payload.items.length === 0) {
+    return (
+      <main
+        className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2"
+        aria-busy
+      >
+        <EditorHeader title="Reading ticket…" onBack={backHome} />
+        <p className="mt-1 text-[15px] text-muted-foreground" role="status">
+          Pulling the items, tip and total off the photo.
+        </p>
+        <ul className="group-list mt-5" aria-hidden>
+          {[72, 56, 64, 48, 60].map((width) => (
+            <li key={width} className="group-row justify-between">
+              <Skeleton className="h-4" style={{ width: `${width}%` }} />
+              <Skeleton className="h-4 w-12" />
+            </li>
+          ))}
+        </ul>
+      </main>
+    )
+  }
+
   if (phase === "review") {
     return (
       <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
         <EditorHeader title="Check the ticket" onBack={backHome} />
-        <div className="mt-5 flex flex-col gap-5">
+        <div className="mt-4 flex flex-col gap-5 pb-6">
           <div className="grid gap-2">
             <Label htmlFor="merchant">Place</Label>
             <Input
@@ -405,6 +445,8 @@ export function CheckEditor({
         {payload.items.length === 0 && isOnline ? (
           <TicketPhotoPicker
             pending={ocrPending}
+            title="Add the ticket"
+            hint="Take a photo or pick one from your gallery. Or type the items in below."
             onFile={(file) => void onScan(file)}
           />
         ) : null}
@@ -996,7 +1038,7 @@ function ItemCard({
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted"
+        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <span className="min-w-0">
           <span className="block text-[15px] font-semibold">

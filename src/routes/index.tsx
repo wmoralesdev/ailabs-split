@@ -173,7 +173,7 @@ function LandingPage() {
         </h1>
         <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
           {kind === "DINNER"
-            ? "Tap who had what. Everyone sees what they owe."
+            ? "Scan the ticket, tap who had what. Everyone sees what they owe."
             : "One code for the whole trip. Settle up at the end."}
         </p>
       </div>

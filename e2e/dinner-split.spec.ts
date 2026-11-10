@@ -10,6 +10,7 @@ import {
   assignQuantities,
   confirmCheck,
   createDinner,
+  openDinnerCreate,
   dinnerNav,
   openLanding,
   startManualCheck,
@@ -23,14 +24,14 @@ const TICKET_PATH = path.resolve(
 test.describe.configure({ mode: "serial" })
 
 test.describe("dinner split", () => {
-  let dinnerCode = ""
-  const dinnerName = `Friday pizzas ${Date.now()}`
-
   test("create dinner, add people, two pizzas, confirm, settle, join", async ({
     page,
     browser,
   }) => {
-    dinnerCode = await createDinner(page, dinnerName, "Ana")
+    const { code: dinnerCode, name: dinnerName } = await createDinner(
+      page,
+      "Ana"
+    )
     await expect(page.getByText("You · Ana")).toBeVisible()
     await expect(page.getByText(/1 person/)).toBeVisible()
 
@@ -111,27 +112,40 @@ test.describe("dinner split", () => {
     await guest.close()
   })
 
-  test("dinner create seats people inline and remembers defaults", async ({
+  test("scan-first create lands on review, names the room from the ticket", async ({
     page,
   }) => {
-    await openLanding(page)
-    const dinnerChip = page
-      .getByRole("group", { name: "Mode" })
-      .getByRole("button", { name: "Dinner" })
-    await dinnerChip.click()
-    await expect(dinnerChip).toHaveAttribute("aria-pressed", "true")
-    await page.getByLabel("Your name").fill("Ana")
-    const guests = page.getByLabel("Who else is at the table?")
-    await guests.fill("Ben, Cam")
-    await guests.press("Enter")
-    await expect(page.getByRole("button", { name: "Remove Cam" })).toBeVisible()
-    await page.getByRole("button", { name: "Create dinner" }).click()
-    await expect(page.getByText("Dinner ready")).toBeVisible()
-    await page.getByRole("button", { name: "Continue to dinner" }).click()
+    test.skip(!existsSync(TICKET_PATH), "ticket photo is missing")
+    test.skip(
+      !process.env.OPENAI_API_KEY && process.env.OCR_FIXTURE !== "1",
+      "needs OPENAI_API_KEY or OCR_FIXTURE=1"
+    )
+    await openDinnerCreate(page)
+    await expect(page.getByLabel("Dinner name")).toHaveCount(0)
+    await expect(page.getByLabel("Who else is at the table?")).toHaveCount(0)
     await expect(
-      page.getByRole("heading", { name: /(breakfast|lunch|dinner)$/ })
+      page.getByRole("button", { name: "Create without a ticket" })
     ).toBeVisible()
-    await expect(page.getByText("3 people")).toBeVisible()
+
+    await page.getByLabel("Your name").fill("")
+    await page.getByRole("button", { name: "From gallery" }).click()
+    await expect(
+      page.getByText("Write your name so the others know who paid")
+    ).toBeVisible()
+
+    await page.getByLabel("Your name").fill("Ana")
+    await page.getByTestId("ticket-gallery-input").setInputFiles(TICKET_PATH)
+    await expect(
+      page.getByRole("heading", { name: "Check the ticket" })
+    ).toBeVisible({ timeout: 40_000 })
+    await expect(page.getByText("Dinner ready")).toHaveCount(0)
+    await expect(page.getByLabel("Place")).not.toHaveValue("")
+
+    const place = await page.getByLabel("Place").inputValue()
+    await page.getByRole("button", { name: "Back" }).click()
+    await expect(
+      page.getByRole("heading", { level: 1, name: place })
+    ).toBeVisible()
     await expect(page.getByText("You · Ana")).toBeVisible()
 
     await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
@@ -162,7 +176,7 @@ test.describe("dinner split", () => {
 test("new check inputs use a hairline instead of muted fill", async ({
   page,
 }) => {
-  await createDinner(page, `Hairline fields ${Date.now()}`, "Ana")
+  await createDinner(page, "Ana")
   await startManualCheck(page)
   await page.getByLabel("Item", { exact: true }).fill("Pizza Margherita")
   await expect(page.getByRole("button", { name: "Add item" })).toBeDisabled()
@@ -181,7 +195,7 @@ test("new check inputs use a hairline instead of muted fill", async ({
 })
 
 test("manual service fee can be a percent of items", async ({ page }) => {
-  await createDinner(page, `Service fee ${Date.now()}`, "Ana")
+  await createDinner(page, "Ana")
   await startManualCheck(page)
   await addCheckItem(page, "Taco", "20.00")
   await page
@@ -199,11 +213,9 @@ test("manual service fee can be a percent of items", async ({ page }) => {
   await expect(page.locator("main")).toContainText("$22.00")
 })
 
-test("new check offers camera and gallery", async ({ page }) => {
-  await createDinner(page, `Gallery pick ${Date.now()}`, "Ana")
-  await page.getByRole("link", { name: "Scan ticket" }).click()
-  await waitForHydration(page)
-  await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible()
+test("dinner home offers camera and gallery", async ({ page }) => {
+  await createDinner(page, "Ana")
+  await expect(page.getByRole("button", { name: "Scan ticket" })).toBeVisible()
   await expect(page.getByRole("button", { name: "From gallery" })).toBeVisible()
   await expect(page.getByTestId("ticket-camera-input")).toHaveAttribute(
     "capture",
@@ -220,18 +232,16 @@ test("OCR review when OpenAI is configured", async ({ page }) => {
     "OPENAI_API_KEY or ticket fixture is missing"
   )
 
-  const name = `Biblioteca OCR ${Date.now()}`
-  await createDinner(page, name, "Ana")
-  await page.getByRole("link", { name: "Scan ticket" }).click()
-  await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible()
-  await expect(page.getByRole("button", { name: "From gallery" })).toBeVisible()
+  await createDinner(page, "Ana")
   await page.getByTestId("ticket-gallery-input").setInputFiles(TICKET_PATH)
   await expect(page.getByText("Continue to assign")).toBeVisible({
     timeout: 40_000,
   })
   await expect(page.getByText(/POLLO CHIPOTLE/i).first()).toBeVisible()
   await expect(page.getByText(/ONZ/i).first()).toBeVisible()
-  await expect(page.getByRole("button", { name: "Tip" }).first()).toBeVisible()
+  await expect(
+    page.getByRole("combobox", { name: /What is .*POLLO CHIPOTLE/i }).first()
+  ).toBeVisible()
   await page.getByRole("button", { name: "Continue to assign" }).click()
   await expect(
     page.getByRole("button", { name: "Confirm check" })
