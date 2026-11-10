@@ -16,6 +16,7 @@ import {
 
 import { BillPeople } from "@/components/dinner/bill-people"
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
+import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { OcrReview } from "@/components/dinner/ocr-review"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
@@ -1054,25 +1055,27 @@ function ItemCard({
         className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         <span className="min-w-0">
-          <span className="block text-[15px] font-semibold">
-            {item.quantity > 1 ? `${item.quantity} × ` : ""}
-            {item.name}
-          </span>
-          {item.modifiers.length > 0 ? (
-            <span className="block text-[13px] text-muted-foreground">
-              {item.modifiers.join(" · ")}
-            </span>
-          ) : null}
-          <span
-            className={cn(
-              "block text-[13px]",
-              unassigned
-                ? "font-medium text-destructive"
-                : "text-muted-foreground"
-            )}
+          <LineQtyName
+            name={item.name}
+            quantity={item.quantity}
+            nameClassName="text-[15px] font-semibold"
           >
-            {summary}
-          </span>
+            {item.modifiers.length > 0 ? (
+              <span className="block text-[13px] text-muted-foreground">
+                {item.modifiers.join(" · ")}
+              </span>
+            ) : null}
+            <span
+              className={cn(
+                "block text-[13px]",
+                unassigned
+                  ? "font-medium text-destructive"
+                  : "text-muted-foreground"
+              )}
+            >
+              {summary}
+            </span>
+          </LineQtyName>
         </span>
         <span className="shrink-0 text-[15px] font-semibold tabular-nums">
           {formatMoney(item.amountCents, currency)}

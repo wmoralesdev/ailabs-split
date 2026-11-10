@@ -8,6 +8,7 @@ import {
   parseReceiptExtract,
 } from "./ocr-schema"
 import type { ReceiptExtract } from "./ocr-schema"
+import { PUPUSERIA_PANCHIMALCO_LIVE_EXTRACT } from "./panchimalco-live-ocr"
 import {
   BIBLIOTECA_CAFE_MD,
   CELESTE_IMPERIO_MD,
@@ -17,6 +18,17 @@ import {
 } from "./receipt-ocr-fixtures"
 import { checkPayloadFromOcr, extractCheckDraft } from "./receipt-ocr"
 import type { OcrCheckDraft } from "./receipt-ocr"
+
+function withCntBakedIntoNames(extract: ReceiptExtract): ReceiptExtract {
+  return {
+    ...extract,
+    items: extract.items.map((item) => ({
+      ...item,
+      name: item.quantity > 1 ? `${item.quantity}×${item.name}` : item.name,
+      quantity: 1,
+    })),
+  }
+}
 
 function extractFromParsed(draft: OcrCheckDraft): ReceiptExtract {
   return {
@@ -160,6 +172,57 @@ describe("draftFromExtract", () => {
       true
     )
     expect(check.tip?.amountCents).toBe(0)
+  })
+
+  it("keeps live Panchimalco gpt-5-mini qty on the field, tip $0, total $60", () => {
+    const check = checkFromExtract(
+      PUPUSERIA_PANCHIMALCO_LIVE_EXTRACT,
+      PUPUSERIA_PANCHIMALCO_LIVE_EXTRACT.rawText
+    )
+    const frijol = check.items.find((item) => item.name === "Frijol/Queso pq")
+    const revuelta = check.items.find((item) => item.name === "Revuelta pq")
+    expect(frijol?.quantity).toBe(8)
+    expect(frijol?.name).toBe("Frijol/Queso pq")
+    expect(revuelta?.quantity).toBe(10)
+    expect(revuelta?.name).toBe("Revuelta pq")
+    expect(check.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
+    expect(check.tip?.amountCents).toBe(0)
+    expect(check.tip?.percentHint).toBe(0)
+    expect(check.totalCents).toBe(6000)
+    expect(check.isPrecuenta).toBe(true)
+  })
+
+  it("peels live CNT baked into names as 8×Frijol with quantity 1", () => {
+    const extract = withCntBakedIntoNames(PUPUSERIA_PANCHIMALCO_LIVE_EXTRACT)
+    expect(extract.items[0]?.name).toBe("8×Frijol/Queso pq")
+    expect(extract.items[1]?.name).toBe("10×Revuelta pq")
+
+    const check = checkFromExtract(extract, extract.rawText)
+    const frijol = check.items.find((item) => item.name === "Frijol/Queso pq")
+    const revuelta = check.items.find((item) => item.name === "Revuelta pq")
+    expect(frijol?.quantity).toBe(8)
+    expect(frijol?.name).toBe("Frijol/Queso pq")
+    expect(revuelta?.quantity).toBe(10)
+    expect(revuelta?.name).toBe("Revuelta pq")
+    expect(check.items.every((item) => !/^\d+\s*[×xX]/u.test(item.name))).toBe(
+      true
+    )
+    expect(check.tip?.amountCents).toBe(0)
+    expect(check.totalCents).toBe(6000)
+
+    const payload = checkPayloadFromOcr(check)
+    expect(
+      payload.items.find((item) => item.name === "Frijol/Queso pq")?.quantity
+    ).toBe(8)
+    expect(
+      payload.items.find((item) => item.name === "Revuelta pq")?.quantity
+    ).toBe(10)
+    expect(payload.tip.amountCents).toBe(0)
+    expect(computeDinnerSplit(payload).totalCents).toBe(
+      payload.items.reduce((sum, item) => sum + item.amountCents, 0)
+    )
   })
 })
 
