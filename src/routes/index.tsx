@@ -17,6 +17,7 @@ import { RecentTripsList } from "@/components/recent-trips-list"
 import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { WithDisplayName } from "@/components/with-display-name"
 import { YourRoomsList } from "@/components/your-rooms-list"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,12 +34,15 @@ import { Label } from "@/components/ui/label"
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
+import { nextCreatorName } from "@/lib/clerk-display-name"
 import {
   getLastCurrency,
   getLastKind,
+  getLastName,
   rememberCurrency,
   mergeNames,
   rememberKind,
+  rememberName,
 } from "@/lib/landing-prefs"
 import type { RoomKind } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
@@ -49,6 +53,7 @@ import {
 } from "@/lib/resume-trip"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
 import { cn } from "@/lib/utils"
+import { fetchSignedInDisplayName } from "@/server/auth"
 import { fetchFxRates } from "@/server/fx"
 import {
   claimMemberById,
@@ -66,9 +71,15 @@ type LandingSearch = {
 }
 
 export const Route = createFileRoute("/")({
-  loader: async ({ context }): Promise<{ yours: OwnedRoomDto[] }> => {
-    if (!context.userId) return { yours: [] }
-    return { yours: await listMyRooms() }
+  loader: async ({
+    context,
+  }): Promise<{ yours: OwnedRoomDto[]; displayName: string }> => {
+    if (!context.userId) return { yours: [], displayName: "" }
+    const [yours, displayName] = await Promise.all([
+      listMyRooms(),
+      fetchSignedInDisplayName(),
+    ])
+    return { yours, displayName }
   },
   validateSearch: (search: Record<string, unknown>): LandingSearch => {
     const tabRaw =
@@ -92,6 +103,11 @@ export const Route = createFileRoute("/")({
 
 const createSchema = z.object({
   name: z.string().trim().min(1, "Name your trip").max(60, "Name is too long"),
+  creatorName: z
+    .string()
+    .trim()
+    .min(1, "Write your name")
+    .max(40, "Name is too long"),
   baseCurrency: z.string().min(3),
 })
 type CreateValues = z.infer<typeof createSchema>
@@ -107,7 +123,7 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
-  const { yours } = Route.useLoaderData()
+  const { yours, displayName } = Route.useLoaderData()
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
   const [kind, setKind] = useState<RoomKind>("TRIP")
@@ -226,9 +242,9 @@ function LandingPage() {
             />
           </div>
           {kind === "DINNER" ? (
-            <CreateDinnerForm navigate={navigate} />
+            <CreateDinnerForm navigate={navigate} displayName={displayName} />
           ) : (
-            <CreateForm navigate={navigate} />
+            <CreateForm navigate={navigate} displayName={displayName} />
           )}
         </TabsContent>
         <TabsContent value="join" className="tab-panel mt-6 text-base">
@@ -295,17 +311,52 @@ function ModeButton({
 
 function CreateForm({
   navigate,
+  displayName = "",
 }: {
   navigate: ReturnType<typeof useNavigate>
+  displayName?: string
+}) {
+  return (
+    <WithDisplayName serverName={displayName}>
+      {(resolved) => (
+        <CreateFormFields navigate={navigate} displayName={resolved} />
+      )}
+    </WithDisplayName>
+  )
+}
+
+function CreateFormFields({
+  navigate,
+  displayName,
+}: {
+  navigate: ReturnType<typeof useNavigate>
+  displayName: string
 }) {
   const form = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", baseCurrency: "USD" },
+    defaultValues: {
+      name: "",
+      creatorName: displayName,
+      baseCurrency: "USD",
+    },
   })
+  const nameEdited = Boolean(form.formState.dirtyFields.creatorName)
   useEffect(() => {
     const last = getLastCurrency()
     if (last) form.setValue("baseCurrency", last)
   }, [form])
+  useEffect(() => {
+    if (nameEdited) return
+    const next = nextCreatorName({
+      clerkName: displayName,
+      lastName: getLastName(),
+    })
+    if (!next || form.getValues("creatorName") === next) return
+    form.setValue("creatorName", next, {
+      shouldDirty: false,
+      shouldValidate: false,
+    })
+  }, [displayName, form, nameEdited])
   const baseCurrency = form.watch("baseCurrency")
 
   const [members, setMembers] = useState<string[]>([])
@@ -406,7 +457,7 @@ function CreateForm({
   }
 
   function onSubmit(values: CreateValues) {
-    const unique = mergeNames(members, memberDraft)
+    const unique = mergeNames([values.creatorName, ...members], memberDraft)
     if (unique.length < 2) {
       setMembersError("Add at least two members")
       return
@@ -423,6 +474,7 @@ function CreateForm({
       }
     }
 
+    rememberName(values.creatorName.trim())
     rememberCurrency(values.baseCurrency)
     mutation.mutate({
       name: values.name.trim(),
@@ -451,6 +503,25 @@ function CreateForm({
                 <FormLabel>Trip name</FormLabel>
                 <FormControl>
                   <Input placeholder="Beach weekend" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="creatorName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Your name</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Ana"
+                    autoComplete="given-name"
+                    enterKeyHint="done"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -628,7 +699,6 @@ function JoinForm({
     setAutoLookupDone(true)
     lookupMutation.mutate(initialCode)
     // One-shot prefill lookup from ?code=
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once per initialCode
   }, [autoLookupDone, initialCode])
 
   function onCodeSubmit(values: JoinCodeValues) {

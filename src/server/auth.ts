@@ -7,3 +7,10 @@ export const fetchAuthState = createServerFn({ method: "GET" }).handler(
     return { userId: await getAuthUserId() }
   }
 )
+
+export const fetchSignedInDisplayName = createServerFn({
+  method: "GET",
+}).handler(async (): Promise<string> => {
+  const { getSignedInDisplayName } = await import("./auth-user.server")
+  return getSignedInDisplayName()
+})

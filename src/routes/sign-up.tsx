@@ -19,5 +19,5 @@ export const Route = createFileRoute("/sign-up")({
 })
 
 function SignUpPage() {
-  return <ClerkAuthScreen mode="sign-up" />
+  return <ClerkAuthScreen />
 }
