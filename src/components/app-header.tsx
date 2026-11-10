@@ -55,7 +55,7 @@ export function AppHeader({
         <Link
           to="/"
           search={{ stay: true }}
-          className="rounded-full"
+          className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Split home"
         >
           <SiteLogo showWordmark={showWordmark} />

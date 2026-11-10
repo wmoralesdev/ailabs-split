@@ -49,7 +49,7 @@ export function RoomTabBar({
               to="/r/$code/check"
               params={{ code }}
               aria-label="Open the bill"
-              className="-mt-4 inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
+              className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
             >
               <HugeiconsIcon icon={Invoice03Icon} size={22} strokeWidth={2} />
             </Link>
@@ -58,7 +58,7 @@ export function RoomTabBar({
               to="/r/$code/new"
               params={{ code }}
               aria-label="Add expense"
-              className="-mt-4 inline-flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:translate-y-px"
+              className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
             >
               <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
             </Link>
@@ -94,8 +94,10 @@ function TabLink({
       to={to}
       params={{ code }}
       className={cn(
-        "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium transition-colors",
-        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+        "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active
+          ? "text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       )}
     >
       <HugeiconsIcon icon={icon} size={20} strokeWidth={active ? 2.2 : 2} />

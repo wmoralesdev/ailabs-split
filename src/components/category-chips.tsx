@@ -20,10 +20,10 @@ export function CategoryChips({
             type="button"
             onClick={() => onChange(active ? "" : category)}
             className={cn(
-              "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background/60 text-muted-foreground hover:text-foreground"
+                ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                : "border-border bg-background/60 text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             {category}

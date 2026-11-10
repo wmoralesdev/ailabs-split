@@ -157,7 +157,7 @@ function PwaInstallPrompt() {
           <button
             type="button"
             aria-label="Dismiss install prompt"
-            className="-mt-1 -mr-1 rounded-full p-1 text-muted-foreground hover:text-foreground"
+            className="icon-hit -mt-1 -mr-1 size-8"
             onClick={dismiss}
           >
             <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={2} />

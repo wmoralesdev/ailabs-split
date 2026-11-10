@@ -252,8 +252,8 @@ function ModeButton({
       className={cn(
         "flex flex-col items-start gap-3 rounded-2xl border px-4 pt-4 pb-3.5 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
         active
-          ? "border-foreground bg-foreground text-background"
-          : "border-transparent bg-card text-foreground"
+          ? "border-foreground bg-foreground text-background hover:bg-foreground/90"
+          : "border-transparent bg-card text-foreground hover:bg-muted"
       )}
     >
       <span
@@ -485,7 +485,7 @@ function CreateForm({
             <button
               type="button"
               onClick={() => setShowExtras(true)}
-              className="inline-flex min-h-11 items-center text-left text-[15px] font-medium text-primary transition-colors hover:text-foreground"
+              className="text-action text-[15px]"
             >
               Add other currencies
             </button>
@@ -501,7 +501,7 @@ function CreateForm({
                   className={cn(
                     "text-xs font-medium text-muted-foreground transition-colors",
                     extraCodes.length === 0
-                      ? "hover:text-foreground"
+                      ? "text-action min-h-8 text-xs"
                       : "pointer-events-none opacity-0"
                   )}
                 >
@@ -692,7 +692,7 @@ function JoinForm({
 
         <button
           type="button"
-          className="min-h-11 text-left text-[15px] font-medium text-primary transition-colors hover:text-foreground"
+          className="text-action text-[15px]"
           onClick={goBackToCode}
           disabled={pending}
         >

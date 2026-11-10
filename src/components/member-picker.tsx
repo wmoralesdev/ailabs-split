@@ -143,8 +143,8 @@ function SearchableMemberSelect({
         aria-controls={listId}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          "flex h-(--control-height) w-full items-center justify-between gap-2 rounded-full border border-input bg-background px-3 text-left text-base transition-colors dark:bg-input/40",
-          "outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+          "flex h-(--control-height) w-full items-center justify-between gap-2 rounded-full border border-transparent bg-muted px-3 text-left text-base transition-colors",
+          "outline-none hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring"
         )}
       >
         <span

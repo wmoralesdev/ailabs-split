@@ -713,7 +713,7 @@ function AddExpenseForm({
                             ? setWeight(member.id, weight > 0 ? 0 : 1)
                             : toggleMember(member.id)
                         }
-                        className="flex min-h-10 min-w-0 flex-1 items-center gap-3 text-left text-[15px]"
+                        className="row-hit flex min-h-10 min-w-0 flex-1 items-center gap-3 px-1 text-left text-[15px]"
                       >
                         <Avatar
                           className={

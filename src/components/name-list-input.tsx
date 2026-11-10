@@ -67,7 +67,7 @@ export function NameListInput({
                 onClick={() =>
                   onNamesChange(names.filter((entry) => entry !== name))
                 }
-                className="relative inline-flex h-8 w-7 items-center justify-center rounded-r-full text-muted-foreground after:absolute after:-inset-y-1.5 after:inset-x-0 hover:text-foreground"
+                className="icon-hit relative h-8 w-7 rounded-r-full after:absolute after:-inset-y-1.5 after:inset-x-0"
                 aria-label={`Remove ${name}`}
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2.2} />

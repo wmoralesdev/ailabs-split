@@ -168,7 +168,7 @@ export function CreateDinnerForm({
                   </p>
                   <button
                     type="button"
-                    className="inline-flex min-h-11 items-center text-[15px] font-medium text-primary transition-colors hover:text-foreground"
+                    className="text-action text-[15px]"
                     onClick={() => setEditCurrency(true)}
                   >
                     Change currency
@@ -195,7 +195,7 @@ export function CreateDinnerForm({
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="inline-flex min-h-11 items-center self-center text-[15px] font-medium text-primary transition-colors hover:text-foreground disabled:opacity-50"
+          className="text-action self-center text-[15px]"
         >
           Create without a ticket
         </button>
