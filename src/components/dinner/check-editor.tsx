@@ -1040,6 +1040,25 @@ export function CheckEditor({
   )
 }
 
+function EveryoneChip({
+  pressed,
+  onClick,
+}: {
+  pressed: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className="person-chip"
+      aria-pressed={pressed}
+      onClick={onClick}
+    >
+      Everyone
+    </button>
+  )
+}
+
 function ItemCard({
   item,
   members,
@@ -1115,35 +1134,39 @@ function ItemCard({
       {members.length > 0 ? (
         <div className="item-row-assign">
           {inlineEditable ? (
-            <>
-              <div className="item-row-chips">
-                {members.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    className="person-chip"
-                    aria-pressed={selected.has(member.id)}
-                    onClick={() => onToggle(member.id)}
-                  >
-                    {member.name}
-                  </button>
-                ))}
-              </div>
-              {members.length > 2 ? (
-                <button
-                  type="button"
-                  className="item-everyone"
-                  aria-pressed={everyone}
-                  onClick={onEveryone}
-                >
-                  Everyone
-                </button>
+            <div
+              className="item-row-chips"
+              role="group"
+              aria-label="Who shared this"
+            >
+              {members.length > 1 ? (
+                <EveryoneChip pressed={everyone} onClick={onEveryone} />
               ) : null}
-            </>
+              {members.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  className="person-chip"
+                  aria-pressed={selected.has(member.id)}
+                  onClick={() => onToggle(member.id)}
+                >
+                  {member.name}
+                </button>
+              ))}
+              {members.length > 1 ? (
+                <EveryoneChip pressed={everyone} onClick={onEveryone} />
+              ) : null}
+            </div>
           ) : (
-            <button type="button" className="item-everyone" onClick={onOpen}>
-              Custom split · edit
-            </button>
+            <div className="item-row-chips">
+              <button
+                type="button"
+                className="person-chip person-chip-ghost"
+                onClick={onOpen}
+              >
+                Custom split · edit
+              </button>
+            </div>
           )}
         </div>
       ) : null}

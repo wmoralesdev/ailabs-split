@@ -84,10 +84,25 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   const first = itemCard(page, "Case Bateria Anker")
   const middle = itemCard(page, "Case Audifonos")
   const last = itemCard(page, "Case Moft")
-  const everyone = last.getByRole("button", { name: "Everyone", exact: true })
-  await expect(everyone).toHaveClass(/item-everyone/)
-  await expect(everyone).not.toHaveClass(/person-chip/)
+  const firstChips = first.locator(".item-row-chips")
+  const lastChips = last.locator(".item-row-chips")
+  const firstChipButtons = firstChips.getByRole("button")
+  const lastEveryone = lastChips.getByRole("button", {
+    name: "Everyone",
+    exact: true,
+  })
 
+  await expect(firstChipButtons.first()).toHaveText("Everyone")
+  await expect(firstChipButtons.last()).toHaveText("Everyone")
+  await expect(firstChipButtons).toHaveCount(1 + GUESTS.length + 2)
+  await expect(firstChips).toHaveCSS("flex-wrap", "nowrap")
+  const chipsBox = await firstChips.boundingBox()
+  expect(chipsBox?.height ?? 0, "chip row should be one line").toBeLessThan(56)
+  await expect(lastEveryone).toHaveCount(2)
+
+  await page.locator(".item-row-chips").evaluateAll((els) => {
+    for (const el of els) el.scrollLeft = 0
+  })
   await page.mouse.move(0, 0)
   await page.waitForTimeout(80)
 
@@ -100,6 +115,16 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await shot(page, "390-bill.png")
   await shot(page, "390-paid-by.png", paidBy)
   await shot(page, "390-items.png", itemsList)
+  await shot(page, "390-chips-start.png", firstChips)
+  await firstChips.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth
+  })
+  await page.waitForTimeout(80)
+  await shot(page, "390-chips-end.png", firstChips)
+  await shot(page, "390-items-end.png", itemsList)
+  await firstChips.evaluate((el) => {
+    el.scrollLeft = 0
+  })
 
   const title = first.locator(".item-row-main")
   const restRow = await paint(first)
@@ -119,6 +144,9 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
 
   await page.setViewportSize({ width: 1280, height: 800 })
   await itemsList.scrollIntoViewIfNeeded()
+  await page.locator(".item-row-chips").evaluateAll((els) => {
+    for (const el of els) el.scrollLeft = 0
+  })
   await page.mouse.move(0, 0)
   await page.waitForTimeout(80)
   await shot(page, "desktop-items-rest.png", itemsList)
@@ -146,8 +174,9 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await page.keyboard.press("Escape")
   await expect(page.getByRole("listbox")).toHaveCount(0)
 
-  await everyone.click()
-  await expect(everyone).toHaveAttribute("aria-pressed", "true")
+  await lastEveryone.first().click()
+  await expect(lastEveryone.first()).toHaveAttribute("aria-pressed", "true")
+  await expect(lastEveryone.last()).toHaveAttribute("aria-pressed", "true")
   for (const name of ["Walter", ...GUESTS]) {
     await expect(
       last.getByRole("button", { name, exact: true })
@@ -156,4 +185,12 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await last.hover()
   await page.waitForTimeout(120)
   await shot(page, "desktop-everyone.png", itemsList)
+
+  await page.mouse.move(0, 0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await itemsList.scrollIntoViewIfNeeded()
+  await page.locator(".item-row-chips").evaluateAll((els) => {
+    for (const el of els) el.scrollLeft = 0
+  })
+  await shot(page, "390-everyone.png", itemsList)
 })

@@ -439,11 +439,22 @@
   }
 
   .item-row-assign {
-    @apply flex flex-col px-4 pb-2;
+    @apply min-w-0;
   }
 
   .item-row-chips {
-    @apply flex flex-wrap gap-1.5;
+    @apply flex flex-nowrap gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pt-1.5 pb-2.5;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+
+  .item-row-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .item-row-chips .person-chip {
+    @apply shrink-0;
   }
 
   .item-everyone {
