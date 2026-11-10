@@ -379,6 +379,11 @@
     background-color: color-mix(in srgb, var(--card) 86%, var(--foreground));
   }
 
+  /* Count on a grouped line: tabular, muted, not a chip (no fill, no hairline). */
+  .line-qty {
+    @apply w-7 shrink-0 text-right text-[13px] font-medium text-muted-foreground tabular-nums;
+  }
+
   /* Grouped list: one card, hairline rows. Never nest a pill inside a row. */
   .group-list {
     @apply overflow-hidden rounded-2xl bg-card;

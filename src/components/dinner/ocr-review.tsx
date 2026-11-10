@@ -3,6 +3,7 @@ import { Delete02Icon } from "@hugeicons/core-free-icons"
 
 import { LineKindPicker } from "@/components/dinner/line-kind-picker"
 import type { LineKind } from "@/components/dinner/line-kind-picker"
+import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { Button } from "@/components/ui/button"
 import type { CheckPayload, LineItem } from "@/lib/dinner-split"
 import { emptyTip, itemToAdjustment, ticketTip } from "@/lib/dinner-split"
@@ -111,7 +112,8 @@ export function OcrReview({
           {payload.items.map((item, index) => (
             <ReviewRow
               key={item.id}
-              name={`${item.quantity > 1 ? `${item.quantity} × ` : ""}${item.name}`}
+              name={item.name}
+              quantity={item.quantity}
               detail={
                 item.modifiers.length > 0 ? item.modifiers.join(" · ") : null
               }
@@ -210,6 +212,7 @@ const ITEM_OPTIONS: Reclass[] = [
 
 function ReviewRow({
   name,
+  quantity = 1,
   detail = null,
   lowConfidence = false,
   amount,
@@ -218,6 +221,7 @@ function ReviewRow({
   onPick,
 }: {
   name: string
+  quantity?: number
   detail?: string | null
   lowConfidence?: boolean
   amount: string
@@ -228,18 +232,23 @@ function ReviewRow({
   return (
     <li className="flex items-start justify-between gap-3 px-4 pt-2.5 pb-1">
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-medium">{name}</p>
-        {detail ? (
-          <p className="text-[13px] text-muted-foreground">{detail}</p>
-        ) : null}
-        <LineKindPicker
-          lineName={name}
-          amount={amount}
-          current={current}
-          options={options}
-          lowConfidence={lowConfidence}
-          onPick={onPick}
-        />
+        <LineQtyName
+          name={name}
+          quantity={quantity}
+          nameClassName="text-[15px] font-medium"
+        >
+          {detail ? (
+            <p className="text-[13px] text-muted-foreground">{detail}</p>
+          ) : null}
+          <LineKindPicker
+            lineName={name}
+            amount={amount}
+            current={current}
+            options={options}
+            lowConfidence={lowConfidence}
+            onPick={onPick}
+          />
+        </LineQtyName>
       </div>
       <p className="pt-px text-[15px] font-semibold tabular-nums">{amount}</p>
     </li>

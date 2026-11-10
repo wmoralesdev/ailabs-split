@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon, MinusSignIcon } from "@hugeicons/core-free-icons"
 
+import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -298,10 +299,12 @@ export function ItemSplitSheet({
           <SheetHeader className="gap-0.5 px-4 pt-4 pb-3 text-left">
             <SheetTitle className="eyebrow">Split item</SheetTitle>
             <div className="flex items-baseline justify-between gap-3">
-              <p className="min-w-0 truncate font-display text-xl font-bold tracking-tight">
-                {quantity > 1 ? `${quantity} × ` : ""}
-                {name || item.name}
-              </p>
+              <LineQtyName
+                name={name || item.name}
+                quantity={quantity}
+                className="min-w-0 flex-1"
+                nameClassName="truncate font-display text-xl font-bold tracking-tight"
+              />
               <p className="shrink-0 font-display text-xl font-bold tabular-nums">
                 {formatMoney(amountCents, currency)}
               </p>
