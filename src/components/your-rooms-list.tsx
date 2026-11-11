@@ -18,14 +18,14 @@ export function YourRoomsList({
   return (
     <section
       className="animate-rise-delay mt-8"
-      aria-label="Your dinners and trips"
+      aria-label="Your bills and trips"
     >
       <h2 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
         Yours
       </h2>
       <ul className="group-list mt-2">
         {rooms.map((room) => {
-          const kind = room.kind === "DINNER" ? "Dinner" : "Trip"
+          const kind = room.kind === "DINNER" ? "Bill" : "Trip"
           return (
             <li key={room.code} className="flex items-stretch">
               <button

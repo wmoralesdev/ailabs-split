@@ -216,7 +216,7 @@ describe("dinnerSettleLine + card", () => {
     const card = buildSettleAllCard([one!, two!])
     expect(card?.dinnerCount).toBe(2)
     expect(formatSettleHeadlines(card!)).toEqual(["You owe $20.00"])
-    expect(formatSettleDetail(card!)).toBe("2 dinners · Pay Walter")
+    expect(formatSettleDetail(card!)).toBe("2 bills · Pay Walter")
     expect(outgoingSettleItems(card!.lines)).toHaveLength(2)
   })
 

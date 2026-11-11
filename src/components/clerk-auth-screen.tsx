@@ -29,7 +29,7 @@ export function ClerkAuthScreen() {
           Sign in
         </h1>
         <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
-          Keep dinners and trips on every device. New here? Same screen creates
+          Keep bills and trips on every device. New here? Same screen creates
           your account. Scanning a ticket needs one so AI credits stay with you.
         </p>
       </div>

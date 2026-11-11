@@ -40,7 +40,7 @@ const config = defineConfig({
       manifest: {
         name: "Split",
         short_name: "Split",
-        description: "Split dinners and trips. Scan a ticket, settle up.",
+        description: "Split bills and trips. Scan a ticket, settle up.",
         theme_color: "#f5f4f8",
         background_color: "#f5f4f8",
         display: "standalone",

@@ -89,7 +89,7 @@ export function DinnerHome({
       <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
           <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-            <span className="font-medium text-foreground">Dinner</span>
+            <span className="font-medium text-foreground">Bill</span>
             <span aria-hidden>·</span>
             <span>{room.currency}</span>
           </div>
@@ -154,7 +154,7 @@ export function DinnerHome({
               type="button"
               onClick={() => void copyCode()}
               className="icon-hit min-h-11 gap-1.5 rounded-full px-2 text-[13px] font-medium"
-              aria-label={`Copy dinner code ${room.code}`}
+              aria-label={`Copy bill code ${room.code}`}
             >
               <span className="font-display tracking-widest text-foreground">
                 {room.code}

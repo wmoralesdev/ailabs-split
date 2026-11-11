@@ -224,14 +224,14 @@ export function formatSettleHeadlines(card: SettleAllCard): string[] {
 }
 
 export function formatSettleDetail(card: SettleAllCard): string {
-  const dinners = `${card.dinnerCount} ${card.dinnerCount === 1 ? "dinner" : "dinners"}`
+  const bills = `${card.dinnerCount} ${card.dinnerCount === 1 ? "bill" : "bills"}`
   if (card.payeeNames.length > 0) {
-    return `${dinners} · Pay ${joinPersonNames(card.payeeNames)}`
+    return `${bills} · Pay ${joinPersonNames(card.payeeNames)}`
   }
   if (card.payerNames.length > 0) {
-    return `${dinners} · From ${joinPersonNames(card.payerNames)}`
+    return `${bills} · From ${joinPersonNames(card.payerNames)}`
   }
-  return dinners
+  return bills
 }
 
 export function formatLineAmount(line: DinnerSettleLine): string {
@@ -278,7 +278,7 @@ export function formatPayAllSummary(card: SettleAllCard): {
   const sentence =
     card.payeeNames.length > 0
       ? `You pay ${joinPersonNames(card.payeeNames)}`
-      : `${card.dinnerCount} dinners`
+      : `${card.dinnerCount} bills`
   const showCode = card.buckets.length > 1
   const amounts = card.buckets
     .filter((bucket) => bucket.oweCents > 0)

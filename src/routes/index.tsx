@@ -237,7 +237,7 @@ function LandingPage() {
             aria-label="Mode"
           >
             <ModeButton
-              label="Dinner"
+              label="Bill"
               detail="One bill, tonight"
               icon={Restaurant01Icon}
               active={kind === "DINNER"}
@@ -776,7 +776,7 @@ function JoinForm({
       <div className="flex flex-col gap-5">
         <div className="surface p-4">
           <p className="eyebrow">
-            Joining {room.kind === "DINNER" ? "dinner" : "trip"}
+            Joining {room.kind === "DINNER" ? "bill" : "trip"}
           </p>
           <p className="mt-0.5 font-display text-xl font-semibold tracking-tight text-foreground">
             {room.name}
@@ -839,7 +839,7 @@ function JoinForm({
                 />
               </FormControl>
               <FormDescription>
-                From whoever started the trip or dinner. You pick your name
+                From whoever started the trip or bill. You pick your name
                 next.
               </FormDescription>
               <FormMessage />

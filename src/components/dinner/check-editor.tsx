@@ -161,7 +161,7 @@ export function CheckEditor({
         data: {
           code: room.code,
           checkId: checkId ?? undefined,
-          merchant: merchant.trim() || "Dinner",
+          merchant: merchant.trim() || "Bill",
           paidById,
           isPrecuenta,
           payload,

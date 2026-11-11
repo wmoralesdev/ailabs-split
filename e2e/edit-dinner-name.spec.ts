@@ -40,9 +40,9 @@ test.describe("edit dinner name", () => {
     await page.getByRole("button", { name: `Rename ${original}` }).click()
     const sheet = page.getByRole("dialog")
     await expect(
-      sheet.getByRole("heading", { name: "Dinner name" })
+      sheet.getByRole("heading", { name: "Bill name" })
     ).toBeVisible()
-    const dinnerField = sheet.getByRole("textbox", { name: "Dinner" })
+    const dinnerField = sheet.getByRole("textbox", { name: "Bill" })
     await expect(dinnerField).toHaveValue(original)
     await dinnerField.fill("Tuesday lunch")
     await shot("rename-sheet.png")
@@ -51,12 +51,12 @@ test.describe("edit dinner name", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Tuesday lunch" })
     ).toBeVisible()
-    await expect(page.getByText("Dinner renamed")).toBeVisible()
+    await expect(page.getByText("Bill renamed")).toBeVisible()
     await shot("home-renamed.png")
-    await expect(page.getByText("Dinner renamed")).toBeHidden()
+    await expect(page.getByText("Bill renamed")).toBeHidden()
 
     await openBill(page)
-    const billDinner = page.getByRole("textbox", { name: "Dinner" })
+    const billDinner = page.getByRole("textbox", { name: "Bill" })
     await expect(billDinner).toHaveValue("Tuesday lunch")
     await expect(page.getByLabel("Place")).toBeVisible()
     await page.getByLabel("Place").fill("Amazon")

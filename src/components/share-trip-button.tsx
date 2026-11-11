@@ -27,7 +27,9 @@ export function ShareTripButton({
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error(kind === "DINNER" ? "Could not share dinner" : "Could not share trip")
+      toast.error(
+        kind === "DINNER" ? "Could not share bill" : "Could not share trip"
+      )
     } finally {
       setBusy(false)
     }
@@ -40,7 +42,7 @@ export function ShareTripButton({
       size="icon-lg"
       onClick={() => void onShare()}
       disabled={busy}
-      aria-label={kind === "DINNER" ? "Share dinner" : "Share trip"}
+      aria-label={kind === "DINNER" ? "Share bill" : "Share trip"}
     >
       <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
     </Button>

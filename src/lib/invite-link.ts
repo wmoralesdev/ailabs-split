@@ -1,7 +1,9 @@
 const FALLBACK_ORIGIN = "https://split.ailabs.sv"
 
 function appOrigin(): string {
-  return typeof window !== "undefined" ? window.location.origin : FALLBACK_ORIGIN
+  return typeof window !== "undefined"
+    ? window.location.origin
+    : FALLBACK_ORIGIN
 }
 
 /** Public invite URL for a trip (no personal `?as=` reclaim). */
@@ -26,10 +28,13 @@ export async function shareOrCopyInvite(opts: {
 }): Promise<ShareInviteResult> {
   const url = inviteLink(opts.code)
   const title = opts.name
-  const noun = opts.kind === "DINNER" ? "dinner" : "trip"
+  const noun = opts.kind === "DINNER" ? "bill" : "trip"
   const text = `Join "${opts.name}" on Split — ${noun} code ${opts.code}`
 
-  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function"
+  ) {
     try {
       await navigator.share({ title, text, url })
       return "shared"

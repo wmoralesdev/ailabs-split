@@ -49,7 +49,7 @@ async function requireDinnerRoom(code: string) {
   })
   if (!room) throw new Error("Room not found")
   if (room.kind !== "DINNER") {
-    throw new Error("Checks are only for dinners")
+    throw new Error("This is only for bills")
   }
   assertHostDinnerEdit(room, await getAuthUserId())
   return room
@@ -73,7 +73,7 @@ async function materializeExpense(input: {
   expenseId: string | null
   shares: Array<{ memberId: string; amountCents: number }>
 }): Promise<string> {
-  const title = input.merchant.slice(0, 80) || "Dinner check"
+  const title = input.merchant.slice(0, 80) || "Bill"
 
   if (input.expenseId) {
     const expense = await prisma.$transaction(async (tx) => {
@@ -142,7 +142,7 @@ export const upsertCheck = createServerFn({ method: "POST" })
     const room = await requireDinnerRoom(data.code)
     const memberIds = new Set(room.members.map((member) => member.id))
     if (!memberIds.has(data.paidById)) {
-      throw new Error("Payer is not in this dinner")
+      throw new Error("Payer is not on this bill")
     }
 
     // A dinner is one bill: a second create lands on the bill that is already there.
@@ -261,11 +261,11 @@ export const confirmCheck = createServerFn({ method: "POST" })
     const memberIds = new Set(room.members.map((member) => member.id))
     for (const share of shares) {
       if (!memberIds.has(share.memberId)) {
-        throw new Error("Share member is not in this dinner")
+        throw new Error("Share member is not on this bill")
       }
     }
     if (!memberIds.has(check.paidById)) {
-      throw new Error("Payer is not in this dinner")
+      throw new Error("Payer is not on this bill")
     }
 
     const expenseId = await materializeExpense({

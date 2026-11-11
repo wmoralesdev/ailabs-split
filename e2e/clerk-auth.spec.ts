@@ -52,7 +52,7 @@ test.describe("Clerk auth", () => {
     const { name } = await createDinner(page, "Ana")
     await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
     await waitForHydration(page)
-    const yours = page.getByRole("region", { name: "Your dinners and trips" })
+    const yours = page.getByRole("region", { name: "Your bills and trips" })
     await expect(yours).toBeVisible()
     await expect(yours.getByText(name)).toBeVisible()
     await expect(page.getByText("Signed in")).toBeVisible()

@@ -28,11 +28,11 @@ export function useRenameDinner(code: string) {
         kind: room.kind,
       })
       await queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
-      toast.success("Dinner renamed")
+      toast.success("Bill renamed")
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Could not rename dinner"
+        error instanceof Error ? error.message : "Could not rename bill"
       )
     },
   })
@@ -69,7 +69,7 @@ export function DinnerNameField({
   if (readOnly) {
     return (
       <div className="grid gap-1.5">
-        <p className="text-[13px] font-medium text-muted-foreground">Dinner</p>
+        <p className="text-[13px] font-medium text-muted-foreground">Bill</p>
         <p className="text-[15px]">{name}</p>
       </div>
     )
@@ -77,7 +77,7 @@ export function DinnerNameField({
 
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={id}>Dinner</Label>
+      <Label htmlFor={id}>Bill</Label>
       <Input
         id={id}
         value={draft}
@@ -136,10 +136,10 @@ export function RenameDinnerSheet({
       >
         <SheetHeader className="gap-1 p-0 text-left">
           <SheetTitle className="font-display text-[22px] font-bold tracking-tight">
-            Dinner name
+            Bill name
           </SheetTitle>
           <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
-            The dinner title. Place on the bill is separate.
+            The bill title. Place on the bill is separate.
           </SheetDescription>
         </SheetHeader>
         <form
@@ -150,7 +150,7 @@ export function RenameDinnerSheet({
           }}
         >
           <div className="grid gap-1.5">
-            <Label htmlFor="dinner-name">Dinner</Label>
+            <Label htmlFor="dinner-name">Bill</Label>
             <Input
               id="dinner-name"
               value={draft}

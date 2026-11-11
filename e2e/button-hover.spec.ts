@@ -126,7 +126,7 @@ test("landing and dinner controls show hover and focus-visible", async ({
   await hoverShot(
     page,
     page
-      .getByRole("navigation", { name: "Dinner navigation" })
+      .getByRole("navigation", { name: "Bill navigation" })
       .getByRole("link", { name: "Settle" }),
     "08-nav-settle"
   )

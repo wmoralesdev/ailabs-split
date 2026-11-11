@@ -32,7 +32,7 @@ export function RoomTabBar({
 
   return (
     <nav
-      aria-label={isDinner ? "Dinner navigation" : "Trip navigation"}
+      aria-label={isDinner ? "Bill navigation" : "Trip navigation"}
       className="pb-safe relative z-30 shrink-0 border-t border-border bg-background"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-1">
