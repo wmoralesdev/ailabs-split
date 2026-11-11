@@ -22,11 +22,13 @@ import {
   deleteExpenseSchema,
   deleteRoomSchema,
   deleteSettlementSchema,
+  deleteSettlementsSchema,
   getRoomByCodeSchema,
   getSettlementProofSchema,
   hideRoomSchema,
   joinRoomSchema,
   recordSettlementSchema,
+  recordSettlementsSchema,
   removeRoomMemberSchema,
   renameRoomMemberSchema,
   renameRoomSchema,
@@ -80,6 +82,8 @@ export type SettlementDto = {
   createdAt: string
   hasProof: boolean
 }
+
+export type RecordedSettlementDto = SettlementDto & { code: string }
 
 export type SettlementProofDto = {
   mimeType: string
@@ -992,6 +996,72 @@ export const recordSettlement = createServerFn({ method: "POST" })
     return settlementToDto(settlement)
   })
 
+export const recordSettlements = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(recordSettlementsSchema, data))
+  .handler(async ({ data }): Promise<RecordedSettlementDto[]> => {
+    limitWrites("record-settlement")
+    let proof:
+      { proofBytes: Uint8Array<ArrayBuffer>; proofMimeType: string } | undefined
+    if (data.proof) {
+      const stored = paymentProofBytesFromPayload(data.proof)
+      proof = {
+        proofBytes: new Uint8Array(stored.bytes),
+        proofMimeType: stored.mimeType,
+      }
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const created: RecordedSettlementDto[] = []
+      for (const item of data.items) {
+        if (item.fromMemberId === item.toMemberId) {
+          throw new Error("Settlement needs two different members")
+        }
+        const room = await tx.room.findUnique({
+          where: { code: item.code },
+          include: { members: true },
+        })
+        if (!room) throw new Error("Trip not found")
+        const memberIds = new Set(room.members.map((member) => member.id))
+        if (
+          !memberIds.has(item.fromMemberId) ||
+          !memberIds.has(item.toMemberId)
+        ) {
+          throw new Error("Settlement member is not in this trip")
+        }
+        const allowedCurrencies =
+          room.currencies.length > 0
+            ? Array.from(new Set([room.currency, ...room.currencies]))
+            : [room.currency]
+        const currency =
+          item.currency && allowedCurrencies.includes(item.currency)
+            ? item.currency
+            : room.currency
+        const copiedProof = proof
+          ? {
+              proofBytes: new Uint8Array(proof.proofBytes),
+              proofMimeType: proof.proofMimeType,
+            }
+          : undefined
+        const settlement = await tx.settlement.create({
+          data: {
+            roomId: room.id,
+            fromMemberId: item.fromMemberId,
+            toMemberId: item.toMemberId,
+            amountCents: item.amountCents,
+            currency,
+            ...copiedProof,
+          },
+          include: {
+            fromMember: true,
+            toMember: true,
+          },
+        })
+        created.push({ ...settlementToDto(settlement), code: room.code })
+      }
+      return created
+    })
+  })
+
 export const getSettlementProof = createServerFn({ method: "GET" })
   .validator((data: unknown) => parseOrThrow(getSettlementProofSchema, data))
   .handler(async ({ data }): Promise<SettlementProofDto | null> => {
@@ -1040,6 +1110,32 @@ export const deleteSettlement = createServerFn({ method: "POST" })
     await prisma.settlement.delete({ where: { id: data.settlementId } })
     return { settlementId: data.settlementId }
   })
+
+export const deleteSettlements = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(deleteSettlementsSchema, data))
+  .handler(
+    async ({
+      data,
+    }): Promise<{ items: Array<{ code: string; settlementId: string }> }> => {
+      limitWrites("delete-settlement")
+      await prisma.$transaction(async (tx) => {
+        for (const item of data.items) {
+          const room = await tx.room.findUnique({
+            where: { code: item.code },
+            select: { id: true },
+          })
+          if (!room) throw new Error("Trip not found")
+          const existing = await tx.settlement.findFirst({
+            where: { id: item.settlementId, roomId: room.id },
+            select: { id: true },
+          })
+          if (!existing) throw new Error("Settlement not found")
+          await tx.settlement.delete({ where: { id: item.settlementId } })
+        }
+      })
+      return { items: data.items }
+    }
+  )
 
 export const calibrateRoomFx = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(calibrateRoomFxSchema, data))

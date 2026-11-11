@@ -4,7 +4,13 @@ import { RoomExitControl } from "@/components/room-exit-control"
 import { formatRecentTripOpened } from "@/lib/recent-trips"
 import type { OwnedRoomDto } from "@/server/rooms"
 
-export function YourRoomsList({ rooms }: { rooms: OwnedRoomDto[] }) {
+export function YourRoomsList({
+  rooms,
+  onChanged,
+}: {
+  rooms: OwnedRoomDto[]
+  onChanged?: () => void
+}) {
   const navigate = useNavigate()
 
   if (rooms.length === 0) return null
@@ -55,6 +61,7 @@ export function YourRoomsList({ rooms }: { rooms: OwnedRoomDto[] }) {
                 kind={room.kind}
                 owned
                 placement="row"
+                onDone={onChanged}
               />
             </li>
           )

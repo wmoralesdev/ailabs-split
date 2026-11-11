@@ -8,9 +8,11 @@ import { formatRecentTripOpened, listRecentTrips } from "@/lib/recent-trips"
 export function RecentTripsList({
   ownedCodes,
   serverHiddenCodes,
+  onChanged,
 }: {
   ownedCodes: readonly string[]
   serverHiddenCodes: readonly string[]
+  onChanged?: () => void
 }) {
   const navigate = useNavigate()
   const [trips, setTrips] = useState<ReturnType<typeof listRecentTrips>>([])
@@ -21,6 +23,11 @@ export function RecentTripsList({
   const refresh = useCallback(() => {
     setTrips(listRecentTrips())
   }, [])
+
+  const refreshAndNotify = useCallback(() => {
+    refresh()
+    onChanged?.()
+  }, [onChanged, refresh])
 
   useEffect(() => {
     mergeHiddenRoomCodes([...serverHiddenCodes])
@@ -84,7 +91,7 @@ export function RecentTripsList({
                 kind={trip.kind === "DINNER" ? "DINNER" : "TRIP"}
                 owned={isOwned}
                 placement="row"
-                onDone={refresh}
+                onDone={refreshAndNotify}
               />
             </li>
           )

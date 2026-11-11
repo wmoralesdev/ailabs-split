@@ -92,12 +92,10 @@ export async function openDinnerCreate(page: Page) {
   await expect(page.getByRole("button", { name: "Scan ticket" })).toBeVisible()
 }
 
-/** The no-ticket path: lands on dinner home with the day's fallback name. */
-export async function createDinner(
+async function submitDinnerCreate(
   page: Page,
   creator: string
 ): Promise<{ code: string; name: string }> {
-  await openDinnerCreate(page)
   await page.getByLabel("Your name").fill(creator)
   await page.getByRole("button", { name: "Create without a ticket" }).click()
   const heading = page.getByRole("heading", {
@@ -109,6 +107,35 @@ export async function createDinner(
   const code = new URL(page.url()).pathname.split("/")[2] ?? ""
   expect(code.length).toBeGreaterThanOrEqual(6)
   return { code, name: (await heading.innerText()).trim() }
+}
+
+/** The no-ticket path: lands on dinner home with the day's fallback name. */
+export async function createDinner(
+  page: Page,
+  creator: string
+): Promise<{ code: string; name: string }> {
+  await openDinnerCreate(page)
+  return submitDinnerCreate(page, creator)
+}
+
+/** Same as createDinner, but the landing page is already open. */
+export async function createDinnerFromHome(
+  page: Page,
+  creator: string
+): Promise<{ code: string; name: string }> {
+  const dinnerChip = page
+    .getByRole("group", { name: "Mode" })
+    .getByRole("button", { name: "Dinner" })
+  await expect(async () => {
+    await dinnerChip.click()
+    await expect(dinnerChip).toHaveAttribute("aria-pressed", "true", {
+      timeout: 2_000,
+    })
+  }).toPass({ timeout: 20_000 })
+  await expect(
+    page.getByRole("button", { name: "Create without a ticket" })
+  ).toBeVisible()
+  return submitDinnerCreate(page, creator)
 }
 
 export async function addPeople(page: Page, names: string[]) {
@@ -133,7 +160,6 @@ export async function openPersonSheet(page: Page, name: string) {
   return sheet
 }
 
-/** Opens the dinner's one bill: "Enter items by hand" before it exists, the tab bar after. */
 /** Guest join: pick an existing name, or add a new one. */
 export async function joinDinner(
   page: Page,
@@ -162,6 +188,7 @@ export async function joinDinner(
   await expect(page.getByText(`You · ${name}`)).toBeVisible()
 }
 
+/** Opens the dinner's one bill: "Enter items by hand" before it exists, the tab bar after. */
 export async function openBill(page: Page) {
   const manual = page.getByRole("link", { name: "Enter items by hand" })
   const bill = dinnerNav(page).getByRole("link", { name: "Open the bill" })
@@ -270,6 +297,55 @@ export function itemCard(page: Page, itemName: string): Locator {
 
 export function dinnerNav(page: Page): Locator {
   return page.getByRole("navigation", { name: "Dinner navigation" })
+}
+
+export async function renameDinner(page: Page, from: string, to: string) {
+  await page.getByRole("button", { name: `Rename ${from}` }).click()
+  const sheet = page.getByRole("dialog")
+  await expect(
+    sheet.getByRole("heading", { name: "Dinner name" })
+  ).toBeVisible()
+  await sheet.getByRole("textbox", { name: "Dinner" }).fill(to)
+  await sheet.getByRole("button", { name: "Save name" }).click()
+  await expect(sheet).toBeHidden()
+  await expect(page.getByRole("heading", { level: 1, name: to })).toBeVisible()
+}
+
+export async function goHome(page: Page) {
+  await page.getByRole("link", { name: "Split home" }).click()
+  await expect(page.getByRole("heading", { name: "Split" })).toBeVisible()
+  await waitForHydration(page)
+}
+
+/** Confirmed dinner where `creator` owes `payer` half of `amount`. */
+export async function createOwingDinner(
+  page: Page,
+  input: {
+    creator: string
+    payer: string
+    dinnerName: string
+    item: string
+    amount: string
+    fromHome?: boolean
+  }
+): Promise<{ code: string; name: string }> {
+  const created = input.fromHome
+    ? await createDinnerFromHome(page, input.creator)
+    : await createDinner(page, input.creator)
+  await renameDinner(page, created.name, input.dinnerName)
+  await openBill(page)
+  await addPeople(page, [input.payer])
+  const paidBy = page.getByRole("group", { name: "Paid by" })
+  const payerChip = paidBy.getByRole("button", {
+    name: input.payer,
+    exact: true,
+  })
+  await payerChip.click()
+  await expect(payerChip).toHaveAttribute("aria-pressed", "true")
+  await addCheckItem(page, input.item, input.amount)
+  await assignEqual(page, input.item, [input.creator, input.payer])
+  await confirmCheck(page)
+  return { code: created.code, name: input.dinnerName }
 }
 
 /** Settle sheet: record the open transfer. Photo is optional. */
