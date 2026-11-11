@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { hideRoomLocal } from "./hidden-rooms"
 import {
   forgetRecentTrip,
   formatRecentTripOpened,
@@ -74,6 +75,19 @@ describe("recent-trips", () => {
     rememberRecentTrip({ code: "abc123", name: "One" })
     rememberRecentTrip({ code: "def456", name: "Two" })
     forgetRecentTrip("abc123")
+    expect(listRecentTrips().map((t) => t.code)).toEqual(["DEF456"])
+  })
+
+  it("does not remember a hidden room", () => {
+    hideRoomLocal("abc123")
+    rememberRecentTrip({ code: "abc123", name: "One" })
+    expect(listRecentTrips()).toEqual([])
+  })
+
+  it("omits a later-hidden room from the list", () => {
+    rememberRecentTrip({ code: "abc123", name: "One" })
+    rememberRecentTrip({ code: "def456", name: "Two" })
+    hideRoomLocal("abc123")
     expect(listRecentTrips().map((t) => t.code)).toEqual(["DEF456"])
   })
 

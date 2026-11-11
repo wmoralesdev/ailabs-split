@@ -39,6 +39,7 @@ function normalizeRoomDto(room: RoomDto): RoomDto {
       hasProof: settlement.hasProof === true,
     })),
     checks: Array.isArray(room.checks) ? room.checks : [],
+    owned: room.owned === true,
   }
 }
 
@@ -55,6 +56,22 @@ export function readRoomCache(
     return isRoomDto(parsed) ? normalizeRoomDto(parsed) : undefined
   } catch {
     return undefined
+  }
+}
+
+/** Drop every viewer variant of a room so a deleted bill cannot revive from cache. */
+export function forgetRoomCache(code: string): void {
+  if (typeof window === "undefined") return
+  try {
+    const prefix = `${STORAGE_PREFIX}${code.toUpperCase()}:`
+    const toRemove: string[] = []
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i)
+      if (key && key.startsWith(prefix)) toRemove.push(key)
+    }
+    for (const key of toRemove) window.localStorage.removeItem(key)
+  } catch {
+    // Quota / private mode — ignore
   }
 }
 

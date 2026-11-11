@@ -32,8 +32,21 @@ model Room {
   expenses    Expense[]
   settlements Settlement[]
   checks      Check[]
+  hides       RoomHide[]
 
   @@index([ownerUserId])
+}
+
+model RoomHide {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  createdAt DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@index([userId])
+  @@index([roomId])
 }
 
 model Member {

@@ -19,9 +19,11 @@ import {
   claimMemberSchema,
   createRoomSchema,
   deleteExpenseSchema,
+  deleteRoomSchema,
   deleteSettlementSchema,
   getRoomByCodeSchema,
   getSettlementProofSchema,
+  hideRoomSchema,
   joinRoomSchema,
   recordSettlementSchema,
   removeRoomMemberSchema,
@@ -109,6 +111,8 @@ export type RoomDto = {
   code: string
   name: string
   kind: "TRIP" | "DINNER"
+  /** True when the signed-in viewer created this room. */
+  owned: boolean
   /** Base / settlement currency. */
   currency: string
   /** Allowed currencies for expenses (always includes the base currency). */
@@ -412,6 +416,7 @@ async function loadRoomByCode(
 
   if (!room) return null
 
+  const viewerUserId = await getAuthUserId()
   const currencies =
     room.currencies.length > 0
       ? Array.from(new Set([room.currency, ...room.currencies]))
@@ -422,6 +427,9 @@ async function loadRoomByCode(
     code: room.code,
     name: room.name,
     kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+    owned: Boolean(
+      room.ownerUserId && viewerUserId && room.ownerUserId === viewerUserId
+    ),
     currency: room.currency,
     currencies,
     fxRates: toFxRates(room.fxRates),
@@ -1059,3 +1067,60 @@ export const listMyRooms = createServerFn({ method: "GET" }).handler(
     }))
   }
 )
+
+export const listHiddenRoomCodes = createServerFn({ method: "GET" }).handler(
+  async (): Promise<string[]> => {
+    const userId = await getAuthUserId()
+    if (!userId) return []
+    const rows = await prisma.roomHide.findMany({
+      where: { userId },
+      select: { room: { select: { code: true } } },
+    })
+    return rows.map((row) => row.room.code)
+  }
+)
+
+export const hideRoom = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(hideRoomSchema, data))
+  .handler(async ({ data }): Promise<{ code: string }> => {
+    limitWrites("hide-room")
+    const userId = await getAuthUserId()
+    if (!userId) {
+      throw new Error("Sign in to hide this on every device")
+    }
+    const room = await prisma.room.findUnique({ where: { code: data.code } })
+    if (!room) throw new Error("Trip not found")
+    if (room.ownerUserId && room.ownerUserId === userId) {
+      throw new Error("You started this. Delete it instead of hiding it.")
+    }
+    await prisma.roomHide.upsert({
+      where: { userId_roomId: { userId, roomId: room.id } },
+      create: { userId, roomId: room.id },
+      update: {},
+    })
+    return { code: room.code }
+  })
+
+export const deleteRoom = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(deleteRoomSchema, data))
+  .handler(async ({ data }): Promise<{ code: string }> => {
+    limitWrites("delete-room")
+    const userId = await getAuthUserId()
+    if (!userId) {
+      throw new Error("Sign in to delete this")
+    }
+    const room = await prisma.room.findUnique({ where: { code: data.code } })
+    if (!room) throw new Error("Trip not found")
+    if (room.ownerUserId !== userId) {
+      throw new Error("Only the person who started this can delete it")
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.check.deleteMany({ where: { roomId: room.id } })
+      await tx.expense.deleteMany({ where: { roomId: room.id } })
+      await tx.settlement.deleteMany({ where: { roomId: room.id } })
+      await tx.member.deleteMany({ where: { roomId: room.id } })
+      await tx.room.delete({ where: { id: room.id } })
+    })
+    return { code: room.code }
+  })

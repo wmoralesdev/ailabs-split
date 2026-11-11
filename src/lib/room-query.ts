@@ -1,6 +1,10 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query"
 
-import { readRoomCache, writeRoomCache } from "@/lib/room-cache"
+import {
+  forgetRoomCache,
+  readRoomCache,
+  writeRoomCache,
+} from "@/lib/room-cache"
 import { getRoomByCode } from "@/server/rooms"
 
 export const roomKeys = {
@@ -11,10 +15,7 @@ export const roomKeys = {
     ["room", code, viewerMemberId ?? "anon"] as const,
 }
 
-export function roomQueryOptions(
-  code: string,
-  viewerMemberId?: string | null
-) {
+export function roomQueryOptions(code: string, viewerMemberId?: string | null) {
   const cached = readRoomCache(code, viewerMemberId)
 
   return queryOptions({
@@ -28,6 +29,8 @@ export function roomQueryOptions(
       })
       if (room) {
         writeRoomCache(code, viewerMemberId, room)
+      } else {
+        forgetRoomCache(code)
       }
       return room
     },

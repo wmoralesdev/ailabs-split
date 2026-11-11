@@ -26,6 +26,7 @@ import { DinnerNameField } from "@/components/dinner/dinner-name"
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { OcrReview } from "@/components/dinner/ocr-review"
+import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -65,12 +66,7 @@ import { roomKeys } from "@/lib/room-query"
 import { formatMoney } from "@/lib/settle"
 import { cn } from "@/lib/utils"
 import { scanReceipt } from "@/server/ocr"
-import {
-  confirmCheck,
-  deleteCheck,
-  revertCheck,
-  upsertCheck,
-} from "@/server/checks"
+import { confirmCheck, revertCheck, upsertCheck } from "@/server/checks"
 import { renameRoom } from "@/server/rooms"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
@@ -194,21 +190,6 @@ export function CheckEditor({
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Could not save")
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!checkId) return
-      await deleteCheck({ data: { code: room.code, checkId } })
-    },
-    onSuccess: async () => {
-      await invalidate()
-      toast.success("Bill deleted")
-      await navigate({ to: "/r/$code", params: { code: room.code } })
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Could not delete")
     },
   })
 
@@ -944,43 +925,38 @@ export function CheckEditor({
           </section>
         ) : null}
 
-        {payload.items.length > 0 || checkId ? (
-          <div className="flex flex-col gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              disabled={saveMutation.isPending}
-              onClick={() => saveMutation.mutate(false)}
-            >
-              Save draft for later
-            </Button>
-            {check?.status === "CONFIRMED" ? (
+        <div className="flex flex-col gap-1">
+          {payload.items.length > 0 || checkId ? (
+            <>
               <Button
                 type="button"
                 variant="ghost"
                 className="w-full"
-                onClick={() => revertMutation.mutate()}
+                disabled={saveMutation.isPending}
+                onClick={() => saveMutation.mutate(false)}
               >
-                Move back to draft
+                Save draft for later
               </Button>
-            ) : null}
-            {checkId ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full text-destructive hover:text-destructive"
-                onClick={() => {
-                  if (window.confirm("Delete this bill?")) {
-                    deleteMutation.mutate()
-                  }
-                }}
-              >
-                Delete bill
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
+              {check?.status === "CONFIRMED" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => revertMutation.mutate()}
+                >
+                  Move back to draft
+                </Button>
+              ) : null}
+            </>
+          ) : null}
+          <RoomExitControl
+            code={room.code}
+            name={room.name}
+            kind={room.kind}
+            owned={room.owned}
+            placement="page"
+          />
+        </div>
       </div>
 
       <div className="action-bar mt-auto">

@@ -11,6 +11,7 @@ import { toast } from "sonner"
 
 import { RenameDinnerSheet } from "@/components/dinner/dinner-name"
 import { PullToRefresh } from "@/components/pull-to-refresh"
+import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { copyText } from "@/lib/invite-link"
@@ -189,6 +190,16 @@ export function DinnerHome({
             </Button>
           </div>
         </section>
+
+        <div className="mt-8 mb-4">
+          <RoomExitControl
+            code={room.code}
+            name={room.name}
+            kind={room.kind}
+            owned={room.owned}
+            placement="page"
+          />
+        </div>
       </main>
     </PullToRefresh>
   )

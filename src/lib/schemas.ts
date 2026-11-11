@@ -191,6 +191,14 @@ export const deleteCheckSchema = z.object({
   checkId: z.string().min(1, "Missing check"),
 })
 
+export const deleteRoomSchema = z.object({
+  code: roomCodeSchema,
+})
+
+export const hideRoomSchema = z.object({
+  code: roomCodeSchema,
+})
+
 export const revertCheckSchema = z.object({
   code: roomCodeSchema,
   checkId: z.string().min(1, "Missing check"),
@@ -358,6 +366,8 @@ export type RemoveRoomMemberInput = z.input<typeof removeRoomMemberSchema>
 export type UpsertCheckInput = z.input<typeof upsertCheckSchema>
 export type ConfirmCheckInput = z.input<typeof confirmCheckSchema>
 export type DeleteCheckInput = z.input<typeof deleteCheckSchema>
+export type DeleteRoomInput = z.input<typeof deleteRoomSchema>
+export type HideRoomInput = z.input<typeof hideRoomSchema>
 export type RevertCheckInput = z.input<typeof revertCheckSchema>
 export type JoinRoomInput = z.input<typeof joinRoomSchema>
 export type AddExpenseInput = z.input<typeof addExpenseSchema>

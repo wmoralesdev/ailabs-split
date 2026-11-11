@@ -60,6 +60,7 @@ import {
   createRoom,
   getRoomByCode,
   joinRoom,
+  listHiddenRoomCodes,
   listMyRooms,
 } from "@/server/rooms"
 import type { OwnedRoomDto, RoomDto } from "@/server/rooms"
@@ -73,13 +74,20 @@ type LandingSearch = {
 export const Route = createFileRoute("/")({
   loader: async ({
     context,
-  }): Promise<{ yours: OwnedRoomDto[]; displayName: string }> => {
-    if (!context.userId) return { yours: [], displayName: "" }
-    const [yours, displayName] = await Promise.all([
+  }): Promise<{
+    yours: OwnedRoomDto[]
+    hiddenCodes: string[]
+    displayName: string
+  }> => {
+    if (!context.userId) {
+      return { yours: [], hiddenCodes: [], displayName: "" }
+    }
+    const [yours, hiddenCodes, displayName] = await Promise.all([
       listMyRooms(),
+      listHiddenRoomCodes(),
       fetchSignedInDisplayName(),
     ])
-    return { yours, displayName }
+    return { yours, hiddenCodes, displayName }
   },
   validateSearch: (search: Record<string, unknown>): LandingSearch => {
     const tabRaw =
@@ -123,7 +131,7 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 
 function LandingPage() {
   const navigate = useNavigate()
-  const { yours, displayName } = Route.useLoaderData()
+  const { yours, hiddenCodes, displayName } = Route.useLoaderData()
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
   const [kind, setKind] = useState<RoomKind>("TRIP")
@@ -253,7 +261,10 @@ function LandingPage() {
       </Tabs>
       <div className="pb-safe pb-10">
         <YourRoomsList rooms={yours} />
-        <RecentTripsList />
+        <RecentTripsList
+          ownedCodes={yours.map((room) => room.code)}
+          serverHiddenCodes={hiddenCodes}
+        />
       </div>
     </PageShell>
   )
