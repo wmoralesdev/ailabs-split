@@ -241,4 +241,34 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
     for (const el of els) el.scrollLeft = 0
   })
   await shot(page, "390-everyone.png", itemsList)
+
+  const themeBtn = page.getByRole("button", { name: /Theme:/ })
+  for (let i = 0; i < 3; i++) {
+    if (
+      await page.locator("html").evaluate((el) => el.classList.contains("dark"))
+    ) {
+      break
+    }
+    await themeBtn.click()
+  }
+  await expect(page.locator("html")).toHaveClass(/dark/)
+  await itemsList.scrollIntoViewIfNeeded()
+  await page.locator(".item-row-chips").evaluateAll((els) => {
+    for (const el of els) el.scrollLeft = 0
+  })
+  await page.mouse.move(0, 0)
+  await page.waitForTimeout(80)
+  await shot(page, "dark-everyone-accent.png", itemsList)
+  await shot(page, "dark-scroll-right.png", firstAssign)
+  await firstChips.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth
+  })
+  await expect(firstAssign).toHaveAttribute("data-scroll-left", "")
+  await page.waitForTimeout(80)
+  await shot(page, "dark-scroll-left.png", firstAssign)
+  await shot(page, "dark-390-items-end.png", itemsList)
+  await firstChips.evaluate((el) => {
+    el.scrollLeft = 0
+  })
+  await shot(page, "dark-390-everyone.png", itemsList)
 })
