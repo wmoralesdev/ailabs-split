@@ -4,6 +4,8 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Camera01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons"
 
 import { Spinner } from "@/components/ui/spinner"
+import { imageFromTransfer, transferHasFiles } from "@/lib/image-from-transfer"
+import { useImagePaste } from "@/lib/use-image-paste"
 import { cn } from "@/lib/utils"
 
 const GALLERY_ACCEPT =
@@ -21,23 +23,6 @@ type TicketPhotoPickerProps = {
   className?: string
 }
 
-function transferHasFiles(dataTransfer: DataTransfer | null): boolean {
-  if (!dataTransfer) return false
-  return Array.from(dataTransfer.types).includes("Files")
-}
-
-function imageFromTransfer(dataTransfer: DataTransfer | null): File | null {
-  if (!dataTransfer) return null
-  const files = Array.from(dataTransfer.files)
-  return (
-    files.find(
-      (file) =>
-        file.type.startsWith("image/") ||
-        /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)
-    ) ?? null
-  )
-}
-
 export function TicketPhotoPicker({
   pending,
   onFile,
@@ -52,6 +37,18 @@ export function TicketPhotoPicker({
   const dragCount = useRef(0)
   const [dropping, setDropping] = useState(false)
   const framed = title != null
+
+  function accept(file: File | null) {
+    if (!file) return
+    if (pending) return
+    if (beforePick && !beforePick()) return
+    onFile(file)
+  }
+
+  useImagePaste({
+    enabled: !pending,
+    onImage: (file) => accept(file),
+  })
 
   function onPick(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
@@ -87,10 +84,7 @@ export function TicketPhotoPicker({
     event.preventDefault()
     dragCount.current = 0
     setDropping(false)
-    if (pending) return
-    if (beforePick && !beforePick()) return
-    const file = imageFromTransfer(event.dataTransfer)
-    if (file) onFile(file)
+    accept(imageFromTransfer(event.dataTransfer))
   }
 
   const buttons = (
@@ -180,7 +174,7 @@ export function TicketPhotoPicker({
       {buttons}
       {dropping ? null : (
         <p className="mt-2 hidden text-center text-[13px] text-muted-foreground [@media(hover:hover)_and_(pointer:fine)]:block">
-          Or drop a ticket photo
+          Or drop or paste a ticket photo
         </p>
       )}
       {dropping ? (
