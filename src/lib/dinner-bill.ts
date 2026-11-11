@@ -8,3 +8,24 @@ export function dinnerBill<T extends { createdAt: string }>(
   }
   return first
 }
+
+/** Host-only once a signed-in creator exists. Unsigned dinners stay open. */
+export function dinnerCanEdit(room: {
+  kind: string
+  canEdit?: boolean
+}): boolean {
+  if (room.kind !== "DINNER") return true
+  return room.canEdit !== false
+}
+
+/** Server-side: block dinner bill edits when someone else created the room. */
+export function assertHostDinnerEdit(
+  room: { kind: string; ownerUserId: string | null },
+  userId: string | null
+): void {
+  if (room.kind !== "DINNER") return
+  if (!room.ownerUserId) return
+  if (userId !== room.ownerUserId) {
+    throw new Error("Only the person who started this can edit it")
+  }
+}

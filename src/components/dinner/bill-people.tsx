@@ -70,6 +70,7 @@ export function BillPeople({
   onPaidByChange,
   items,
   onItemsChange,
+  readOnly = false,
 }: {
   room: RoomDto
   selfMemberId: string
@@ -77,6 +78,7 @@ export function BillPeople({
   onPaidByChange: (memberId: string) => void
   items: LineItem[]
   onItemsChange: (items: LineItem[]) => void
+  readOnly?: boolean
 }) {
   const queryClient = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -227,78 +229,96 @@ export function BillPeople({
       <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="At the table">
         {members.map((member) => (
           <li key={member.id}>
-            <button
-              type="button"
-              className="person-chip"
-              aria-label={`Edit ${member.name}`}
-              onClick={() => setEditingId(member.id)}
-            >
-              {member.name}
-            </button>
+            {readOnly ? (
+              <span className="person-chip">{member.name}</span>
+            ) : (
+              <button
+                type="button"
+                className="person-chip"
+                aria-label={`Edit ${member.name}`}
+                onClick={() => setEditingId(member.id)}
+              >
+                {member.name}
+              </button>
+            )}
           </li>
         ))}
       </ul>
-      <form
-        className="mt-2.5 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          submit()
-        }}
-      >
-        <Label htmlFor="bill-add-person" className="sr-only">
-          Add people
-        </Label>
-        <Input
-          ref={inputRef}
-          id="bill-add-person"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Add a guest's name"
-          autoComplete="off"
-          enterKeyHint="done"
-          className="flex-1"
-        />
-        <Button
-          type="submit"
-          className="shrink-0 px-4"
-          disabled={!draft.trim() || addMutation.isPending}
+      {readOnly ? null : (
+        <form
+          className="mt-2.5 flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault()
+            submit()
+          }}
         >
-          <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-          Add
-        </Button>
-      </form>
-      {members.length > 1 ? (
-        <div className="mt-4 grid gap-2">
-          <Label htmlFor="bill-paid-by">Paid by</Label>
-          <MemberPicker
-            id="bill-paid-by"
-            members={members}
-            value={paidById}
-            onChange={onPaidByChange}
+          <Label htmlFor="bill-add-person" className="sr-only">
+            Add people
+          </Label>
+          <Input
+            ref={inputRef}
+            id="bill-add-person"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Add a guest's name"
+            autoComplete="off"
+            enterKeyHint="done"
+            className="flex-1"
           />
-        </div>
+          <Button
+            type="submit"
+            className="shrink-0 px-4"
+            disabled={!draft.trim() || addMutation.isPending}
+          >
+            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+            Add
+          </Button>
+        </form>
+      )}
+      {members.length > 1 ? (
+        readOnly ? (
+          <p className="mt-4 text-[15px] text-muted-foreground">
+            Paid by{" "}
+            <span className="font-medium text-foreground">
+              {members.find((member) => member.id === paidById)?.name ??
+                "someone at the table"}
+            </span>
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-2">
+            <Label htmlFor="bill-paid-by">Paid by</Label>
+            <MemberPicker
+              id="bill-paid-by"
+              members={members}
+              value={paidById}
+              onChange={onPaidByChange}
+            />
+          </div>
+        )
       ) : null}
-      <BillPersonSheet
-        member={editing}
-        open={editingId != null}
-        saving={saving}
-        assignedCount={assignedItems.length}
-        assignedAmountCents={assignedAmountCents}
-        currency={room.currency}
-        blockReason={blockReason}
-        onOpenChange={(open) => {
-          if (!open && !saving) setEditingId(null)
-        }}
-        onRename={(name) => renameMutation.mutate(name)}
-        onRemove={() => {
-          if (!editing) return
-          removeMutation.mutate({
-            memberId: editing.id,
-            name: editing.name,
-            items,
-          })
-        }}
-      />
+      {readOnly ? null : (
+        <BillPersonSheet
+          member={editing}
+          open={editingId != null}
+          saving={saving}
+          assignedCount={assignedItems.length}
+          assignedAmountCents={assignedAmountCents}
+          currency={room.currency}
+          blockReason={blockReason}
+          onOpenChange={(open) => {
+            if (!open && !saving) setEditingId(null)
+          }}
+          onRename={(name) => renameMutation.mutate(name)}
+          onRemove={() => {
+            if (!editing) return
+            removeMutation.mutate({
+              memberId: editing.id,
+              name: editing.name,
+              items,
+            })
+          }}
+        />
+      )}
     </section>
   )
 }

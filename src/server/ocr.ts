@@ -10,6 +10,7 @@ import {
 import { zodTextFormat } from "openai/helpers/zod"
 
 import { requireSignedInUserId } from "@/server/auth-user.server"
+import { assertHostDinnerEdit } from "@/lib/dinner-bill"
 import {
   RECEIPT_VISION_INSTRUCTIONS,
   draftFromExtract,
@@ -46,6 +47,18 @@ async function claimRoomOwnerIfOpen(code: string, userId: string) {
     where: { code, ownerUserId: null },
     data: { ownerUserId: userId },
   })
+}
+
+async function assertCanScanRoom(code: string, userId: string) {
+  const room = await prisma.room.findUnique({
+    where: { code },
+    select: { id: true, kind: true, ownerUserId: true },
+  })
+  if (!room) {
+    throw new Error("Trip not found")
+  }
+  assertHostDinnerEdit(room, userId)
+  return room
 }
 
 function clientKey(): string {
@@ -170,6 +183,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     })
 
     if (process.env.OCR_FIXTURE === "1") {
+      await assertCanScanRoom(data.code, userId)
       await claimRoomOwnerIfOpen(data.code, userId)
       return fixtureDraft(data.mode)
     }
@@ -192,13 +206,7 @@ export const scanReceipt = createServerFn({ method: "POST" })
     })
 
     // Prove the room exists before spending OpenAI credits.
-    const room = await prisma.room.findUnique({
-      where: { code: data.code },
-      select: { id: true },
-    })
-    if (!room) {
-      throw new Error("Trip not found")
-    }
+    await assertCanScanRoom(data.code, userId)
     await claimRoomOwnerIfOpen(data.code, userId)
 
     const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })

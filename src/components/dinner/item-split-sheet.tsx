@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon, MinusSignIcon } from "@hugeicons/core-free-icons"
 
 import { LineQtyName } from "@/components/dinner/line-qty-name"
+import { OwingAmount } from "@/components/dinner/owing-amount"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +18,11 @@ import {
 } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { initials } from "@/lib/dinner-labels"
-import { lineAmountCents, unitPriceFromLine } from "@/lib/dinner-split"
+import {
+  lineAmountCents,
+  splitLineItemShares,
+  unitPriceFromLine,
+} from "@/lib/dinner-split"
 import type { ItemSplit, LineItem } from "@/lib/dinner-split"
 import {
   atmDigitsFromInput,
@@ -42,6 +47,7 @@ export function ItemSplitSheet({
   onOpenChange,
   onSave,
   onSplitLine,
+  readOnly = false,
 }: {
   item: LineItem | null
   members: RoomMemberDto[]
@@ -51,6 +57,7 @@ export function ItemSplitSheet({
   onOpenChange: (open: boolean) => void
   onSave: (item: LineItem) => void
   onSplitLine: (item: LineItem) => void
+  readOnly?: boolean
 }) {
   const fractionDigits = currencyFractionDigits(currency)
   const [name, setName] = useState("")
@@ -289,6 +296,56 @@ export function ItemSplitSheet({
     return <Sheet open={open} onOpenChange={onOpenChange} />
   }
 
+  if (readOnly) {
+    const lineShares = splitLineItemShares(item)
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="bottom"
+          className="flex max-h-[92dvh] flex-col gap-0 rounded-t-3xl bg-background p-0"
+        >
+          <div className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col">
+            <SheetHeader className="gap-0.5 px-4 pt-4 pb-3 text-left">
+              <SheetTitle className="eyebrow">This item</SheetTitle>
+              <div className="flex items-baseline justify-between gap-3">
+                <LineQtyName
+                  name={item.name}
+                  quantity={item.quantity}
+                  className="min-w-0 flex-1"
+                  nameClassName="truncate font-display text-xl font-bold tracking-tight"
+                />
+                <p className="shrink-0 font-display text-xl font-bold tabular-nums">
+                  {formatMoney(item.amountCents, currency)}
+                </p>
+              </div>
+              <SheetDescription className="text-[13px]">
+                {item.modifiers.length > 0
+                  ? item.modifiers.join(", ")
+                  : "Who had this."}
+              </SheetDescription>
+            </SheetHeader>
+            <ul
+              className="group-list min-h-0 flex-1 overflow-y-auto px-4 pb-6"
+              aria-label="Who had this"
+            >
+              {members.map((member) => (
+                <li key={member.id} className="group-row justify-between gap-3">
+                  <span className="min-w-0 truncate text-[15px]">
+                    {member.name}
+                  </span>
+                  <OwingAmount
+                    cents={lineShares.shares.get(member.id) ?? 0}
+                    currency={currency}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+  }
+
   const tabLabel: Record<SplitTab, string> = {
     EQUAL: "Equal",
     PARTS: "Parts",
@@ -411,10 +468,16 @@ export function ItemSplitSheet({
                       >
                         {member.name}
                       </span>
-                      {tab === "EQUAL" && active ? (
-                        <span className="ml-auto pr-2 text-[15px] font-medium tabular-nums">
-                          {formatMoney(equalShareCents, currency)}
-                        </span>
+                      {tab === "EQUAL" ? (
+                        active ? (
+                          <span className="ml-auto pr-2 text-[15px] font-medium tabular-nums">
+                            {formatMoney(equalShareCents, currency)}
+                          </span>
+                        ) : (
+                          <span className="ml-auto pr-2 text-[15px] font-normal text-muted-foreground">
+                            Nothing
+                          </span>
+                        )
                       ) : null}
                     </button>
                     {tab === "PARTS" ? (

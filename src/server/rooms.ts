@@ -3,6 +3,7 @@ import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
 import { getAuthUserId } from "@/server/auth-user.server"
+import { assertHostDinnerEdit } from "@/lib/dinner-bill"
 import { emptyCheckPayload, unassignMemberFromItems } from "@/lib/dinner-split"
 import {
   encodePaymentProof,
@@ -113,6 +114,11 @@ export type RoomDto = {
   kind: "TRIP" | "DINNER"
   /** True when the signed-in viewer created this room. */
   owned: boolean
+  /**
+   * Dinner: the signed-in creator, or anyone if the room has no owner yet.
+   * Trips stay editable by anyone with the code.
+   */
+  canEdit: boolean
   /** Base / settlement currency. */
   currency: string
   /** Allowed currencies for expenses (always includes the base currency). */
@@ -175,6 +181,17 @@ function toFxCalibrationSamples(value: unknown): FxCalibrationSample[] {
     samples.push(sample)
   }
   return samples
+}
+
+function viewerAccess(
+  room: { kind: string; ownerUserId: string | null },
+  viewerUserId: string | null
+): { owned: boolean; canEdit: boolean } {
+  const owned = Boolean(
+    room.ownerUserId && viewerUserId && room.ownerUserId === viewerUserId
+  )
+  const canEdit = room.kind !== "DINNER" || !room.ownerUserId || owned
+  return { owned, canEdit }
 }
 
 function clientIp(): string {
@@ -417,6 +434,7 @@ async function loadRoomByCode(
   if (!room) return null
 
   const viewerUserId = await getAuthUserId()
+  const access = viewerAccess(room, viewerUserId)
   const currencies =
     room.currencies.length > 0
       ? Array.from(new Set([room.currency, ...room.currencies]))
@@ -427,9 +445,8 @@ async function loadRoomByCode(
     code: room.code,
     name: room.name,
     kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
-    owned: Boolean(
-      room.ownerUserId && viewerUserId && room.ownerUserId === viewerUserId
-    ),
+    owned: access.owned,
+    canEdit: access.canEdit,
     currency: room.currency,
     currencies,
     fxRates: toFxRates(room.fxRates),
@@ -548,6 +565,7 @@ export const addRoomMembers = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Room not found")
+    assertHostDinnerEdit(room, await getAuthUserId())
 
     const existing = new Set(
       room.members.map((member) => member.name.toLowerCase())
@@ -580,6 +598,7 @@ export const renameRoomMember = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Room not found")
+    assertHostDinnerEdit(room, await getAuthUserId())
     const member = room.members.find((entry) => entry.id === data.memberId)
     if (!member) throw new Error("Person not found")
     const taken = room.members.some(
@@ -617,6 +636,7 @@ export const removeRoomMember = createServerFn({ method: "POST" })
       },
     })
     if (!room) throw new Error("Room not found")
+    assertHostDinnerEdit(room, await getAuthUserId())
     if (room.members.length <= 1) {
       throw new Error("Keep at least one person")
     }
@@ -669,16 +689,21 @@ export const removeRoomMember = createServerFn({ method: "POST" })
     return loaded
   })
 
-/** Anyone in the room can rename it. Scan-first dinner create still fills the fallback from the ticket place. */
+/** Dinner title: host only once a creator exists. Scan-first create still names it from the ticket. */
 export const renameRoom = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(renameRoomSchema, data))
   .handler(async ({ data }): Promise<RoomDto> => {
     limitWrites("rename-room")
-    const updated = await prisma.room.updateMany({
+    const room = await prisma.room.findUnique({
+      where: { code: data.code },
+      select: { kind: true, ownerUserId: true },
+    })
+    if (!room) throw new Error("Room not found")
+    assertHostDinnerEdit(room, await getAuthUserId())
+    await prisma.room.update({
       where: { code: data.code },
       data: { name: data.name },
     })
-    if (updated.count === 0) throw new Error("Room not found")
     const loaded = await loadRoomByCode(data.code)
     if (!loaded) throw new Error("Room not found")
     return loaded
