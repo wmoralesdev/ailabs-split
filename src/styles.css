@@ -419,22 +419,18 @@
   .item-row {
     @apply transition-colors duration-150 outline-none;
     transition-timing-function: var(--ease-out);
-    --chip-fade: var(--card);
   }
 
   .item-row:active {
     background-color: var(--muted);
-    --chip-fade: var(--muted);
   }
 
   .item-row-unassigned {
     background-color: color-mix(in srgb, var(--destructive) 4%, var(--card));
-    --chip-fade: color-mix(in srgb, var(--destructive) 4%, var(--card));
   }
 
   .item-row-unassigned:active {
     background-color: color-mix(in srgb, var(--destructive) 7%, var(--muted));
-    --chip-fade: color-mix(in srgb, var(--destructive) 7%, var(--muted));
   }
 
   .item-row-main {
@@ -443,49 +439,7 @@
   }
 
   .item-row-assign {
-    @apply relative min-w-0;
-  }
-
-  .item-row-assign::before,
-  .item-row-assign::after {
-    content: "";
-    position: absolute;
-    top: 0.2rem;
-    bottom: 0.35rem;
-    width: 2.25rem;
-    pointer-events: none;
-    z-index: 1;
-    opacity: 0;
-    transition: opacity 160ms var(--ease-out);
-  }
-
-  .item-row-assign::before {
-    left: 0;
-    background: linear-gradient(
-      to right,
-      var(--chip-fade) 0%,
-      color-mix(in srgb, var(--chip-fade) 72%, transparent) 46%,
-      transparent 100%
-    );
-    box-shadow: inset 12px 0 10px -8px
-      color-mix(in srgb, var(--foreground) 16%, transparent);
-  }
-
-  .item-row-assign::after {
-    right: 0;
-    background: linear-gradient(
-      to left,
-      var(--chip-fade) 0%,
-      color-mix(in srgb, var(--chip-fade) 72%, transparent) 46%,
-      transparent 100%
-    );
-    box-shadow: inset -12px 0 10px -8px
-      color-mix(in srgb, var(--foreground) 16%, transparent);
-  }
-
-  .item-row-assign[data-scroll-left]::before,
-  .item-row-assign[data-scroll-right]::after {
-    opacity: 1;
+    @apply min-w-0;
   }
 
   .item-row-chips {
@@ -493,6 +447,38 @@
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
+    --chip-mask-left: 0px;
+    --chip-mask-right: 0px;
+  }
+
+  .item-row-assign[data-scroll-left] .item-row-chips,
+  .item-row-assign[data-scroll-right] .item-row-chips {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--chip-mask-left),
+      #000 calc(100% - var(--chip-mask-right)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--chip-mask-left),
+      #000 calc(100% - var(--chip-mask-right)),
+      transparent
+    );
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+  }
+
+  .item-row-assign[data-scroll-left] .item-row-chips {
+    --chip-mask-left: 1.75rem;
+  }
+
+  .item-row-assign[data-scroll-right] .item-row-chips {
+    --chip-mask-right: 1.75rem;
   }
 
   .item-row-chips::-webkit-scrollbar {
@@ -706,13 +692,11 @@ button.person-chip-everyone:not([aria-pressed="true"]):focus-visible,
   .item-row:hover,
   .item-row:has(:focus-visible) {
     background-color: var(--muted);
-    --chip-fade: var(--muted);
   }
 
   .item-row-unassigned:hover,
   .item-row-unassigned:has(:focus-visible) {
     background-color: color-mix(in srgb, var(--destructive) 7%, var(--muted));
-    --chip-fade: color-mix(in srgb, var(--destructive) 7%, var(--muted));
   }
 
   button.person-chip:not([aria-pressed="true"]):hover {
