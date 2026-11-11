@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   onlineManager,
@@ -1040,6 +1047,58 @@ export function CheckEditor({
   )
 }
 
+function ChipRow({
+  children,
+  role,
+  "aria-label": ariaLabel,
+}: {
+  children: ReactNode
+  role?: string
+  "aria-label"?: string
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    const wrap = wrapRef.current
+    if (!scroller || !wrap) return
+
+    const update = () => {
+      const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+      wrap.toggleAttribute("data-scroll-left", scroller.scrollLeft > 1)
+      wrap.toggleAttribute("data-scroll-right", max - scroller.scrollLeft > 1)
+    }
+
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(scroller)
+    const mo = new MutationObserver(update)
+    mo.observe(scroller, { childList: true, subtree: true })
+    scroller.addEventListener("scroll", update, { passive: true })
+    window.addEventListener("resize", update)
+    return () => {
+      ro.disconnect()
+      mo.disconnect()
+      scroller.removeEventListener("scroll", update)
+      window.removeEventListener("resize", update)
+    }
+  }, [])
+
+  return (
+    <div ref={wrapRef} className="item-row-assign">
+      <div
+        ref={scrollerRef}
+        className="item-row-chips"
+        role={role}
+        aria-label={ariaLabel}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function EveryoneChip({
   pressed,
   onClick,
@@ -1050,7 +1109,7 @@ function EveryoneChip({
   return (
     <button
       type="button"
-      className="person-chip"
+      className="person-chip person-chip-everyone"
       aria-pressed={pressed}
       onClick={onClick}
     >
@@ -1132,43 +1191,37 @@ function ItemCard({
         </span>
       </button>
       {members.length > 0 ? (
-        <div className="item-row-assign">
-          {inlineEditable ? (
-            <div
-              className="item-row-chips"
-              role="group"
-              aria-label="Who shared this"
-            >
-              {members.length > 1 ? (
-                <EveryoneChip pressed={everyone} onClick={onEveryone} />
-              ) : null}
-              {members.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="person-chip"
-                  aria-pressed={selected.has(member.id)}
-                  onClick={() => onToggle(member.id)}
-                >
-                  {member.name}
-                </button>
-              ))}
-              {members.length > 1 ? (
-                <EveryoneChip pressed={everyone} onClick={onEveryone} />
-              ) : null}
-            </div>
-          ) : (
-            <div className="item-row-chips">
+        inlineEditable ? (
+          <ChipRow role="group" aria-label="Who shared this">
+            {members.length > 1 ? (
+              <EveryoneChip pressed={everyone} onClick={onEveryone} />
+            ) : null}
+            {members.map((member) => (
               <button
+                key={member.id}
                 type="button"
-                className="person-chip person-chip-ghost"
-                onClick={onOpen}
+                className="person-chip"
+                aria-pressed={selected.has(member.id)}
+                onClick={() => onToggle(member.id)}
               >
-                Custom split · edit
+                {member.name}
               </button>
-            </div>
-          )}
-        </div>
+            ))}
+            {members.length > 1 ? (
+              <EveryoneChip pressed={everyone} onClick={onEveryone} />
+            ) : null}
+          </ChipRow>
+        ) : (
+          <ChipRow>
+            <button
+              type="button"
+              className="person-chip person-chip-ghost"
+              onClick={onOpen}
+            >
+              Custom split · edit
+            </button>
+          </ChipRow>
+        )
       ) : null}
     </li>
   )

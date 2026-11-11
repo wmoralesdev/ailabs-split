@@ -419,18 +419,22 @@
   .item-row {
     @apply transition-colors duration-150 outline-none;
     transition-timing-function: var(--ease-out);
+    --chip-fade: var(--card);
   }
 
   .item-row:active {
     background-color: var(--muted);
+    --chip-fade: var(--muted);
   }
 
   .item-row-unassigned {
     background-color: color-mix(in srgb, var(--destructive) 4%, var(--card));
+    --chip-fade: color-mix(in srgb, var(--destructive) 4%, var(--card));
   }
 
   .item-row-unassigned:active {
     background-color: color-mix(in srgb, var(--destructive) 7%, var(--muted));
+    --chip-fade: color-mix(in srgb, var(--destructive) 7%, var(--muted));
   }
 
   .item-row-main {
@@ -439,7 +443,49 @@
   }
 
   .item-row-assign {
-    @apply min-w-0;
+    @apply relative min-w-0;
+  }
+
+  .item-row-assign::before,
+  .item-row-assign::after {
+    content: "";
+    position: absolute;
+    top: 0.2rem;
+    bottom: 0.35rem;
+    width: 2.25rem;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 160ms var(--ease-out);
+  }
+
+  .item-row-assign::before {
+    left: 0;
+    background: linear-gradient(
+      to right,
+      var(--chip-fade) 0%,
+      color-mix(in srgb, var(--chip-fade) 72%, transparent) 46%,
+      transparent 100%
+    );
+    box-shadow: inset 12px 0 10px -8px
+      color-mix(in srgb, var(--foreground) 16%, transparent);
+  }
+
+  .item-row-assign::after {
+    right: 0;
+    background: linear-gradient(
+      to left,
+      var(--chip-fade) 0%,
+      color-mix(in srgb, var(--chip-fade) 72%, transparent) 46%,
+      transparent 100%
+    );
+    box-shadow: inset -12px 0 10px -8px
+      color-mix(in srgb, var(--foreground) 16%, transparent);
+  }
+
+  .item-row-assign[data-scroll-left]::before,
+  .item-row-assign[data-scroll-right]::after {
+    opacity: 1;
   }
 
   .item-row-chips {
@@ -496,6 +542,22 @@
 
   :is(.surface, .group-list) .person-chip:not([aria-pressed="true"]) {
     background-color: var(--muted);
+  }
+
+  /* Everyone: stamp purple, not a person chip. Idle = tint fill; selected = solid. */
+  .person-chip-everyone:not([aria-pressed="true"]) {
+    background-color: color-mix(in srgb, var(--primary) 14%, var(--card));
+    color: var(--primary);
+  }
+
+  :is(.surface, .group-list) .person-chip-everyone:not([aria-pressed="true"]) {
+    background-color: color-mix(in srgb, var(--primary) 14%, var(--card));
+    color: var(--primary);
+  }
+
+  .person-chip-everyone[aria-pressed="true"] {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
   }
 
   .person-chip-ghost {
@@ -633,15 +695,24 @@ button.person-chip:not([aria-pressed="true"]):focus-visible {
   background-color: color-mix(in srgb, var(--muted) 78%, var(--foreground));
 }
 
+button.person-chip-everyone:not([aria-pressed="true"]):focus-visible,
+:is(.surface, .group-list)
+  button.person-chip-everyone:not([aria-pressed="true"]):focus-visible {
+  background-color: color-mix(in srgb, var(--primary) 18%, var(--card));
+  color: var(--primary);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .item-row:hover,
   .item-row:has(:focus-visible) {
     background-color: var(--muted);
+    --chip-fade: var(--muted);
   }
 
   .item-row-unassigned:hover,
   .item-row-unassigned:has(:focus-visible) {
     background-color: color-mix(in srgb, var(--destructive) 7%, var(--muted));
+    --chip-fade: color-mix(in srgb, var(--destructive) 7%, var(--muted));
   }
 
   button.person-chip:not([aria-pressed="true"]):hover {
@@ -673,6 +744,37 @@ button.person-chip:not([aria-pressed="true"]):focus-visible {
       var(--foreground) 88%,
       var(--background)
     );
+  }
+
+  .group-list
+    > .item-row:hover
+    .person-chip-everyone:not([aria-pressed="true"]),
+  .group-list
+    > .item-row:has(:focus-visible)
+    .person-chip-everyone:not([aria-pressed="true"]) {
+    background-color: color-mix(in srgb, var(--primary) 16%, var(--card));
+    color: var(--primary);
+  }
+
+  .group-list
+    > .item-row:hover
+    .person-chip-everyone:not([aria-pressed="true"]):hover,
+  .group-list
+    > .item-row:has(:focus-visible)
+    .person-chip-everyone:not([aria-pressed="true"]):hover {
+    background-color: color-mix(in srgb, var(--primary) 22%, var(--card));
+    color: var(--primary);
+  }
+
+  button.person-chip-everyone:not([aria-pressed="true"]):hover,
+  button.person-chip-everyone:not([aria-pressed="true"]):focus-visible {
+    background-color: color-mix(in srgb, var(--primary) 20%, var(--card));
+    color: var(--primary);
+  }
+
+  button.person-chip-everyone[aria-pressed="true"]:hover {
+    background-color: color-mix(in srgb, var(--primary) 86%, var(--foreground));
+    color: var(--primary-foreground);
   }
 
   .item-everyone:hover {

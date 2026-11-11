@@ -84,11 +84,20 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   const first = itemCard(page, "Case Bateria Anker")
   const middle = itemCard(page, "Case Audifonos")
   const last = itemCard(page, "Case Moft")
+  const firstAssign = first.locator(".item-row-assign")
   const firstChips = first.locator(".item-row-chips")
   const lastChips = last.locator(".item-row-chips")
   const firstChipButtons = firstChips.getByRole("button")
   const lastEveryone = lastChips.getByRole("button", {
     name: "Everyone",
+    exact: true,
+  })
+  const firstEveryone = firstChips.getByRole("button", {
+    name: "Everyone",
+    exact: true,
+  })
+  const boreaChip = firstChips.getByRole("button", {
+    name: "Borea",
     exact: true,
   })
 
@@ -100,9 +109,19 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   expect(chipsBox?.height ?? 0, "chip row should be one line").toBeLessThan(56)
   await expect(lastEveryone).toHaveCount(2)
 
+  const everyonePaint = await paint(firstEveryone.first())
+  const personPaint = await paint(boreaChip)
+  const accentPaint = await paint(
+    page.getByRole("button", { name: "Confirm bill" })
+  )
+  expect(everyonePaint.bg).not.toBe(personPaint.bg)
+  await expect(firstEveryone.first()).toHaveCSS("color", accentPaint.bg)
+
   await page.locator(".item-row-chips").evaluateAll((els) => {
     for (const el of els) el.scrollLeft = 0
   })
+  await expect(firstAssign).toHaveAttribute("data-scroll-right", "")
+  await expect(firstAssign).not.toHaveAttribute("data-scroll-left")
   await page.mouse.move(0, 0)
   await page.waitForTimeout(80)
 
@@ -115,15 +134,35 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await shot(page, "390-bill.png")
   await shot(page, "390-paid-by.png", paidBy)
   await shot(page, "390-items.png", itemsList)
+  await shot(page, "everyone-accent.png", itemsList)
+  await shot(page, "scroll-right.png", firstAssign)
   await shot(page, "390-chips-start.png", firstChips)
   await firstChips.evaluate((el) => {
     el.scrollLeft = el.scrollWidth
   })
+  await expect(firstAssign).toHaveAttribute("data-scroll-left", "")
   await page.waitForTimeout(80)
+  await shot(page, "scroll-left.png", firstAssign)
   await shot(page, "390-chips-end.png", firstChips)
   await shot(page, "390-items-end.png", itemsList)
   await firstChips.evaluate((el) => {
     el.scrollLeft = 0
+  })
+  await expect(firstAssign).toHaveAttribute("data-scroll-right", "")
+  await expect(firstAssign).not.toHaveAttribute("data-scroll-left")
+
+  const textOnly = await page.addStyleTag({
+    content: `
+      :is(.surface, .group-list) .person-chip-everyone:not([aria-pressed="true"]) {
+        background-color: var(--muted) !important;
+        color: var(--primary) !important;
+      }
+    `,
+  })
+  await page.waitForTimeout(40)
+  await shot(page, "everyone-accent-text.png", itemsList)
+  await textOnly.evaluate((el) => {
+    if (el instanceof HTMLElement) el.remove()
   })
 
   const title = first.locator(".item-row-main")
@@ -177,6 +216,15 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await lastEveryone.first().click()
   await expect(lastEveryone.first()).toHaveAttribute("aria-pressed", "true")
   await expect(lastEveryone.last()).toHaveAttribute("aria-pressed", "true")
+  await page.mouse.move(0, 0)
+  await expect(lastEveryone.first()).toHaveCSS(
+    "background-color",
+    accentPaint.bg
+  )
+  const selectedPerson = await paint(
+    last.getByRole("button", { name: "Walter", exact: true })
+  )
+  expect(selectedPerson.bg).not.toBe(accentPaint.bg)
   for (const name of ["Walter", ...GUESTS]) {
     await expect(
       last.getByRole("button", { name, exact: true })
