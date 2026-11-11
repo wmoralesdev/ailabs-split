@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   onlineManager,
@@ -539,6 +546,11 @@ export function CheckEditor({
               >
                 Assign rest to me
               </button>
+            ) : payload.items.length > 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                {payload.items.length}{" "}
+                {payload.items.length === 1 ? "item" : "items"}
+              </p>
             ) : null}
           </div>
           {payload.items.length > 0 ? (
@@ -1035,6 +1047,77 @@ export function CheckEditor({
   )
 }
 
+function ChipRow({
+  children,
+  role,
+  "aria-label": ariaLabel,
+}: {
+  children: ReactNode
+  role?: string
+  "aria-label"?: string
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    const wrap = wrapRef.current
+    if (!scroller || !wrap) return
+
+    const update = () => {
+      const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
+      wrap.toggleAttribute("data-scroll-left", scroller.scrollLeft > 1)
+      wrap.toggleAttribute("data-scroll-right", max - scroller.scrollLeft > 1)
+    }
+
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(scroller)
+    const mo = new MutationObserver(update)
+    mo.observe(scroller, { childList: true, subtree: true })
+    scroller.addEventListener("scroll", update, { passive: true })
+    window.addEventListener("resize", update)
+    return () => {
+      ro.disconnect()
+      mo.disconnect()
+      scroller.removeEventListener("scroll", update)
+      window.removeEventListener("resize", update)
+    }
+  }, [])
+
+  return (
+    <div ref={wrapRef} className="item-row-assign">
+      <div
+        ref={scrollerRef}
+        className="item-row-chips"
+        role={role}
+        aria-label={ariaLabel}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function EveryoneChip({
+  pressed,
+  onClick,
+}: {
+  pressed: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className="person-chip person-chip-everyone"
+      aria-pressed={pressed}
+      onClick={onClick}
+    >
+      Everyone
+    </button>
+  )
+}
+
 function ItemCard({
   item,
   members,
@@ -1078,14 +1161,8 @@ function ItemCard({
   }
 
   return (
-    <li
-      className={cn("overflow-hidden", unassigned && "bg-destructive/[0.04]")}
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-start justify-between gap-3 px-4 pt-3 pb-2 text-left outline-none hover:bg-muted/70 focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-      >
+    <li className={cn("item-row", unassigned && "item-row-unassigned")}>
+      <button type="button" onClick={onOpen} className="item-row-main">
         <span className="min-w-0">
           <LineQtyName
             name={item.name}
@@ -1114,32 +1191,28 @@ function ItemCard({
         </span>
       </button>
       {members.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
-          {inlineEditable ? (
-            <>
-              {members.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  className="person-chip"
-                  aria-pressed={selected.has(member.id)}
-                  onClick={() => onToggle(member.id)}
-                >
-                  {member.name}
-                </button>
-              ))}
-              {members.length > 2 ? (
-                <button
-                  type="button"
-                  className="person-chip person-chip-ghost"
-                  aria-pressed={everyone}
-                  onClick={onEveryone}
-                >
-                  Everyone
-                </button>
-              ) : null}
-            </>
-          ) : (
+        inlineEditable ? (
+          <ChipRow role="group" aria-label="Who shared this">
+            {members.length > 1 ? (
+              <EveryoneChip pressed={everyone} onClick={onEveryone} />
+            ) : null}
+            {members.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                className="person-chip"
+                aria-pressed={selected.has(member.id)}
+                onClick={() => onToggle(member.id)}
+              >
+                {member.name}
+              </button>
+            ))}
+            {members.length > 1 ? (
+              <EveryoneChip pressed={everyone} onClick={onEveryone} />
+            ) : null}
+          </ChipRow>
+        ) : (
+          <ChipRow>
             <button
               type="button"
               className="person-chip person-chip-ghost"
@@ -1147,8 +1220,8 @@ function ItemCard({
             >
               Custom split · edit
             </button>
-          )}
-        </div>
+          </ChipRow>
+        )
       ) : null}
     </li>
   )

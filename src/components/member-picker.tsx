@@ -1,13 +1,7 @@
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
+import type { KeyboardEvent as ReactKeyboardEvent } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowDown01Icon } from "@hugeicons/core-free-icons"
+import { ArrowDown01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -22,6 +16,7 @@ type MemberPickerProps = {
   value: string
   onChange: (id: string) => void
   placeholder?: string
+  id?: string
 }
 
 const CHIP_THRESHOLD = 5
@@ -31,6 +26,7 @@ export function MemberPicker({
   value,
   onChange,
   placeholder = "Who paid?",
+  id,
 }: MemberPickerProps) {
   if (members.length < CHIP_THRESHOLD) {
     return (
@@ -52,6 +48,7 @@ export function MemberPicker({
 
   return (
     <SearchableMemberSelect
+      id={id}
       members={members}
       value={value}
       onChange={onChange}
@@ -65,6 +62,7 @@ function SearchableMemberSelect({
   value,
   onChange,
   placeholder,
+  id,
 }: MemberPickerProps) {
   const listId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -80,8 +78,15 @@ function SearchableMemberSelect({
   }, [members, query])
 
   useEffect(() => {
-    setHighlight(0)
-  }, [query, open])
+    const selectedIndex = filtered.findIndex((member) => member.id === value)
+    setHighlight(selectedIndex >= 0 ? selectedIndex : 0)
+  }, [filtered, open, query, value])
+
+  useEffect(() => {
+    if (!open) return
+    const option = rootRef.current?.querySelector("[data-picker-active='true']")
+    option?.scrollIntoView({ block: "nearest" })
+  }, [highlight, open])
 
   useEffect(() => {
     if (!open) return
@@ -108,8 +113,8 @@ function SearchableMemberSelect({
     }
   }, [open])
 
-  function pick(id: string) {
-    onChange(id)
+  function pick(memberId: string) {
+    onChange(memberId)
     setOpen(false)
     setQuery("")
   }
@@ -129,7 +134,7 @@ function SearchableMemberSelect({
     }
     if (event.key === "Enter") {
       event.preventDefault()
-      const member = filtered[highlight]
+      const member = filtered.at(highlight)
       if (member) pick(member.id)
     }
   }
@@ -138,14 +143,13 @@ function SearchableMemberSelect({
     <div ref={rootRef} className="relative">
       <button
         type="button"
+        id={id}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        aria-label={selected ? `Paid by, ${selected.name}` : "Paid by"}
         onClick={() => setOpen((prev) => !prev)}
-        className={cn(
-          "flex h-(--control-height) w-full items-center justify-between gap-2 rounded-full border border-transparent bg-muted px-3 text-left text-base transition-colors",
-          "outline-none hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring"
-        )}
+        className="picker-trigger"
       >
         <span
           className={cn(
@@ -164,7 +168,7 @@ function SearchableMemberSelect({
       </button>
 
       {open ? (
-        <div className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
+        <div className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-md">
           <div className="border-b border-border p-2">
             <Input
               autoFocus
@@ -183,7 +187,7 @@ function SearchableMemberSelect({
             className="max-h-56 overflow-y-auto p-1"
           >
             {filtered.length === 0 ? (
-              <li className="px-2 py-3 text-sm text-muted-foreground">
+              <li className="px-3 py-3 text-[15px] text-muted-foreground">
                 No matches
               </li>
             ) : (
@@ -194,16 +198,25 @@ function SearchableMemberSelect({
                   <li key={member.id} role="option" aria-selected={isActive}>
                     <button
                       type="button"
+                      data-picker-active={isHighlighted ? "true" : undefined}
                       className={cn(
-                        "flex w-full rounded-md px-2 py-2 text-left text-sm",
+                        "flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 text-left text-[15px]",
                         isHighlighted || isActive
-                          ? "bg-accent text-accent-foreground"
+                          ? "bg-muted text-foreground"
                           : "hover:bg-muted/60"
                       )}
                       onMouseEnter={() => setHighlight(index)}
                       onClick={() => pick(member.id)}
                     >
                       {member.name}
+                      {isActive ? (
+                        <HugeiconsIcon
+                          icon={Tick02Icon}
+                          size={18}
+                          strokeWidth={2.2}
+                          className="shrink-0 text-primary"
+                        />
+                      ) : null}
                     </button>
                   </li>
                 )

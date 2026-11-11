@@ -415,6 +415,95 @@
     }
   }
 
+  /* Bill item: hover fills the whole li; .group-list clips it to the card radius. */
+  .item-row {
+    @apply transition-colors duration-150 outline-none;
+    transition-timing-function: var(--ease-out);
+  }
+
+  .item-row:active {
+    background-color: var(--muted);
+  }
+
+  .item-row-unassigned {
+    background-color: color-mix(in srgb, var(--destructive) 4%, var(--card));
+  }
+
+  .item-row-unassigned:active {
+    background-color: color-mix(in srgb, var(--destructive) 7%, var(--muted));
+  }
+
+  .item-row-main {
+    @apply flex w-full items-start justify-between gap-3 px-4 pt-2.5 pb-1.5 text-left outline-none;
+    @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset;
+  }
+
+  .item-row-assign {
+    @apply min-w-0;
+  }
+
+  .item-row-chips {
+    @apply flex flex-nowrap gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pt-1.5 pb-2.5;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    --chip-mask-left: 0px;
+    --chip-mask-right: 0px;
+  }
+
+  .item-row-assign[data-scroll-left] .item-row-chips,
+  .item-row-assign[data-scroll-right] .item-row-chips {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--chip-mask-left),
+      #000 calc(100% - var(--chip-mask-right)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--chip-mask-left),
+      #000 calc(100% - var(--chip-mask-right)),
+      transparent
+    );
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+  }
+
+  .item-row-assign[data-scroll-left] .item-row-chips {
+    --chip-mask-left: 1.75rem;
+  }
+
+  .item-row-assign[data-scroll-right] .item-row-chips {
+    --chip-mask-right: 1.75rem;
+  }
+
+  .item-row-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .item-row-chips .person-chip {
+    @apply shrink-0;
+  }
+
+  .item-everyone {
+    @apply relative mt-0.5 flex min-h-9 w-full items-center text-[15px] font-medium text-primary transition-colors duration-150 outline-none;
+    @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset;
+  }
+
+  .item-everyone[aria-pressed="true"] {
+    @apply text-foreground;
+  }
+
+  .picker-trigger {
+    @apply flex h-(--control-height) w-full items-center justify-between gap-2 rounded-xl border border-border bg-card px-3.5 text-left text-base text-foreground transition-colors outline-none;
+    @apply hover:bg-muted/30 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40;
+    @apply aria-expanded:border-ring aria-expanded:ring-2 aria-expanded:ring-ring/40;
+  }
+
   .group-label {
     @apply px-4 pb-1.5 text-[13px] font-medium text-muted-foreground;
   }
@@ -439,6 +528,22 @@
 
   :is(.surface, .group-list) .person-chip:not([aria-pressed="true"]) {
     background-color: var(--muted);
+  }
+
+  /* Everyone: stamp purple, not a person chip. Idle = tint fill; selected = solid. */
+  .person-chip-everyone:not([aria-pressed="true"]) {
+    background-color: color-mix(in srgb, var(--primary) 14%, var(--card));
+    color: var(--primary);
+  }
+
+  :is(.surface, .group-list) .person-chip-everyone:not([aria-pressed="true"]) {
+    background-color: color-mix(in srgb, var(--primary) 14%, var(--card));
+    color: var(--primary);
+  }
+
+  .person-chip-everyone[aria-pressed="true"] {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
   }
 
   .person-chip-ghost {
@@ -576,7 +681,24 @@ button.person-chip:not([aria-pressed="true"]):focus-visible {
   background-color: color-mix(in srgb, var(--muted) 78%, var(--foreground));
 }
 
+button.person-chip-everyone:not([aria-pressed="true"]):focus-visible,
+:is(.surface, .group-list)
+  button.person-chip-everyone:not([aria-pressed="true"]):focus-visible {
+  background-color: color-mix(in srgb, var(--primary) 18%, var(--card));
+  color: var(--primary);
+}
+
 @media (hover: hover) and (pointer: fine) {
+  .item-row:hover,
+  .item-row:has(:focus-visible) {
+    background-color: var(--muted);
+  }
+
+  .item-row-unassigned:hover,
+  .item-row-unassigned:has(:focus-visible) {
+    background-color: color-mix(in srgb, var(--destructive) 7%, var(--muted));
+  }
+
   button.person-chip:not([aria-pressed="true"]):hover {
     background-color: var(--muted);
   }
@@ -586,12 +708,61 @@ button.person-chip:not([aria-pressed="true"]):focus-visible {
     background-color: color-mix(in srgb, var(--muted) 78%, var(--foreground));
   }
 
+  .group-list > .item-row:hover .person-chip:not([aria-pressed="true"]),
+  .group-list
+    > .item-row:has(:focus-visible)
+    .person-chip:not([aria-pressed="true"]) {
+    background-color: var(--card);
+  }
+
+  .group-list > .item-row:hover .person-chip:not([aria-pressed="true"]):hover,
+  .group-list
+    > .item-row:has(:focus-visible)
+    .person-chip:not([aria-pressed="true"]):hover {
+    background-color: color-mix(in srgb, var(--card) 86%, var(--foreground));
+  }
+
   button.person-chip[aria-pressed="true"]:hover {
     background-color: color-mix(
       in srgb,
       var(--foreground) 88%,
       var(--background)
     );
+  }
+
+  .group-list
+    > .item-row:hover
+    .person-chip-everyone:not([aria-pressed="true"]),
+  .group-list
+    > .item-row:has(:focus-visible)
+    .person-chip-everyone:not([aria-pressed="true"]) {
+    background-color: color-mix(in srgb, var(--primary) 16%, var(--card));
+    color: var(--primary);
+  }
+
+  .group-list
+    > .item-row:hover
+    .person-chip-everyone:not([aria-pressed="true"]):hover,
+  .group-list
+    > .item-row:has(:focus-visible)
+    .person-chip-everyone:not([aria-pressed="true"]):hover {
+    background-color: color-mix(in srgb, var(--primary) 22%, var(--card));
+    color: var(--primary);
+  }
+
+  button.person-chip-everyone:not([aria-pressed="true"]):hover,
+  button.person-chip-everyone:not([aria-pressed="true"]):focus-visible {
+    background-color: color-mix(in srgb, var(--primary) 20%, var(--card));
+    color: var(--primary);
+  }
+
+  button.person-chip-everyone[aria-pressed="true"]:hover {
+    background-color: color-mix(in srgb, var(--primary) 86%, var(--foreground));
+    color: var(--primary-foreground);
+  }
+
+  .item-everyone:hover {
+    color: var(--foreground);
   }
 }
 
