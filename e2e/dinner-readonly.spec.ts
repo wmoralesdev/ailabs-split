@@ -102,6 +102,7 @@ test.describe("dinner read-only for non-creators", () => {
     await expect(
       guestPage.getByRole("heading", { name: dinnerName })
     ).toBeVisible()
+    await expect(guestPage.getByText(/Joined /)).toHaveCount(0)
     await expect(
       guestPage.getByRole("button", { name: `Rename ${dinnerName}` })
     ).toHaveCount(0)
