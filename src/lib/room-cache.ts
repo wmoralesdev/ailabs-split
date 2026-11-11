@@ -21,9 +21,12 @@ function isRoomDto(value: unknown): value is RoomDto {
 }
 
 function normalizeRoomDto(room: RoomDto): RoomDto {
+  const kind = room.kind === "DINNER" ? "DINNER" : "TRIP"
   return {
     ...room,
-    kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+    kind,
+    owned: room.owned === true,
+    canEdit: kind !== "DINNER" ? true : room.canEdit !== false,
     fxAdjustmentBps: Number.isFinite(room.fxAdjustmentBps)
       ? room.fxAdjustmentBps
       : 0,
@@ -39,7 +42,6 @@ function normalizeRoomDto(room: RoomDto): RoomDto {
       hasProof: settlement.hasProof === true,
     })),
     checks: Array.isArray(room.checks) ? room.checks : [],
-    owned: room.owned === true,
   }
 }
 

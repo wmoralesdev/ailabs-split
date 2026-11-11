@@ -1,5 +1,15 @@
 import type { ItemSplit, LineItem } from "@/lib/dinner-split"
 import { itemSplitMemberIds } from "@/lib/dinner-split"
+import { formatMoney } from "@/lib/settle"
+
+/** Zero is a word, not $0.00 — that reads as an amount due. */
+export function owingAmount(
+  cents: number,
+  currency: string
+): { zero: boolean; text: string } {
+  if (cents === 0) return { zero: true, text: "Nothing" }
+  return { zero: false, text: formatMoney(cents, currency) }
+}
 
 export function initials(name: string): string {
   return name
@@ -10,7 +20,19 @@ export function initials(name: string): string {
     .join("")
 }
 
-const LOWER_WORDS = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "of", "the", "and"])
+const LOWER_WORDS = new Set([
+  "de",
+  "del",
+  "la",
+  "las",
+  "el",
+  "los",
+  "y",
+  "e",
+  "of",
+  "the",
+  "and",
+])
 
 /** Tickets print the place in capitals; a room title reads better in title case. */
 export function tidyPlaceName(raw: string): string {
@@ -51,7 +73,9 @@ export function splitSummary(
     case "PARTS": {
       const parts = split.parts
         .filter((part) => part.weight > 0)
-        .map((part) => `${nameById.get(part.memberId) ?? "Unknown"} ${part.weight}`)
+        .map(
+          (part) => `${nameById.get(part.memberId) ?? "Unknown"} ${part.weight}`
+        )
       return parts.length > 0 ? `${parts.join(" · ")} · parts` : "Parts"
     }
     case "QUANTITY": {

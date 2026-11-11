@@ -42,10 +42,12 @@ export function DinnerNameField({
   code,
   name,
   id = "dinner-name",
+  readOnly = false,
 }: {
   code: string
   name: string
   id?: string
+  readOnly?: boolean
 }) {
   const [draft, setDraft] = useState(name)
   const rename = useRenameDinner(code)
@@ -62,6 +64,15 @@ export function DinnerNameField({
     }
     if (trimmed === name) return
     rename.mutate(trimmed)
+  }
+
+  if (readOnly) {
+    return (
+      <div className="grid gap-1.5">
+        <p className="text-[13px] font-medium text-muted-foreground">Dinner</p>
+        <p className="text-[15px]">{name}</p>
+      </div>
+    )
   }
 
   return (

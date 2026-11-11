@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
+import { assertHostDinnerEdit } from "@/lib/dinner-bill"
 import { computeDinnerSplit, expenseSharesFromDinner } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
@@ -50,6 +51,7 @@ async function requireDinnerRoom(code: string) {
   if (room.kind !== "DINNER") {
     throw new Error("Checks are only for dinners")
   }
+  assertHostDinnerEdit(room, await getAuthUserId())
   return room
 }
 

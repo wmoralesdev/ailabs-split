@@ -10,12 +10,13 @@ import {
 import { toast } from "sonner"
 
 import { RenameDinnerSheet } from "@/components/dinner/dinner-name"
+import { OwingAmount } from "@/components/dinner/owing-amount"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { copyText } from "@/lib/invite-link"
-import { dinnerBill } from "@/lib/dinner-bill"
+import { dinnerBill, dinnerCanEdit } from "@/lib/dinner-bill"
 import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { memberLink } from "@/lib/member-storage"
@@ -43,6 +44,7 @@ export function DinnerHome({
   const online = useOnlineStatus()
   const me = room.members.find((member) => member.id === memberId)
   const bill = dinnerBill(room.checks)
+  const canEdit = dinnerCanEdit(room)
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
 
@@ -92,31 +94,39 @@ export function DinnerHome({
             <span>{room.currency}</span>
           </div>
           <h1 className="mt-0.5">
-            <button
-              type="button"
-              onClick={() => setRenameOpen(true)}
-              aria-haspopup="dialog"
-              aria-label={`Rename ${room.name}`}
-              className="flex min-h-11 w-full items-center gap-2 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="min-w-0 flex-1 font-display text-[28px] leading-tight font-bold tracking-tight">
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setRenameOpen(true)}
+                aria-haspopup="dialog"
+                aria-label={`Rename ${room.name}`}
+                className="flex min-h-11 w-full items-center gap-2 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="min-w-0 flex-1 font-display text-[28px] leading-tight font-bold tracking-tight">
+                  {room.name}
+                </span>
+                <HugeiconsIcon
+                  icon={Edit02Icon}
+                  size={18}
+                  strokeWidth={2}
+                  className="shrink-0 text-muted-foreground"
+                />
+              </button>
+            ) : (
+              <span className="block font-display text-[28px] leading-tight font-bold tracking-tight">
                 {room.name}
               </span>
-              <HugeiconsIcon
-                icon={Edit02Icon}
-                size={18}
-                strokeWidth={2}
-                className="shrink-0 text-muted-foreground"
-              />
-            </button>
+            )}
           </h1>
         </header>
-        <RenameDinnerSheet
-          open={renameOpen}
-          onOpenChange={setRenameOpen}
-          code={room.code}
-          name={room.name}
-        />
+        {canEdit ? (
+          <RenameDinnerSheet
+            open={renameOpen}
+            onOpenChange={setRenameOpen}
+            code={room.code}
+            name={room.name}
+          />
+        ) : null}
 
         {bill ? (
           <BillCard
@@ -124,9 +134,12 @@ export function DinnerHome({
             bill={bill}
             memberId={memberId}
             transfers={transfers}
+            canEdit={canEdit}
           />
-        ) : (
+        ) : canEdit ? (
           <StartBillCard code={room.code} />
+        ) : (
+          <WaitingOnBill />
         )}
 
         <section className="mt-6" aria-labelledby="people-heading">
@@ -150,17 +163,22 @@ export function DinnerHome({
               {copied === "code" ? "Copied" : "Copy"}
             </button>
           </div>
-          <ul className="flex flex-wrap gap-1.5" aria-label="At the table">
-            {room.members.map((member) => (
-              <li key={member.id} className="person-chip">
-                {member.name}
-              </li>
-            ))}
-          </ul>
+          {bill ? (
+            <PeopleShares room={room} bill={bill} memberId={memberId} />
+          ) : (
+            <ul className="flex flex-wrap gap-1.5" aria-label="At the table">
+              {room.members.map((member) => (
+                <li key={member.id} className="person-chip">
+                  {member.name}
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
             {room.members.length}{" "}
             {room.members.length === 1 ? "person" : "people"} · the table joins
-            with the code, or add them on the bill.
+            with the code
+            {canEdit ? ", or add them on the bill." : "."}
           </p>
           <div className="mt-3 flex h-11 items-center gap-1 rounded-xl bg-card pr-1.5 pl-3.5">
             <p className="min-w-0 flex-1 truncate text-[15px]">
@@ -202,6 +220,57 @@ export function DinnerHome({
         </div>
       </main>
     </PullToRefresh>
+  )
+}
+
+function WaitingOnBill() {
+  return (
+    <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
+      <h2 id="ticket-heading" className="font-display text-lg font-semibold">
+        Waiting on the bill
+      </h2>
+      <p className="mt-0.5 text-[15px] text-muted-foreground">
+        The host will scan the ticket or add the items.
+      </p>
+    </section>
+  )
+}
+
+function PeopleShares({
+  room,
+  bill,
+  memberId,
+}: {
+  room: RoomDto
+  bill: CheckDto
+  memberId: string
+}) {
+  const split = computeDinnerSplit({
+    items: bill.payload.items,
+    adjustments: bill.payload.adjustments,
+    tip: bill.payload.tip,
+    notedTotalCents: bill.payload.notedTotalCents,
+  })
+  const centsById = new Map(
+    split.shares.map((share) => [share.memberId, share.totalCents])
+  )
+  return (
+    <ul className="group-list mt-2.5" aria-label="At the table">
+      {room.members.map((member) => (
+        <li key={member.id} className="group-row justify-between">
+          <span className="min-w-0 truncate text-[15px]">
+            {member.name}
+            {member.id === memberId ? (
+              <span className="text-muted-foreground"> (you)</span>
+            ) : null}
+          </span>
+          <OwingAmount
+            cents={centsById.get(member.id) ?? 0}
+            currency={room.currency}
+          />
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -249,11 +318,13 @@ function BillCard({
   bill,
   memberId,
   transfers,
+  canEdit,
 }: {
   room: RoomDto
   bill: CheckDto
   memberId: string
   transfers: ReturnType<typeof simplifyTransfers>
+  canEdit: boolean
 }) {
   const split = computeDinnerSplit({
     items: bill.payload.items,
@@ -269,9 +340,12 @@ function BillCard({
 
   let headline: string
   let detail: string
+  const moneyHeadline = oweCents > 0 || owedCents > 0
   if (!confirmed) {
     headline = "Draft in progress"
-    detail = "Assign every item, then confirm to see who owes what."
+    detail = canEdit
+      ? "Assign every item, then confirm to see who owes what."
+      : "The host is still assigning items."
   } else if (oweCents > 0) {
     headline = `You owe ${formatMoney(oweCents, room.currency)}`
     detail =
@@ -285,11 +359,11 @@ function BillCard({
         ? `From ${owedToMe[0].fromName}`
         : `From ${owedToMe.length} people`
   } else if (transfers.length > 0) {
-    headline = "You're square"
+    headline = "You owe nothing"
     detail = `${transfers.length} ${transfers.length === 1 ? "payment" : "payments"} left between others`
   } else {
-    headline = "Everyone is square"
-    detail = "Nothing left to pay."
+    headline = "You owe nothing"
+    detail = "Nothing to pay."
   }
 
   const status = confirmed
@@ -305,7 +379,13 @@ function BillCard({
           <span id="bill-heading">The bill</span> ·{" "}
           {formatMoney(split.totalCents, bill.currency)} · {status}
         </p>
-        <p className="mt-1 font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums">
+        <p
+          className={
+            moneyHeadline
+              ? "mt-1 font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums"
+              : "mt-1 font-display text-[22px] leading-tight font-bold tracking-tight text-muted-foreground"
+          }
+        >
           {headline}
         </p>
         <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
@@ -315,7 +395,7 @@ function BillCard({
             params={{ code: room.code, checkId: bill.id }}
             className="split-cta mt-3.5 w-full"
           >
-            Assign the items
+            {canEdit ? "Assign the items" : "See the items"}
             <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
           </Link>
         ) : transfers.length > 0 ? (

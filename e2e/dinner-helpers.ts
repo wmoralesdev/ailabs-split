@@ -134,6 +134,34 @@ export async function openPersonSheet(page: Page, name: string) {
 }
 
 /** Opens the dinner's one bill: "Enter items by hand" before it exists, the tab bar after. */
+/** Guest join: pick an existing name, or add a new one. */
+export async function joinDinner(
+  page: Page,
+  code: string,
+  name: string,
+  existing = false
+) {
+  await skipCookieBanner(page)
+  await page.goto("/?stay=true&tab=join", { waitUntil: "domcontentloaded" })
+  await waitForHydration(page)
+  const joinTab = page.getByRole("tab", { name: "Join" })
+  if (await joinTab.isVisible()) {
+    await joinTab.click()
+  }
+  await page.getByLabel("Code", { exact: true }).fill(code)
+  await expect(page.getByText(/Joining dinner/i)).toBeVisible()
+  if (existing) {
+    const pick = page.getByRole("button", { name })
+    await expect(pick).toBeVisible()
+    await pick.click()
+  } else {
+    await page.getByRole("button", { name: /add my name/i }).click()
+    await page.getByLabel("Your name").fill(name)
+    await page.getByRole("button", { name: "Continue" }).click()
+  }
+  await expect(page.getByText(`You · ${name}`)).toBeVisible()
+}
+
 export async function openBill(page: Page) {
   const manual = page.getByRole("link", { name: "Enter items by hand" })
   const bill = dinnerNav(page).getByRole("link", { name: "Open the bill" })

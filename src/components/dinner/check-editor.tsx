@@ -26,6 +26,7 @@ import { DinnerNameField } from "@/components/dinner/dinner-name"
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { OcrReview } from "@/components/dinner/ocr-review"
+import { OwingAmount } from "@/components/dinner/owing-amount"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { itemSplitSummary, tidyPlaceName } from "@/lib/dinner-labels"
+import { dinnerCanEdit } from "@/lib/dinner-bill"
 import {
   assignRestToMember,
   computedTotalWithoutPrintedForce,
@@ -85,6 +87,7 @@ export function CheckEditor({
   const queryClient = useQueryClient()
   const isOnline = useOnlineStatus()
   const requireSignIn = useRequireSignIn()
+  const readOnly = !dinnerCanEdit(room)
   const fd = currencyFractionDigits(room.currency)
 
   const [checkId, setCheckId] = useState<string | null>(check?.id ?? null)
@@ -151,6 +154,9 @@ export function CheckEditor({
 
   const saveMutation = useMutation({
     mutationFn: async (confirmAfter: boolean) => {
+      if (readOnly) {
+        throw new Error("Only the person who started this can edit it")
+      }
       const saved = await upsertCheck({
         data: {
           code: room.code,
@@ -195,6 +201,9 @@ export function CheckEditor({
 
   const revertMutation = useMutation({
     mutationFn: async () => {
+      if (readOnly) {
+        throw new Error("Only the person who started this can edit it")
+      }
       if (!checkId) return
       return await revertCheck({ data: { code: room.code, checkId } })
     },
@@ -237,7 +246,7 @@ export function CheckEditor({
   }
 
   async function onScan(file: File | null, nameFromTicket = false) {
-    if (!file) return
+    if (readOnly || !file) return
     if (!onlineManager.isOnline()) {
       setOcrPending(false)
       toast.error("Scanning needs a connection")
@@ -274,6 +283,7 @@ export function CheckEditor({
   }, [])
 
   function addManualItem() {
+    if (readOnly) return
     const unitPriceCents = atmDigitsToCents(newAmount, fd)
     if (!newName.trim() || unitPriceCents <= 0) {
       toast.error("Add a name and amount")
@@ -304,6 +314,7 @@ export function CheckEditor({
   }
 
   function setItemSplit(itemId: string, memberIds: string[]) {
+    if (readOnly) return
     setPayload((prev) => ({
       ...prev,
       items: prev.items.map((item) =>
@@ -428,6 +439,7 @@ export function CheckEditor({
             code={room.code}
             name={room.name}
             id="dinner-name-review"
+            readOnly={readOnly}
           />
           <div className="grid gap-2">
             <Label htmlFor="merchant">Place</Label>
@@ -464,7 +476,7 @@ export function CheckEditor({
       <EditorHeader title={merchant.trim() || "The bill"} onBack={backHome} />
 
       <div className="mt-3 flex flex-col gap-6 pb-6">
-        {payload.items.length === 0 && isOnline ? (
+        {payload.items.length === 0 && isOnline && !readOnly ? (
           <TicketPhotoPicker
             pending={ocrPending}
             title="Add the ticket"
@@ -473,9 +485,14 @@ export function CheckEditor({
             onFile={(file) => void onScan(file)}
           />
         ) : null}
-        {payload.items.length === 0 && !isOnline ? (
+        {payload.items.length === 0 && !isOnline && !readOnly ? (
           <p className="text-[15px] text-muted-foreground">
             Scanning needs a connection. Type the items in below.
+          </p>
+        ) : null}
+        {payload.items.length === 0 && readOnly ? (
+          <p className="text-[15px] text-muted-foreground">
+            The host has not added items yet.
           </p>
         ) : null}
 
@@ -483,17 +500,27 @@ export function CheckEditor({
           code={room.code}
           name={room.name}
           id="dinner-name-assign"
+          readOnly={readOnly}
         />
-        <div className="grid gap-1.5">
-          <Label htmlFor="merchant-assign">Place</Label>
-          <Input
-            id="merchant-assign"
-            value={merchant}
-            onChange={(event) => setMerchant(event.target.value)}
-            placeholder="Celeste Imperio"
-            enterKeyHint="next"
-          />
-        </div>
+        {readOnly ? (
+          <div className="grid gap-1.5">
+            <p className="text-[13px] font-medium text-muted-foreground">
+              Place
+            </p>
+            <p className="text-[15px]">{merchant.trim() || "No place yet"}</p>
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            <Label htmlFor="merchant-assign">Place</Label>
+            <Input
+              id="merchant-assign"
+              value={merchant}
+              onChange={(event) => setMerchant(event.target.value)}
+              placeholder="Celeste Imperio"
+              enterKeyHint="next"
+            />
+          </div>
+        )}
 
         <BillPeople
           room={room}
@@ -504,6 +531,7 @@ export function CheckEditor({
           onItemsChange={(nextItems) =>
             setPayload((prev) => ({ ...prev, items: nextItems }))
           }
+          readOnly={readOnly}
         />
 
         <section aria-labelledby="items-heading">
@@ -514,7 +542,7 @@ export function CheckEditor({
             >
               Items
             </h2>
-            {unassignedCount > 0 ? (
+            {unassignedCount > 0 && !readOnly ? (
               <button
                 type="button"
                 className="text-action text-[15px]"
@@ -536,7 +564,9 @@ export function CheckEditor({
           </div>
           {payload.items.length > 0 ? (
             <p className="text-[13px] leading-snug text-muted-foreground">
-              Tap who shared each item. Tap the item for parts or amounts.
+              {readOnly
+                ? "Who had each item."
+                : "Tap who shared each item. Tap the item for parts or amounts."}
             </p>
           ) : null}
 
@@ -549,6 +579,7 @@ export function CheckEditor({
                   members={room.members}
                   currency={room.currency}
                   nameById={nameById}
+                  readOnly={readOnly}
                   onOpen={() => setSelectedItemId(item.id)}
                   onToggle={(memberId) => toggleItemMember(item, memberId)}
                   onEveryone={() =>
@@ -562,146 +593,238 @@ export function CheckEditor({
             </ul>
           ) : null}
 
-          <form
-            className="surface mt-2.5 flex flex-col gap-3 p-3.5"
-            onSubmit={(event) => {
-              event.preventDefault()
-              addManualItem()
-            }}
-          >
-            <div className="grid gap-1.5">
-              <Label htmlFor="new-item-name">Item</Label>
-              <Input
-                ref={itemNameRef}
-                id="new-item-name"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                placeholder="Pizza Margherita"
-                autoComplete="off"
-                enterKeyHint="next"
-              />
-            </div>
-            <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
+          {readOnly ? null : (
+            <form
+              className="surface mt-2.5 flex flex-col gap-3 p-3.5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                addManualItem()
+              }}
+            >
               <div className="grid gap-1.5">
-                <Label htmlFor="new-item-qty">Qty</Label>
-                <div className="flex h-(--control-height) items-center rounded-xl border border-border bg-card">
-                  <button
-                    type="button"
-                    className="stepper-hit h-full w-10 rounded-l-xl"
-                    onClick={() => setNewQty((value) => Math.max(1, value - 1))}
-                    disabled={newQty <= 1}
-                    aria-label="One fewer"
-                  >
-                    <HugeiconsIcon
-                      icon={MinusSignIcon}
-                      size={16}
-                      strokeWidth={2}
-                    />
-                  </button>
-                  <input
-                    id="new-item-qty"
-                    inputMode="numeric"
-                    value={String(newQty)}
-                    onChange={(event) =>
-                      setNewQty(
-                        Math.max(
-                          1,
-                          Number.parseInt(event.target.value, 10) || 1
-                        )
-                      )
-                    }
-                    onFocus={(event) => event.target.select()}
-                    className="w-7 bg-transparent text-center text-base font-semibold tabular-nums outline-none"
-                  />
-                  <button
-                    type="button"
-                    className="stepper-hit h-full w-10 rounded-r-xl"
-                    onClick={() => setNewQty((value) => value + 1)}
-                    aria-label="One more"
-                  >
-                    <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-                  </button>
-                </div>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="new-item-amount">Price</Label>
+                <Label htmlFor="new-item-name">Item</Label>
                 <Input
-                  id="new-item-amount"
-                  inputMode="numeric"
-                  enterKeyHint="done"
-                  value={formatAtmAmountInput(newAmount, fd)}
-                  onChange={(event) =>
-                    setNewAmount(atmDigitsFromInput(event.target.value))
-                  }
-                  onFocus={(event) => event.target.select()}
-                  placeholder={formatAtmAmount("", fd)}
-                  className="text-right tabular-nums"
+                  ref={itemNameRef}
+                  id="new-item-name"
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                  placeholder="Pizza Margherita"
+                  autoComplete="off"
+                  enterKeyHint="next"
                 />
               </div>
-            </div>
-            {newQty > 1 && atmDigitsToCents(newAmount, fd) > 0 ? (
-              <p className="text-[13px] text-muted-foreground">
-                {formatMoney(
-                  lineAmountCents(atmDigitsToCents(newAmount, fd), newQty),
-                  room.currency
-                )}{" "}
-                on the bill
-              </p>
-            ) : null}
-            <Button
-              type="submit"
-              variant="secondary"
-              className="btn-tint w-full"
-              disabled={!newName.trim() || atmDigitsToCents(newAmount, fd) <= 0}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-              Add item
-            </Button>
-          </form>
+              <div className="grid grid-cols-[auto_1fr] items-end gap-2.5">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="new-item-qty">Qty</Label>
+                  <div className="flex h-(--control-height) items-center rounded-xl border border-border bg-card">
+                    <button
+                      type="button"
+                      className="stepper-hit h-full w-10 rounded-l-xl"
+                      onClick={() =>
+                        setNewQty((value) => Math.max(1, value - 1))
+                      }
+                      disabled={newQty <= 1}
+                      aria-label="One fewer"
+                    >
+                      <HugeiconsIcon
+                        icon={MinusSignIcon}
+                        size={16}
+                        strokeWidth={2}
+                      />
+                    </button>
+                    <input
+                      id="new-item-qty"
+                      inputMode="numeric"
+                      value={String(newQty)}
+                      onChange={(event) =>
+                        setNewQty(
+                          Math.max(
+                            1,
+                            Number.parseInt(event.target.value, 10) || 1
+                          )
+                        )
+                      }
+                      onFocus={(event) => event.target.select()}
+                      className="w-7 bg-transparent text-center text-base font-semibold tabular-nums outline-none"
+                    />
+                    <button
+                      type="button"
+                      className="stepper-hit h-full w-10 rounded-r-xl"
+                      onClick={() => setNewQty((value) => value + 1)}
+                      aria-label="One more"
+                    >
+                      <HugeiconsIcon
+                        icon={Add01Icon}
+                        size={16}
+                        strokeWidth={2}
+                      />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="new-item-amount">Price</Label>
+                  <Input
+                    id="new-item-amount"
+                    inputMode="numeric"
+                    enterKeyHint="done"
+                    value={formatAtmAmountInput(newAmount, fd)}
+                    onChange={(event) =>
+                      setNewAmount(atmDigitsFromInput(event.target.value))
+                    }
+                    onFocus={(event) => event.target.select()}
+                    placeholder={formatAtmAmount("", fd)}
+                    className="text-right tabular-nums"
+                  />
+                </div>
+              </div>
+              {newQty > 1 && atmDigitsToCents(newAmount, fd) > 0 ? (
+                <p className="text-[13px] text-muted-foreground">
+                  {formatMoney(
+                    lineAmountCents(atmDigitsToCents(newAmount, fd), newQty),
+                    room.currency
+                  )}{" "}
+                  on the bill
+                </p>
+              ) : null}
+              <Button
+                type="submit"
+                variant="secondary"
+                className="btn-tint w-full"
+                disabled={
+                  !newName.trim() || atmDigitsToCents(newAmount, fd) <= 0
+                }
+              >
+                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+                Add item
+              </Button>
+            </form>
+          )}
         </section>
 
-        <section
-          aria-labelledby="extras-heading"
-          className="flex flex-col gap-2.5"
-        >
-          <h2
-            id="extras-heading"
-            className="font-display text-lg font-semibold"
+        {readOnly &&
+        payload.adjustments.length === 0 &&
+        payload.tip.amountCents === 0 ? null : (
+          <section
+            aria-labelledby="extras-heading"
+            className="flex flex-col gap-2.5"
           >
-            Tip and fees
-          </h2>
-          {payload.adjustments.length > 0 ? (
-            <ul className="group-list">
-              {payload.adjustments.map((adjustment) => (
-                <li
-                  key={adjustment.id}
-                  className={cn("group-row", "justify-between pr-1")}
-                >
-                  <span className="text-[15px]">
-                    {adjustment.name}
-                    {adjustment.percent != null ? (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {adjustment.percent}%
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-[15px] tabular-nums">
-                      {formatMoney(adjustment.amountCents, room.currency)}
+            <h2
+              id="extras-heading"
+              className="font-display text-lg font-semibold"
+            >
+              Tip and fees
+            </h2>
+            {payload.adjustments.length > 0 ? (
+              <ul className="group-list">
+                {payload.adjustments.map((adjustment) => (
+                  <li
+                    key={adjustment.id}
+                    className={cn("group-row", "justify-between pr-1")}
+                  >
+                    <span className="text-[15px]">
+                      {adjustment.name}
+                      {adjustment.percent != null ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {adjustment.percent}%
+                        </span>
+                      ) : null}
                     </span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-[15px] tabular-nums">
+                        {formatMoney(adjustment.amountCents, room.currency)}
+                      </span>
+                      {readOnly ? null : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Remove ${adjustment.name}`}
+                          onClick={() =>
+                            setPayload((prev) => ({
+                              ...prev,
+                              adjustments: prev.adjustments.filter(
+                                (entry) => entry.id !== adjustment.id
+                              ),
+                            }))
+                          }
+                        >
+                          <HugeiconsIcon
+                            icon={Delete02Icon}
+                            size={16}
+                            strokeWidth={2}
+                          />
+                        </Button>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {showTipChips && !readOnly ? (
+              <div className="surface flex flex-col gap-3 p-3.5">
+                <div>
+                  <Label htmlFor="custom-tip">Add tip</Label>
+                  <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+                    Only if you want one. Nothing is added unless the ticket
+                    prints it.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[10, 15].map((percent) => (
+                    <Button
+                      key={percent}
+                      type="button"
+                      variant="secondary"
+                      className="btn-tint rounded-xl"
+                      onClick={() => applyTipPercent(percent)}
+                    >
+                      {percent}%
+                    </Button>
+                  ))}
+                  <Input
+                    id="custom-tip"
+                    inputMode="numeric"
+                    value={formatAtmAmountInput(customTip, fd)}
+                    onChange={(event) =>
+                      setCustomTip(atmDigitsFromInput(event.target.value))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault()
+                        applyCustomTip()
+                      }
+                    }}
+                    onBlur={applyCustomTip}
+                    placeholder={formatAtmAmount("", fd)}
+                    aria-label="Custom tip amount"
+                    className="text-center tabular-nums"
+                  />
+                </div>
+              </div>
+            ) : payload.tip.amountCents > 0 ? (
+              <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
+                <p className="text-[15px]">
+                  Tip
+                  <span className="text-muted-foreground">
+                    {payload.tip.source === "TICKET"
+                      ? " · on ticket"
+                      : " · added"}
+                  </span>
+                </p>
+                <span className="flex items-center gap-1">
+                  <span className="text-[15px] font-semibold tabular-nums">
+                    {formatMoney(payload.tip.amountCents, room.currency)}
+                  </span>
+                  {payload.tip.source === "TICKET" || readOnly ? null : (
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      aria-label={`Remove ${adjustment.name}`}
+                      aria-label="Remove tip"
                       onClick={() =>
-                        setPayload((prev) => ({
-                          ...prev,
-                          adjustments: prev.adjustments.filter(
-                            (entry) => entry.id !== adjustment.id
-                          ),
-                        }))
+                        setPayload((prev) => ({ ...prev, tip: manualTip(0) }))
                       }
                     >
                       <HugeiconsIcon
@@ -710,201 +833,127 @@ export function CheckEditor({
                         strokeWidth={2}
                       />
                     </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {showTipChips ? (
-            <div className="surface flex flex-col gap-3 p-3.5">
-              <div>
-                <Label htmlFor="custom-tip">Add tip</Label>
-                <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-                  Only if you want one. Nothing is added unless the ticket
-                  prints it.
-                </p>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[10, 15].map((percent) => (
-                  <Button
-                    key={percent}
-                    type="button"
-                    variant="secondary"
-                    className="btn-tint rounded-xl"
-                    onClick={() => applyTipPercent(percent)}
-                  >
-                    {percent}%
-                  </Button>
-                ))}
-                <Input
-                  id="custom-tip"
-                  inputMode="numeric"
-                  value={formatAtmAmountInput(customTip, fd)}
-                  onChange={(event) =>
-                    setCustomTip(atmDigitsFromInput(event.target.value))
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault()
-                      applyCustomTip()
-                    }
-                  }}
-                  onBlur={applyCustomTip}
-                  placeholder={formatAtmAmount("", fd)}
-                  aria-label="Custom tip amount"
-                  className="text-center tabular-nums"
-                />
-              </div>
-            </div>
-          ) : payload.tip.amountCents > 0 ? (
-            <div className="group-list flex min-h-11 items-center justify-between gap-3 pr-1 pl-4">
-              <p className="text-[15px]">
-                Tip
-                <span className="text-muted-foreground">
-                  {payload.tip.source === "TICKET"
-                    ? " · on ticket"
-                    : " · added"}
+                  )}
                 </span>
-              </p>
-              <span className="flex items-center gap-1">
-                <span className="text-[15px] font-semibold tabular-nums">
-                  {formatMoney(payload.tip.amountCents, room.currency)}
-                </span>
-                {payload.tip.source === "TICKET" ? null : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove tip"
-                    onClick={() =>
-                      setPayload((prev) => ({ ...prev, tip: manualTip(0) }))
-                    }
-                  >
-                    <HugeiconsIcon
-                      icon={Delete02Icon}
-                      size={16}
-                      strokeWidth={2}
-                    />
-                  </Button>
-                )}
-              </span>
-            </div>
-          ) : null}
-
-          {showFee ? (
-            <form
-              className="surface flex flex-col gap-3 p-3.5"
-              onSubmit={(event) => {
-                event.preventDefault()
-                addFee()
-              }}
-            >
-              <Label htmlFor="fee-name">Add fee</Label>
-              <Input
-                id="fee-name"
-                value={feeName}
-                onChange={(event) => setFeeName(event.target.value)}
-                placeholder="Service"
-                autoComplete="off"
-              />
-              <div className="flex gap-2">
-                <div
-                  role="group"
-                  aria-label="Fee as amount or percent"
-                  className="flex h-(--control-height) shrink-0 rounded-xl bg-muted p-0.5"
-                >
-                  <button
-                    type="button"
-                    aria-pressed={feeUnit === "amount"}
-                    aria-label="Fee as amount"
-                    className={cn(
-                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      feeUnit === "amount"
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "text-muted-foreground hover:bg-card hover:text-foreground"
-                    )}
-                    onClick={() => setFeeUnit("amount")}
-                  >
-                    $
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={feeUnit === "percent"}
-                    aria-label="Fee as percent"
-                    className={cn(
-                      "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      feeUnit === "percent"
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "text-muted-foreground hover:bg-card hover:text-foreground"
-                    )}
-                    onClick={() => setFeeUnit("percent")}
-                  >
-                    %
-                  </button>
-                </div>
-                {feeUnit === "percent" ? (
-                  <Input
-                    id="fee-value"
-                    inputMode="decimal"
-                    value={feePercent}
-                    onChange={(event) => setFeePercent(event.target.value)}
-                    placeholder="10"
-                    aria-label="Fee percent"
-                    className="text-right tabular-nums"
-                  />
-                ) : (
-                  <Input
-                    id="fee-value"
-                    inputMode="numeric"
-                    value={formatAtmAmountInput(feeAmount, fd)}
-                    onChange={(event) =>
-                      setFeeAmount(atmDigitsFromInput(event.target.value))
-                    }
-                    placeholder={formatAtmAmount("", fd)}
-                    aria-label="Fee amount"
-                    className="text-right tabular-nums"
-                  />
-                )}
               </div>
-              {feeUnit === "percent" && pendingFee ? (
-                <p className="text-[13px] text-muted-foreground">
-                  Adds {formatMoney(pendingFee.amountCents, room.currency)}
-                </p>
-              ) : null}
-              <Button
-                type="submit"
-                variant="secondary"
-                className="btn-tint w-full"
-                disabled={!pendingFee}
+            ) : null}
+
+            {readOnly ? null : showFee ? (
+              <form
+                className="surface flex flex-col gap-3 p-3.5"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  addFee()
+                }}
               >
-                Add fee
+                <Label htmlFor="fee-name">Add fee</Label>
+                <Input
+                  id="fee-name"
+                  value={feeName}
+                  onChange={(event) => setFeeName(event.target.value)}
+                  placeholder="Service"
+                  autoComplete="off"
+                />
+                <div className="flex gap-2">
+                  <div
+                    role="group"
+                    aria-label="Fee as amount or percent"
+                    className="flex h-(--control-height) shrink-0 rounded-xl bg-muted p-0.5"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={feeUnit === "amount"}
+                      aria-label="Fee as amount"
+                      className={cn(
+                        "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        feeUnit === "amount"
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "text-muted-foreground hover:bg-card hover:text-foreground"
+                      )}
+                      onClick={() => setFeeUnit("amount")}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={feeUnit === "percent"}
+                      aria-label="Fee as percent"
+                      className={cn(
+                        "min-w-11 rounded-lg px-3 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        feeUnit === "percent"
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "text-muted-foreground hover:bg-card hover:text-foreground"
+                      )}
+                      onClick={() => setFeeUnit("percent")}
+                    >
+                      %
+                    </button>
+                  </div>
+                  {feeUnit === "percent" ? (
+                    <Input
+                      id="fee-value"
+                      inputMode="decimal"
+                      value={feePercent}
+                      onChange={(event) => setFeePercent(event.target.value)}
+                      placeholder="10"
+                      aria-label="Fee percent"
+                      className="text-right tabular-nums"
+                    />
+                  ) : (
+                    <Input
+                      id="fee-value"
+                      inputMode="numeric"
+                      value={formatAtmAmountInput(feeAmount, fd)}
+                      onChange={(event) =>
+                        setFeeAmount(atmDigitsFromInput(event.target.value))
+                      }
+                      placeholder={formatAtmAmount("", fd)}
+                      aria-label="Fee amount"
+                      className="text-right tabular-nums"
+                    />
+                  )}
+                </div>
+                {feeUnit === "percent" && pendingFee ? (
+                  <p className="text-[13px] text-muted-foreground">
+                    Adds {formatMoney(pendingFee.amountCents, room.currency)}
+                  </p>
+                ) : null}
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  className="btn-tint w-full"
+                  disabled={!pendingFee}
+                >
+                  Add fee
+                </Button>
+              </form>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-action h-auto self-start px-0"
+                onClick={() => setShowFee(true)}
+              >
+                <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+                Add a fee or service charge
               </Button>
-            </form>
-          ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-action h-auto self-start px-0"
-              onClick={() => setShowFee(true)}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
-              Add a fee or service charge
-            </Button>
-          )}
-        </section>
+            )}
+          </section>
+        )}
 
         <Totals
           split={split}
           currency={room.currency}
           onForcePrinted={
-            split.ocrDeltaCents != null && split.ocrDeltaCents !== 0
+            !readOnly &&
+            split.ocrDeltaCents != null &&
+            split.ocrDeltaCents !== 0
               ? forcePrintedTotal
               : undefined
           }
         />
 
-        {split.shares.length > 0 ? (
+        {room.members.length > 0 && payload.items.length > 0 ? (
           <section aria-labelledby="by-person-heading">
             <h2
               id="by-person-heading"
@@ -913,20 +962,26 @@ export function CheckEditor({
               By person
             </h2>
             <ul className="group-list mt-2.5">
-              {split.shares.map((share) => (
-                <li key={share.memberId} className="group-row justify-between">
-                  <span>{nameById.get(share.memberId) ?? share.memberId}</span>
-                  <span className="font-semibold tabular-nums">
-                    {formatMoney(share.totalCents, room.currency)}
-                  </span>
-                </li>
-              ))}
+              {room.members.map((member) => {
+                const share = split.shares.find(
+                  (entry) => entry.memberId === member.id
+                )
+                return (
+                  <li key={member.id} className="group-row justify-between">
+                    <span>{member.name}</span>
+                    <OwingAmount
+                      cents={share?.totalCents ?? 0}
+                      currency={room.currency}
+                    />
+                  </li>
+                )
+              })}
             </ul>
           </section>
         ) : null}
 
         <div className="flex flex-col gap-1">
-          {payload.items.length > 0 || checkId ? (
+          {!readOnly && (payload.items.length > 0 || checkId) ? (
             <>
               <Button
                 type="button"
@@ -959,40 +1014,43 @@ export function CheckEditor({
         </div>
       </div>
 
-      <div className="action-bar mt-auto">
-        <div className="mb-2 flex items-baseline justify-between gap-3">
-          <p className="font-display text-xl font-bold tabular-nums">
-            {formatMoney(split.totalCents, room.currency)}
-          </p>
-          {split.confirmBlockReason ? (
-            <p
-              className="text-right text-[13px] font-medium text-destructive"
-              role="alert"
-            >
-              {split.confirmBlockReason}
+      {readOnly ? null : (
+        <div className="action-bar mt-auto">
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <p className="font-display text-xl font-bold tabular-nums">
+              {formatMoney(split.totalCents, room.currency)}
             </p>
-          ) : payload.items.length > 0 ? (
-            <p className="text-[13px] text-muted-foreground">
-              Split between {split.shares.length}{" "}
-              {split.shares.length === 1 ? "person" : "people"}
-            </p>
-          ) : null}
+            {split.confirmBlockReason ? (
+              <p
+                className="text-right text-[13px] font-medium text-destructive"
+                role="alert"
+              >
+                {split.confirmBlockReason}
+              </p>
+            ) : payload.items.length > 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                Split between {split.shares.length}{" "}
+                {split.shares.length === 1 ? "person" : "people"}
+              </p>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            className="cta-lg"
+            disabled={!split.canConfirm || saveMutation.isPending}
+            onClick={() => saveMutation.mutate(true)}
+          >
+            {saveMutation.isPending ? "Saving…" : "Confirm bill"}
+          </Button>
         </div>
-        <Button
-          type="button"
-          className="cta-lg"
-          disabled={!split.canConfirm || saveMutation.isPending}
-          onClick={() => saveMutation.mutate(true)}
-        >
-          {saveMutation.isPending ? "Saving…" : "Confirm bill"}
-        </Button>
-      </div>
+      )}
 
       <ItemSplitSheet
         item={selectedItem}
         members={room.members}
         currency={room.currency}
         previousItem={previousItem}
+        readOnly={readOnly}
         open={selectedItem != null}
         onOpenChange={(open) => {
           if (!open) setSelectedItemId(null)
@@ -1099,6 +1157,7 @@ function ItemCard({
   members,
   currency,
   nameById,
+  readOnly = false,
   onOpen,
   onToggle,
   onEveryone,
@@ -1107,6 +1166,7 @@ function ItemCard({
   members: RoomDto["members"]
   currency: string
   nameById: Map<string, string>
+  readOnly?: boolean
   onOpen: () => void
   onToggle: (memberId: string) => void
   onEveryone: () => void
@@ -1169,33 +1229,49 @@ function ItemCard({
       {members.length > 0 ? (
         inlineEditable ? (
           <ChipRow role="group" aria-label="Who shared this">
-            {members.length > 1 ? (
+            {readOnly ? null : members.length > 1 ? (
               <EveryoneChip pressed={everyone} onClick={onEveryone} />
             ) : null}
-            {members.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                className="person-chip"
-                aria-pressed={selected.has(member.id)}
-                onClick={() => onToggle(member.id)}
-              >
-                {member.name}
-              </button>
-            ))}
-            {members.length > 1 ? (
+            {members.map((member) =>
+              readOnly ? (
+                <span
+                  key={member.id}
+                  className="person-chip"
+                  aria-pressed={selected.has(member.id)}
+                >
+                  {member.name}
+                </span>
+              ) : (
+                <button
+                  key={member.id}
+                  type="button"
+                  className="person-chip"
+                  aria-pressed={selected.has(member.id)}
+                  onClick={() => onToggle(member.id)}
+                >
+                  {member.name}
+                </button>
+              )
+            )}
+            {readOnly ? null : members.length > 1 ? (
               <EveryoneChip pressed={everyone} onClick={onEveryone} />
             ) : null}
           </ChipRow>
         ) : (
           <ChipRow>
-            <button
-              type="button"
-              className="person-chip person-chip-ghost"
-              onClick={onOpen}
-            >
-              Custom split · edit
-            </button>
+            {readOnly ? (
+              <span className="person-chip person-chip-ghost">
+                Custom split
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="person-chip person-chip-ghost"
+                onClick={onOpen}
+              >
+                Custom split · edit
+              </button>
+            )}
           </ChipRow>
         )
       ) : null}

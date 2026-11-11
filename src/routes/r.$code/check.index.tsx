@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import { CheckEditor } from "@/components/dinner/check-editor"
 import { Skeleton } from "@/components/ui/skeleton"
-import { dinnerBill } from "@/lib/dinner-bill"
+import { dinnerBill, dinnerCanEdit } from "@/lib/dinner-bill"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { roomQueryOptions } from "@/lib/room-query"
 
@@ -38,6 +38,10 @@ function NewCheckPage() {
         replace
       />
     )
+  }
+
+  if (!dinnerCanEdit(room)) {
+    return <Navigate to="/r/$code" params={{ code }} replace />
   }
 
   return <CheckEditor room={room} selfMemberId={memberId} check={null} />
