@@ -27,8 +27,14 @@ import { cn } from "@/lib/utils"
 const GALLERY_ACCEPT =
   "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
 
+export type PaymentProofSummary = {
+  sentence: string
+  amountLabel: string
+}
+
 type PaymentProofSheetProps = {
   transfer: Transfer | null
+  summary?: PaymentProofSummary | null
   currency: string
   memberId: string
   open: boolean
@@ -39,6 +45,7 @@ type PaymentProofSheetProps = {
 
 export function PaymentProofSheet({
   transfer,
+  summary = null,
   currency,
   memberId,
   open,
@@ -88,9 +95,10 @@ export function PaymentProofSheet({
   }
 
   const busy = preparing || saving
+  const canRecord = Boolean(transfer || summary)
 
   useImagePaste({
-    enabled: open && Boolean(transfer) && !busy,
+    enabled: open && canRecord && !busy,
     onImage: takePhoto,
   })
 
@@ -130,8 +138,13 @@ export function PaymentProofSheet({
     })
   }
 
+  function skipPhoto() {
+    if (!canRecord || preparing || saving) return
+    onConfirm()
+  }
+
   async function confirm() {
-    if (!transfer || preparing || saving) return
+    if (!canRecord || preparing || saving) return
     if (!file) {
       onConfirm()
       return
@@ -151,17 +164,26 @@ export function PaymentProofSheet({
     }
   }
 
-  if (!transfer) {
+  const display = summary
+    ? { sentence: summary.sentence, amountLabel: summary.amountLabel }
+    : transfer
+      ? {
+          sentence:
+            transfer.fromId === memberId
+              ? `You pay ${transfer.toName}`
+              : transfer.toId === memberId
+                ? `${transfer.fromName} pays you`
+                : `${transfer.fromName} pays ${transfer.toName}`,
+          amountLabel: formatMoney(transfer.amountCents, currency),
+        }
+      : null
+
+  if (!display) {
     return <Sheet open={open} onOpenChange={onOpenChange} />
   }
 
-  const iPay = transfer.fromId === memberId
-  const iGet = transfer.toId === memberId
-  const sentence = iPay
-    ? `You pay ${transfer.toName}`
-    : iGet
-      ? `${transfer.fromName} pays you`
-      : `${transfer.fromName} pays ${transfer.toName}`
+  const sentence = display.sentence
+  const amountLabel = display.amountLabel
   const confirmLabel = preparing
     ? "Preparing photo…"
     : saving
@@ -182,7 +204,7 @@ export function PaymentProofSheet({
                 {sentence}
               </p>
               <p className="shrink-0 font-display text-xl font-bold tabular-nums">
-                {formatMoney(transfer.amountCents, currency)}
+                {amountLabel}
               </p>
             </div>
             <SheetDescription className="text-[13px]">
@@ -308,6 +330,16 @@ export function PaymentProofSheet({
             >
               {confirmLabel}
             </Button>
+            {summary ? (
+              <button
+                type="button"
+                className="text-action justify-center text-[15px]"
+                onClick={skipPhoto}
+                disabled={busy}
+              >
+                Skip
+              </button>
+            ) : null}
           </SheetFooter>
         </div>
       </SheetContent>

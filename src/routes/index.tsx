@@ -17,6 +17,7 @@ import { RecentTripsList } from "@/components/recent-trips-list"
 import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { ToSettleCard } from "@/components/to-settle-card"
 import { WithDisplayName } from "@/components/with-display-name"
 import { YourRoomsList } from "@/components/your-rooms-list"
 import { Button } from "@/components/ui/button"
@@ -132,6 +133,7 @@ type JoinCodeValues = z.infer<typeof joinCodeSchema>
 function LandingPage() {
   const navigate = useNavigate()
   const { yours, hiddenCodes, displayName } = Route.useLoaderData()
+  const [listsRevision, setListsRevision] = useState(0)
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
   const [kind, setKind] = useState<RoomKind>("TRIP")
@@ -260,10 +262,19 @@ function LandingPage() {
         </TabsContent>
       </Tabs>
       <div className="pb-safe pb-10">
-        <YourRoomsList rooms={yours} />
+        <ToSettleCard
+          yours={yours}
+          serverHiddenCodes={hiddenCodes}
+          revision={listsRevision}
+        />
+        <YourRoomsList
+          rooms={yours}
+          onChanged={() => setListsRevision((n) => n + 1)}
+        />
         <RecentTripsList
           ownedCodes={yours.map((room) => room.code)}
           serverHiddenCodes={hiddenCodes}
+          onChanged={() => setListsRevision((n) => n + 1)}
         />
       </div>
     </PageShell>

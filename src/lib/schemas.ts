@@ -340,6 +340,25 @@ export const deleteSettlementSchema = z.object({
   settlementId: z.string().min(1, "Missing settlement"),
 })
 
+export const recordSettlementItemSchema = recordSettlementSchema.omit({
+  proof: true,
+})
+
+export const recordSettlementsSchema = z.object({
+  items: z
+    .array(recordSettlementItemSchema)
+    .min(1, "Nothing to record")
+    .max(20, "Too many payments at once"),
+  proof: paymentProofSchema.optional(),
+})
+
+export const deleteSettlementsSchema = z.object({
+  items: z
+    .array(deleteSettlementSchema)
+    .min(1, "Nothing to undo")
+    .max(20, "Too many payments at once"),
+})
+
 export const getSettlementProofSchema = z.object({
   code: roomCodeSchema,
   settlementId: z.string().min(1, "Missing settlement"),
@@ -375,7 +394,9 @@ export type UpdateExpenseInput = z.input<typeof updateExpenseSchema>
 export type DeleteExpenseInput = z.input<typeof deleteExpenseSchema>
 export type ReorderExpensesInput = z.input<typeof reorderExpensesSchema>
 export type RecordSettlementInput = z.input<typeof recordSettlementSchema>
+export type RecordSettlementsInput = z.input<typeof recordSettlementsSchema>
 export type DeleteSettlementInput = z.input<typeof deleteSettlementSchema>
+export type DeleteSettlementsInput = z.input<typeof deleteSettlementsSchema>
 export type GetSettlementProofInput = z.input<typeof getSettlementProofSchema>
 export type CalibrateRoomFxInput = z.input<typeof calibrateRoomFxSchema>
 export type ExpenseSplitInput = z.input<typeof expenseSplitSchema>
