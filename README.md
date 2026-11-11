@@ -43,7 +43,7 @@ pnpm dev
 4. **/r/$code/new** — fast add expense; optional scan (scan needs network)
 5. **/r/$code/settle** — “X owes Y $Z” transfers
 
-Join-by-code stays open for guests. Sign in (Clerk, same app as ailabs.sv) to keep dinners and trips across devices and to scan tickets.
+Join-by-code stays open for guests. Sign in (Clerk, same app as ailabs.sv) to keep bills and trips across devices and to scan tickets.
 
 Offline: after opening a trip online once, you can add expenses without a connection. They sync when you’re back online (header sync icon shows status).
 

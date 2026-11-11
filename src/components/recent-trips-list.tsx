@@ -43,7 +43,7 @@ export function RecentTripsList({
       </h2>
       <ul className="group-list mt-2">
         {trips.map((trip, index) => {
-          const kind = trip.kind === "DINNER" ? "Dinner" : "Trip"
+          const kind = trip.kind === "DINNER" ? "Bill" : "Trip"
           const isContinue = index === 0
           const isOwned = owned.has(trip.code)
           return (

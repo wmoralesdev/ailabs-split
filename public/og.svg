@@ -6,5 +6,5 @@
     <path d="M190.517 153.52C179.377 154.37 169.257 148.08 165.627 137.73C163.617 131.99 164.007 125.92 166.937 120.67C174.037 107.96 190.387 103.35 202.207 112.22C208.597 117.02 211.727 125.02 210.977 133.2C209.957 144.23 201.947 152.64 190.517 153.51V153.52Z" fill="#614afc"/>
   </g>
   <text x="600" y="500" text-anchor="middle" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="72" font-weight="700" fill="#16131f">Split</text>
-  <text x="600" y="555" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" fill="#5c5868">Trip and dinner costs, shared by code.</text>
+  <text x="600" y="555" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" fill="#5c5868">Bills and trip costs, shared by code.</text>
 </svg>

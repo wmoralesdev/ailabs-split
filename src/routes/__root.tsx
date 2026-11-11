@@ -23,7 +23,7 @@ import appCss from "../styles.css?url"
 const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('split-theme');var d=t==='dark'||((!t||t==='system')&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';}catch(e){}})();`
 
 const SITE_ORIGIN = "https://split.ailabs.sv"
-const SITE_TITLE = "Split — dinners and trips"
+const SITE_TITLE = "Split — bills and trips"
 const SITE_DESCRIPTION =
   "Scan a ticket, tap who had what. Join with a code. Keep yours when you sign in."
 const OG_IMAGE = `${SITE_ORIGIN}/og-image.png`

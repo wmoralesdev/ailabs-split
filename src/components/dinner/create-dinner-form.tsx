@@ -127,7 +127,7 @@ function CreateDinnerFields({
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : "Could not start the dinner"
+        error instanceof Error ? error.message : "Could not start the bill"
       )
     },
   })

@@ -55,7 +55,7 @@ test.describe("home to settle", () => {
     const card = await twoOwingDinners(page)
     await expect(card.getByText("To settle")).toBeVisible()
     await expect(card.getByText("You owe $20.00")).toBeVisible()
-    await expect(card.getByText("2 dinners · Pay Walter")).toBeVisible()
+    await expect(card.getByText("2 bills · Pay Walter")).toBeVisible()
     await shot(page, "home-card.png")
 
     await card.click()

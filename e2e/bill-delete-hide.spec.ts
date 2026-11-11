@@ -58,7 +58,7 @@ test.describe("bill delete and hide", () => {
 
     await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
     await waitForHydration(page)
-    const yours = page.getByRole("region", { name: "Your dinners and trips" })
+    const yours = page.getByRole("region", { name: "Your bills and trips" })
     await expect(yours.getByText(name)).toBeVisible()
     await expect(
       yours.getByRole("button", { name: `Delete ${name}` })
@@ -152,7 +152,7 @@ test.describe("bill delete and hide", () => {
     await waitForHydration(page)
     await expect(
       page
-        .getByRole("region", { name: "Your dinners and trips" })
+        .getByRole("region", { name: "Your bills and trips" })
         .getByText(name)
     ).toBeVisible()
     await page.screenshot({

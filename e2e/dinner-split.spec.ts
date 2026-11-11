@@ -194,7 +194,7 @@ test.describe("dinner split", () => {
     )
     await signInE2e(page)
     await openDinnerCreate(page)
-    await expect(page.getByLabel("Dinner name")).toHaveCount(0)
+    await expect(page.getByLabel("Bill name")).toHaveCount(0)
     await expect(page.getByLabel("Who else is at the table?")).toHaveCount(0)
     await expect(
       page.getByRole("button", { name: "Create without a ticket" })
@@ -211,7 +211,7 @@ test.describe("dinner split", () => {
     await expect(
       page.getByRole("heading", { name: "Check the ticket" })
     ).toBeVisible({ timeout: 40_000 })
-    await expect(page.getByText("Dinner ready")).toHaveCount(0)
+    await expect(page.getByText("Bill ready")).toHaveCount(0)
     await expect(page.getByLabel("Place")).not.toHaveValue("")
 
     const place = await page.getByLabel("Place").inputValue()
@@ -225,7 +225,7 @@ test.describe("dinner split", () => {
     await waitForHydration(page)
     await expect(
       page.getByRole("group", { name: "Mode" }).getByRole("button", {
-        name: "Dinner",
+        name: "Bill",
       })
     ).toHaveAttribute("aria-pressed", "true")
     await expect(page.getByLabel("Your name")).toHaveValue("Ana")

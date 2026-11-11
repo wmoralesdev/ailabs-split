@@ -81,7 +81,7 @@ export async function openDinnerCreate(page: Page) {
   const dinnerChip = page
     .getByRole("group", { name: "Mode" })
     .getByRole("button", {
-      name: "Dinner",
+      name: "Bill",
     })
   await expect(async () => {
     await dinnerChip.click()
@@ -103,7 +103,7 @@ async function submitDinnerCreate(
     name: /(breakfast|lunch|dinner)$/,
   })
   await expect(heading).toBeVisible()
-  await expect(page.getByText("Dinner ready")).toHaveCount(0)
+  await expect(page.getByText("Bill ready")).toHaveCount(0)
   const code = new URL(page.url()).pathname.split("/")[2] ?? ""
   expect(code.length).toBeGreaterThanOrEqual(6)
   return { code, name: (await heading.innerText()).trim() }
@@ -125,7 +125,7 @@ export async function createDinnerFromHome(
 ): Promise<{ code: string; name: string }> {
   const dinnerChip = page
     .getByRole("group", { name: "Mode" })
-    .getByRole("button", { name: "Dinner" })
+    .getByRole("button", { name: "Bill" })
   await expect(async () => {
     await dinnerChip.click()
     await expect(dinnerChip).toHaveAttribute("aria-pressed", "true", {
@@ -175,7 +175,7 @@ export async function joinDinner(
     await joinTab.click()
   }
   await page.getByLabel("Code", { exact: true }).fill(code)
-  await expect(page.getByText(/Joining dinner/i)).toBeVisible()
+  await expect(page.getByText(/Joining bill/i)).toBeVisible()
   if (existing) {
     const pick = page.getByRole("button", { name })
     await expect(pick).toBeVisible()
@@ -284,7 +284,7 @@ export async function confirmCheck(page: Page) {
   await expect(confirm).toBeEnabled()
   await confirm.click()
   await expect(
-    page.getByRole("navigation", { name: "Dinner navigation" })
+    page.getByRole("navigation", { name: "Bill navigation" })
   ).toBeVisible()
   await expect(page.getByText("Confirmed").first()).toBeVisible()
 }
@@ -296,16 +296,14 @@ export function itemCard(page: Page, itemName: string): Locator {
 }
 
 export function dinnerNav(page: Page): Locator {
-  return page.getByRole("navigation", { name: "Dinner navigation" })
+  return page.getByRole("navigation", { name: "Bill navigation" })
 }
 
 export async function renameDinner(page: Page, from: string, to: string) {
   await page.getByRole("button", { name: `Rename ${from}` }).click()
   const sheet = page.getByRole("dialog")
-  await expect(
-    sheet.getByRole("heading", { name: "Dinner name" })
-  ).toBeVisible()
-  await sheet.getByRole("textbox", { name: "Dinner" }).fill(to)
+  await expect(sheet.getByRole("heading", { name: "Bill name" })).toBeVisible()
+  await sheet.getByRole("textbox", { name: "Bill" }).fill(to)
   await sheet.getByRole("button", { name: "Save name" }).click()
   await expect(sheet).toBeHidden()
   await expect(page.getByRole("heading", { level: 1, name: to })).toBeVisible()

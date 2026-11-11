@@ -42,7 +42,7 @@ export function CreateTripSuccessSheet({
   async function onCopyCode() {
     await copyText(code)
     setCopied(true)
-    toast.success(isDinner ? "Dinner code copied" : "Trip code copied")
+    toast.success(isDinner ? "Bill code copied" : "Trip code copied")
     window.setTimeout(() => setCopied(false), 1500)
   }
 
@@ -55,7 +55,7 @@ export function CreateTripSuccessSheet({
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error(isDinner ? "Could not share dinner" : "Could not share trip")
+      toast.error(isDinner ? "Could not share bill" : "Could not share trip")
     } finally {
       setBusy(false)
     }
@@ -74,7 +74,7 @@ export function CreateTripSuccessSheet({
       >
         <SheetHeader className="gap-1 p-0 text-left">
           <SheetTitle className="font-display text-[22px] font-bold tracking-tight">
-            {isDinner ? "Dinner ready" : "Trip ready"}
+            {isDinner ? "Bill ready" : "Trip ready"}
           </SheetTitle>
           <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
             {isDinner
@@ -133,7 +133,7 @@ export function CreateTripSuccessSheet({
             className="w-full"
             onClick={onContinue}
           >
-            {isDinner ? "Continue to dinner" : "Continue to trip"}
+            {isDinner ? "Continue to bill" : "Continue to trip"}
           </Button>
         </SheetFooter>
       </SheetContent>
