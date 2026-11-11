@@ -45,9 +45,7 @@ test("recent trips sit in one grouped card", async ({ page }) => {
   await expect(continueRow).not.toHaveClass(/rounded-2xl/)
   await recent.screenshot({ path: "test-results/recent-list.png" })
 
-  await recent
-    .getByRole("button", { name: "Remove Guate pet from recent trips" })
-    .click()
+  await recent.getByRole("button", { name: "Hide Guate pet" }).click()
   await expect(recent.getByText("Guate pet")).toHaveCount(0)
   await expect(recent.getByText("Monday lunch")).toBeVisible()
   await expect(recent.getByText("Costa Rica")).toBeVisible()

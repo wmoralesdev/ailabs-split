@@ -12,6 +12,7 @@ import {
   revertCheckSchema,
   upsertCheckSchema,
 } from "@/lib/schemas"
+import { getAuthUserId } from "@/server/auth-user.server"
 import { checkToDto } from "@/server/rooms"
 import type { CheckDto } from "@/server/rooms"
 
@@ -314,6 +315,10 @@ export const deleteCheck = createServerFn({ method: "POST" })
       where: { id: data.checkId, roomId: room.id },
     })
     if (!check) throw new Error("Check not found")
+    const userId = await getAuthUserId()
+    if (!room.ownerUserId || room.ownerUserId !== userId) {
+      throw new Error("Only the person who started this bill can delete it")
+    }
 
     const expenseId = check.expenseId
     await prisma.check.delete({ where: { id: check.id } })

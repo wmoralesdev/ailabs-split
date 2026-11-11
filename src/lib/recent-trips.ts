@@ -1,3 +1,5 @@
+import { isRoomHidden } from "@/lib/hidden-rooms"
+
 export type RoomKindLabel = "TRIP" | "DINNER"
 
 export type RecentTrip = {
@@ -45,6 +47,7 @@ function writeTrips(trips: RecentTrip[]): void {
 /** Most-recent-first list of trips this device has opened. */
 export function listRecentTrips(): RecentTrip[] {
   return readTrips()
+    .filter((trip) => !isRoomHidden(trip.code))
     .slice()
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, MAX_RECENT)
@@ -60,6 +63,7 @@ export function rememberRecentTrip(input: {
   const code = input.code.trim().toUpperCase()
   const name = input.name.trim()
   if (!code || !name) return
+  if (isRoomHidden(code)) return
 
   const next: RecentTrip = {
     code,
@@ -67,9 +71,7 @@ export function rememberRecentTrip(input: {
     updatedAt: Date.now(),
     kind: input.kind === "DINNER" ? "DINNER" : "TRIP",
   }
-  const without = readTrips().filter(
-    (trip) => trip.code.toUpperCase() !== code
-  )
+  const without = readTrips().filter((trip) => trip.code.toUpperCase() !== code)
   writeTrips([next, ...without].slice(0, MAX_RECENT))
 }
 
@@ -82,7 +84,10 @@ export function forgetRecentTrip(code: string): void {
 }
 
 /** Short relative label for last opened (e.g. "Just now", "3d ago"). */
-export function formatRecentTripOpened(updatedAt: number, now = Date.now()): string {
+export function formatRecentTripOpened(
+  updatedAt: number,
+  now = Date.now()
+): string {
   const diffMs = Math.max(0, now - updatedAt)
   const mins = Math.floor(diffMs / 60_000)
   if (mins < 1) return "Just now"

@@ -79,6 +79,29 @@ export const Route = createFileRoute("/r/$code")({
   },
 })
 
+function RoomLoadingShell() {
+  return (
+    <RoomShell>
+      <main className="page-gutter mx-auto w-full max-w-content pt-6">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="mt-3 h-6 w-28 rounded-full" />
+        <Skeleton className="mt-6 h-20 w-full rounded-lg" />
+        <Skeleton className="mt-8 h-5 w-24" />
+        <div className="mt-3 space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <Skeleton className="mt-8 h-5 w-24" />
+        <div className="mt-3 space-y-2">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+        </div>
+      </main>
+    </RoomShell>
+  )
+}
+
 function RoomLayout() {
   const { code } = Route.useParams()
   const { as: asName, created } = Route.useSearch()
@@ -90,7 +113,7 @@ function RoomLayout() {
   const [hydrated, setHydrated] = useState(false)
   const [showCreatedSheet, setShowCreatedSheet] = useState(Boolean(created))
 
-  const { data: room } = useQuery(roomQueryOptions(code, memberId))
+  const { data: room, isFetched } = useQuery(roomQueryOptions(code, memberId))
 
   const members = room?.members
   const invalidateRoom = () =>
@@ -217,27 +240,36 @@ function RoomLayout() {
     setError(null)
   }
 
-  if (!room || !hydrated) {
+  if (!room) {
+    if (isFetched) {
+      return (
+        <PageShell innerClassName="flex min-h-dvh flex-col justify-center">
+          <h1 className="font-display text-3xl font-semibold">
+            Trip not found
+          </h1>
+          <p className="mt-2 text-muted-foreground">Could not load this trip</p>
+          <Link
+            to="/"
+            search={{ stay: true }}
+            className="mt-6 text-primary underline"
+          >
+            Back to Split
+          </Link>
+        </PageShell>
+      )
+    }
     return (
       <>
-        <RoomShell>
-          <main className="page-gutter mx-auto w-full max-w-content pt-6">
-            <Skeleton className="h-8 w-40" />
-            <Skeleton className="mt-3 h-6 w-28 rounded-full" />
-            <Skeleton className="mt-6 h-20 w-full rounded-lg" />
-            <Skeleton className="mt-8 h-5 w-24" />
-            <div className="mt-3 space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-            <Skeleton className="mt-8 h-5 w-24" />
-            <div className="mt-3 space-y-2">
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <Skeleton className="h-16 w-full rounded-lg" />
-            </div>
-          </main>
-        </RoomShell>
+        <RoomLoadingShell />
+        {createdSheet}
+      </>
+    )
+  }
+
+  if (!hydrated) {
+    return (
+      <>
+        <RoomLoadingShell />
         {createdSheet}
       </>
     )

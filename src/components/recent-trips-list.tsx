@@ -1,25 +1,31 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
-import {
-  forgetRecentTrip,
-  formatRecentTripOpened,
-  listRecentTrips,
-} from "@/lib/recent-trips"
+import { RoomExitControl } from "@/components/room-exit-control"
+import { mergeHiddenRoomCodes } from "@/lib/hidden-rooms"
+import { formatRecentTripOpened, listRecentTrips } from "@/lib/recent-trips"
 
-export function RecentTripsList() {
+export function RecentTripsList({
+  ownedCodes,
+  serverHiddenCodes,
+}: {
+  ownedCodes: readonly string[]
+  serverHiddenCodes: readonly string[]
+}) {
   const navigate = useNavigate()
   const [trips, setTrips] = useState<ReturnType<typeof listRecentTrips>>([])
-
-  useEffect(() => {
-    setTrips(listRecentTrips())
-  }, [])
+  const owned = useMemo(() => new Set(ownedCodes), [ownedCodes])
+  const ownedKey = ownedCodes.join(",")
+  const hiddenKey = serverHiddenCodes.join(",")
 
   const refresh = useCallback(() => {
     setTrips(listRecentTrips())
   }, [])
+
+  useEffect(() => {
+    mergeHiddenRoomCodes([...serverHiddenCodes])
+    refresh()
+  }, [hiddenKey, ownedKey, refresh, serverHiddenCodes])
 
   if (trips.length === 0) return null
 
@@ -32,6 +38,7 @@ export function RecentTripsList() {
         {trips.map((trip, index) => {
           const kind = trip.kind === "DINNER" ? "Dinner" : "Trip"
           const isContinue = index === 0
+          const isOwned = owned.has(trip.code)
           return (
             <li key={trip.code} className="flex items-stretch">
               <button
@@ -71,17 +78,14 @@ export function RecentTripsList() {
                   {formatRecentTripOpened(trip.updatedAt)}
                 </span>
               </button>
-              <button
-                type="button"
-                className="inline-flex size-11 shrink-0 items-center justify-center self-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label={`Remove ${trip.name} from recent trips`}
-                onClick={() => {
-                  forgetRecentTrip(trip.code)
-                  refresh()
-                }}
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-              </button>
+              <RoomExitControl
+                code={trip.code}
+                name={trip.name}
+                kind={trip.kind === "DINNER" ? "DINNER" : "TRIP"}
+                owned={isOwned}
+                placement="row"
+                onDone={refresh}
+              />
             </li>
           )
         })}

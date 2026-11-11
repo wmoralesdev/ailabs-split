@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router"
 
+import { RoomExitControl } from "@/components/room-exit-control"
 import { formatRecentTripOpened } from "@/lib/recent-trips"
 import type { OwnedRoomDto } from "@/server/rooms"
 
@@ -48,6 +49,13 @@ export function YourRoomsList({ rooms }: { rooms: OwnedRoomDto[] }) {
                   {formatRecentTripOpened(new Date(room.createdAt).getTime())}
                 </span>
               </button>
+              <RoomExitControl
+                code={room.code}
+                name={room.name}
+                kind={room.kind}
+                owned
+                placement="row"
+              />
             </li>
           )
         })}

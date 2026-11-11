@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { readRoomCache, writeRoomCache } from "@/lib/room-cache"
+import { forgetRoomCache, readRoomCache, writeRoomCache } from "@/lib/room-cache"
 import type { RoomDto } from "@/server/rooms"
 
 function stubLocalStorage() {
@@ -13,6 +13,10 @@ function stubLocalStorage() {
     removeItem: (key: string) => {
       store.delete(key)
     },
+    get length() {
+      return store.size
+    },
+    key: (index: number) => [...store.keys()][index] ?? null,
   }
   vi.stubGlobal("window", { localStorage })
   vi.stubGlobal("localStorage", localStorage)
@@ -30,6 +34,7 @@ const sampleRoom: RoomDto = {
   fxAdjustmentBps: 0,
   fxCalibrationSamples: [],
   createdAt: "2026-01-01T00:00:00.000Z",
+  owned: false,
   members: [{ id: "m1", name: "Ada" }],
   expenses: [],
   settlements: [],
@@ -52,6 +57,17 @@ describe("room-cache", () => {
     writeRoomCache("abc123", "m1", sampleRoom)
     expect(readRoomCache("abc123", "m2")).toBeUndefined()
     expect(readRoomCache("abc123", null)).toBeUndefined()
+  })
+
+  it("forgets every viewer cache for a room", () => {
+    stubLocalStorage()
+    writeRoomCache("abc123", "m1", sampleRoom)
+    writeRoomCache("abc123", null, sampleRoom)
+    writeRoomCache("zzz999", "m1", sampleRoom)
+    forgetRoomCache("abc123")
+    expect(readRoomCache("ABC123", "m1")).toBeUndefined()
+    expect(readRoomCache("ABC123", null)).toBeUndefined()
+    expect(readRoomCache("zzz999", "m1")).toEqual(sampleRoom)
   })
 
   it("ignores corrupt JSON", () => {
