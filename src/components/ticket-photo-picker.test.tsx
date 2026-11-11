@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act } from "react"
 import { afterEach, expect, test, vi } from "vitest"
 
 import { TicketPhotoPicker } from "./ticket-photo-picker"
@@ -94,4 +95,56 @@ test("drag over marks the drop zone", () => {
   })
   expect(zone.getAttribute("data-dropping")).toBe("true")
   expect(screen.getByText("Drop ticket photo")).toBeTruthy()
+})
+
+function pasteImage(file: File) {
+  const event = new Event("paste", { bubbles: true, cancelable: true })
+  Object.defineProperty(event, "clipboardData", {
+    value: {
+      files: [file],
+      items: [{ kind: "file", type: file.type, getAsFile: () => file }],
+      types: ["Files"],
+      getData: () => "",
+    },
+  })
+  act(() => {
+    window.dispatchEvent(event)
+  })
+}
+
+test("paste forwards a clipboard image", () => {
+  const onFile = vi.fn()
+  render(<TicketPhotoPicker pending={false} onFile={onFile} />)
+
+  const file = new File(["ticket"], "ticket.jpg", { type: "image/jpeg" })
+  pasteImage(file)
+  expect(onFile).toHaveBeenCalledTimes(1)
+  expect(onFile.mock.calls[0]?.[0]).toBe(file)
+})
+
+test("beforePick can reject a paste", () => {
+  const onFile = vi.fn()
+  const beforePick = vi.fn(() => false)
+  render(
+    <TicketPhotoPicker
+      pending={false}
+      onFile={onFile}
+      beforePick={beforePick}
+    />
+  )
+  pasteImage(new File(["ticket"], "ticket.jpg", { type: "image/jpeg" }))
+  expect(beforePick).toHaveBeenCalledTimes(1)
+  expect(onFile).not.toHaveBeenCalled()
+})
+
+test("paste is ignored while pending", () => {
+  const onFile = vi.fn()
+  render(<TicketPhotoPicker pending onFile={onFile} />)
+  pasteImage(new File(["ticket"], "ticket.jpg", { type: "image/jpeg" }))
+  expect(onFile).not.toHaveBeenCalled()
+})
+
+test("desktop hint mentions paste", () => {
+  render(<TicketPhotoPicker pending={false} onFile={vi.fn()} />)
+  expect(screen.getByText("Or drop or paste a ticket photo")).toBeTruthy()
 })

@@ -3,11 +3,7 @@ import type { Locator } from "@playwright/test"
 import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
-import {
-  openDinnerCreate,
-  signInE2e,
-  waitForHydration,
-} from "./dinner-helpers"
+import { openDinnerCreate, signInE2e, waitForHydration } from "./dinner-helpers"
 
 const TICKET_PATH = path.resolve(
   "/cursor/stores/self/docs/tickets/celeste-imperio.jpg"
@@ -83,7 +79,9 @@ test.describe("scan drop and OCR wait", () => {
 
     const zone = page.getByTestId("ticket-drop-zone")
     await expect(zone).toBeVisible()
-    await expect(page.getByText("Or drop a ticket photo")).toBeVisible()
+    await expect(
+      page.getByText("Or drop or paste a ticket photo")
+    ).toBeVisible()
     await hoverDrop(zone)
     await page.screenshot({
       path: path.join(SHOTS, "landing-drop-hover.png"),
@@ -136,7 +134,7 @@ test.describe("scan drop and OCR wait", () => {
       page.getByRole("button", { name: "From gallery" })
     ).toBeVisible()
     await expect(page.getByTestId("ticket-drop-zone")).toBeVisible()
-    await expect(page.getByText("Or drop a ticket photo")).toBeHidden()
+    await expect(page.getByText("Or drop or paste a ticket photo")).toBeHidden()
     await context.close()
   })
 })

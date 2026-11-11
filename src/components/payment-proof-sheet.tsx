@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { ChangeEvent } from "react"
+import type { ChangeEvent, DragEvent } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Camera01Icon,
@@ -18,8 +18,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { compressImageForProof } from "@/lib/compress-image"
+import { imageFromTransfer, transferHasFiles } from "@/lib/image-from-transfer"
 import { formatMoney } from "@/lib/settle"
 import type { Transfer } from "@/lib/settle"
+import { useImagePaste } from "@/lib/use-image-paste"
+import { cn } from "@/lib/utils"
 
 const GALLERY_ACCEPT =
   "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
@@ -45,14 +48,18 @@ export function PaymentProofSheet({
 }: PaymentProofSheetProps) {
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
+  const dragCount = useRef(0)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
+  const [dropping, setDropping] = useState(false)
 
   useEffect(() => {
     if (open) return
     setFile(null)
     setPreparing(false)
+    setDropping(false)
+    dragCount.current = 0
     setPreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current)
       return null
@@ -65,15 +72,54 @@ export function PaymentProofSheet({
     }
   }, [previewUrl])
 
-  function onPick(event: ChangeEvent<HTMLInputElement>) {
-    const next = event.target.files?.[0] ?? null
-    event.target.value = ""
-    if (!next) return
+  function takePhoto(next: File) {
     setPreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current)
       return URL.createObjectURL(next)
     })
     setFile(next)
+  }
+
+  function onPick(event: ChangeEvent<HTMLInputElement>) {
+    const next = event.target.files?.[0] ?? null
+    event.target.value = ""
+    if (!next) return
+    takePhoto(next)
+  }
+
+  const busy = preparing || saving
+
+  useImagePaste({
+    enabled: open && Boolean(transfer) && !busy,
+    onImage: takePhoto,
+  })
+
+  function onDragEnter(event: DragEvent<HTMLDivElement>) {
+    if (!transferHasFiles(event.dataTransfer) || busy) return
+    event.preventDefault()
+    dragCount.current += 1
+    setDropping(true)
+  }
+
+  function onDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!transferHasFiles(event.dataTransfer)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = busy ? "none" : "copy"
+  }
+
+  function onDragLeave(event: DragEvent<HTMLDivElement>) {
+    if (!transferHasFiles(event.dataTransfer)) return
+    dragCount.current = Math.max(0, dragCount.current - 1)
+    if (dragCount.current === 0) setDropping(false)
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    dragCount.current = 0
+    setDropping(false)
+    if (busy) return
+    const next = imageFromTransfer(event.dataTransfer)
+    if (next) takePhoto(next)
   }
 
   function clearPhoto() {
@@ -116,7 +162,6 @@ export function PaymentProofSheet({
     : iGet
       ? `${transfer.fromName} pays you`
       : `${transfer.fromName} pays ${transfer.toName}`
-  const busy = preparing || saving
   const confirmLabel = preparing
     ? "Preparing photo…"
     : saving
@@ -146,60 +191,89 @@ export function PaymentProofSheet({
           </SheetHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-            {previewUrl ? (
-              <div className="relative overflow-hidden rounded-2xl bg-muted">
-                <img
-                  src={previewUrl}
-                  alt="Transfer photo"
-                  data-testid="payment-proof-preview"
-                  className="mx-auto max-h-48 w-full object-contain"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon-sm"
-                  className="absolute top-2 right-2 bg-card text-foreground"
-                  onClick={clearPhoto}
-                  disabled={busy}
-                  aria-label="Remove photo"
-                >
-                  <HugeiconsIcon
-                    icon={Cancel01Icon}
-                    size={14}
-                    strokeWidth={2}
+            <div
+              data-testid="payment-proof-drop-zone"
+              data-dropping={dropping ? "true" : undefined}
+              onDragEnter={onDragEnter}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+              className={cn(
+                "relative rounded-2xl transition-[border-color,background-color,box-shadow] duration-200",
+                !previewUrl &&
+                  "[@media(hover:hover)_and_(pointer:fine)]:border [@media(hover:hover)_and_(pointer:fine)]:border-dashed [@media(hover:hover)_and_(pointer:fine)]:border-border [@media(hover:hover)_and_(pointer:fine)]:p-3",
+                dropping &&
+                  "border border-dashed border-primary bg-accent/70 shadow-[inset_0_0_0_1px] shadow-primary/30"
+              )}
+            >
+              {previewUrl ? (
+                <div className="relative overflow-hidden rounded-2xl bg-muted">
+                  <img
+                    src={previewUrl}
+                    alt="Transfer photo"
+                    data-testid="payment-proof-preview"
+                    className="mx-auto max-h-48 w-full object-contain"
                   />
-                </Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className="split-cta-tinted"
-                  disabled={busy}
-                  onClick={() => cameraRef.current?.click()}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon-sm"
+                    className="absolute top-2 right-2 bg-card text-foreground"
+                    onClick={clearPhoto}
+                    disabled={busy}
+                    aria-label="Remove photo"
+                  >
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      size={14}
+                      strokeWidth={2}
+                    />
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="split-cta-tinted"
+                    disabled={busy}
+                    onClick={() => cameraRef.current?.click()}
+                  >
+                    <HugeiconsIcon
+                      icon={Camera01Icon}
+                      size={18}
+                      strokeWidth={2}
+                    />
+                    Camera
+                  </button>
+                  <button
+                    type="button"
+                    className="split-cta-tinted"
+                    disabled={busy}
+                    onClick={() => galleryRef.current?.click()}
+                  >
+                    <HugeiconsIcon
+                      icon={ImageAdd01Icon}
+                      size={18}
+                      strokeWidth={2}
+                    />
+                    From photos
+                  </button>
+                </div>
+              )}
+              {previewUrl || dropping ? null : (
+                <p className="mt-2 hidden text-center text-[13px] text-muted-foreground [@media(hover:hover)_and_(pointer:fine)]:block">
+                  Or drop or paste a photo
+                </p>
+              )}
+              {dropping ? (
+                <div
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-card text-[15px] font-semibold text-foreground"
+                  aria-hidden
                 >
-                  <HugeiconsIcon
-                    icon={Camera01Icon}
-                    size={18}
-                    strokeWidth={2}
-                  />
-                  Camera
-                </button>
-                <button
-                  type="button"
-                  className="split-cta-tinted"
-                  disabled={busy}
-                  onClick={() => galleryRef.current?.click()}
-                >
-                  <HugeiconsIcon
-                    icon={ImageAdd01Icon}
-                    size={18}
-                    strokeWidth={2}
-                  />
-                  From photos
-                </button>
-              </div>
-            )}
+                  Drop photo
+                </div>
+              ) : null}
+            </div>
             <input
               ref={cameraRef}
               type="file"
