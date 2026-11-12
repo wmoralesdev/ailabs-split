@@ -20,7 +20,7 @@ export function ClerkAuthScreen() {
           className="rounded-full transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Split home"
         >
-          <SiteLogo showWordmark={false} markClassName="size-7" />
+          <SiteLogo />
         </Link>
       </header>
 

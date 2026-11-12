@@ -31,15 +31,13 @@ function useScrolled(threshold: number) {
   return { scrolled, hostRef }
 }
 
-/** Sticky top chrome: brand mark on the left, theme toggle + optional slot on the right. */
+/** Sticky top chrome: Ai Labs lockup on the left, theme toggle + optional slot on the right. */
 export function AppHeader({
   right,
   className,
-  showWordmark = true,
 }: {
   right?: ReactNode
   className?: string
-  showWordmark?: boolean
 }) {
   const { scrolled, hostRef } = useScrolled(SCROLL_THRESHOLD)
 
@@ -59,7 +57,7 @@ export function AppHeader({
           className="rounded-full transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Split home"
         >
-          <SiteLogo showWordmark={showWordmark} />
+          <SiteLogo />
         </Link>
         <div className="flex items-center gap-1">
           {right}
