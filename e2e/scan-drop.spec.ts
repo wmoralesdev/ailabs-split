@@ -116,7 +116,10 @@ test.describe("scan drop and OCR wait", () => {
       path: path.join(SHOTS, "after-scan-bill.png"),
       animations: "disabled",
     })
-    await expect(page.getByLabel("Place")).not.toHaveValue("")
+    const bill = page.getByRole("textbox", { name: "Bill" })
+    await expect(bill).not.toHaveValue("")
+    await expect(bill).not.toHaveValue(/breakfast|lunch|dinner$/i)
+    await expect(page.getByLabel("Place")).toHaveCount(0)
   })
 
   test("mobile 390 keeps camera and gallery", async ({ browser }) => {

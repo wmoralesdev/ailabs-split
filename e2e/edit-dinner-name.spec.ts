@@ -2,16 +2,21 @@ import { expect, test } from "@playwright/test"
 import { existsSync, mkdirSync } from "node:fs"
 import path from "node:path"
 
-import { addCheckItem, createDinner, openBill } from "./dinner-helpers"
+import {
+  addCheckItem,
+  billNameField,
+  createDinner,
+  fillBillName,
+  openBill,
+} from "./dinner-helpers"
 
 const SHOTS = "/cursor/stores/self/media/edit-dinner-name"
+const PLACE_SHOTS = "/cursor/stores/self/media/bill-title-place"
 
 const SHOT_FILES = [
   "home-before.png",
   "rename-sheet.png",
   "home-renamed.png",
-  "place-on-bill.png",
-  "home-place-separate.png",
 ] as const
 
 test.describe("edit dinner name", () => {
@@ -20,13 +25,14 @@ test.describe("edit dinner name", () => {
     deviceScaleFactor: 2,
   })
 
-  test("anyone in the dinner can rename the title; place stays its own field", async ({
+  test("the bill has one name; home and the editor stay in sync", async ({
     page,
   }) => {
     mkdirSync(SHOTS, { recursive: true })
-    const shot = (name: (typeof SHOT_FILES)[number]) =>
+    mkdirSync(PLACE_SHOTS, { recursive: true })
+    const shot = (dir: string, name: string) =>
       page.screenshot({
-        path: path.join(SHOTS, name),
+        path: path.join(dir, name),
         animations: "disabled",
       })
 
@@ -35,48 +41,58 @@ test.describe("edit dinner name", () => {
       page.getByRole("heading", { level: 1, name: original })
     ).toBeVisible()
     await expect(page.locator("select")).toHaveCount(0)
-    await shot("home-before.png")
+    await shot(SHOTS, "home-before.png")
 
     await page.getByRole("button", { name: `Rename ${original}` }).click()
     const sheet = page.getByRole("dialog")
     await expect(
       sheet.getByRole("heading", { name: "Bill name" })
     ).toBeVisible()
+    await expect(sheet.getByText("What to call this bill.")).toBeVisible()
+    await expect(sheet.getByText("Place on the bill is separate")).toHaveCount(
+      0
+    )
     const dinnerField = sheet.getByRole("textbox", { name: "Bill" })
     await expect(dinnerField).toHaveValue(original)
     await dinnerField.fill("Tuesday lunch")
-    await shot("rename-sheet.png")
+    await shot(SHOTS, "rename-sheet.png")
     await sheet.getByRole("button", { name: "Save name" }).click()
     await expect(sheet).toBeHidden()
     await expect(
       page.getByRole("heading", { level: 1, name: "Tuesday lunch" })
     ).toBeVisible()
     await expect(page.getByText("Bill renamed")).toBeVisible()
-    await shot("home-renamed.png")
+    await shot(SHOTS, "home-renamed.png")
     await expect(page.getByText("Bill renamed")).toBeHidden()
 
     await openBill(page)
-    const billDinner = page.getByRole("textbox", { name: "Bill" })
-    await expect(billDinner).toHaveValue("Tuesday lunch")
-    await expect(page.getByLabel("Place")).toBeVisible()
-    await page.getByLabel("Place").fill("Amazon")
-    await billDinner.scrollIntoViewIfNeeded()
-    await shot("place-on-bill.png")
+    const billField = billNameField(page)
+    await expect(billField).toHaveValue("Tuesday lunch")
+    await expect(page.getByLabel("Place")).toHaveCount(0)
+    await fillBillName(page, "Amazon")
+    await expect(page.getByText("Bill renamed")).toBeVisible()
+    await expect(page.getByText("Bill renamed")).toBeHidden()
     await addCheckItem(page, "Coffee", "4.50")
+    await page
+      .getByRole("button", { name: "Back", exact: true })
+      .scrollIntoViewIfNeeded()
+    await shot(PLACE_SHOTS, "editor.png")
     await page.getByRole("button", { name: "Save draft for later" }).click()
     await expect(page.getByText("Draft saved")).toBeVisible()
 
     await page.getByRole("button", { name: "Back", exact: true }).click()
     await expect(
-      page.getByRole("heading", { level: 1, name: "Tuesday lunch" })
+      page.getByRole("heading", { level: 1, name: "Amazon" })
     ).toBeVisible()
-    await expect(page.getByText("Amazon")).toBeVisible()
     await expect(page.getByText("Walter paid")).toBeVisible()
     await expect(page.getByText("Draft saved")).toBeHidden()
-    await shot("home-place-separate.png")
+    await expect(page.getByText("Tuesday lunch")).toHaveCount(0)
+    await shot(PLACE_SHOTS, "home.png")
 
     for (const file of SHOT_FILES) {
       expect(existsSync(path.join(SHOTS, file)), file).toBe(true)
     }
+    expect(existsSync(path.join(PLACE_SHOTS, "editor.png"))).toBe(true)
+    expect(existsSync(path.join(PLACE_SHOTS, "home.png"))).toBe(true)
   })
 })

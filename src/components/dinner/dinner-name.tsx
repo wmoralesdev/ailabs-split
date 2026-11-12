@@ -40,29 +40,28 @@ export function useRenameDinner(code: string) {
 
 export function DinnerNameField({
   code,
-  name,
+  value,
+  savedName,
+  onChange,
   id = "dinner-name",
   readOnly = false,
 }: {
   code: string
-  name: string
+  value: string
+  savedName: string
+  onChange: (name: string) => void
   id?: string
   readOnly?: boolean
 }) {
-  const [draft, setDraft] = useState(name)
   const rename = useRenameDinner(code)
 
-  useEffect(() => {
-    setDraft(name)
-  }, [name])
-
   function commit() {
-    const trimmed = draft.trim()
+    const trimmed = value.trim()
     if (!trimmed) {
-      setDraft(name)
+      onChange(savedName)
       return
     }
-    if (trimmed === name) return
+    if (trimmed === savedName) return
     rename.mutate(trimmed)
   }
 
@@ -70,7 +69,7 @@ export function DinnerNameField({
     return (
       <div className="grid gap-1.5">
         <p className="text-[13px] font-medium text-muted-foreground">Bill</p>
-        <p className="text-[15px]">{name}</p>
+        <p className="text-[15px]">{savedName}</p>
       </div>
     )
   }
@@ -80,8 +79,8 @@ export function DinnerNameField({
       <Label htmlFor={id}>Bill</Label>
       <Input
         id={id}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
           if (event.key !== "Enter") return
@@ -139,7 +138,7 @@ export function RenameDinnerSheet({
             Bill name
           </SheetTitle>
           <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
-            The bill title. Place on the bill is separate.
+            What to call this bill.
           </SheetDescription>
         </SheetHeader>
         <form

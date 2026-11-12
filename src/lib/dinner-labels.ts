@@ -1,5 +1,6 @@
 import type { ItemSplit, LineItem } from "@/lib/dinner-split"
 import { itemSplitMemberIds } from "@/lib/dinner-split"
+import { isDefaultDinnerName } from "@/lib/landing-prefs"
 import { formatMoney } from "@/lib/settle"
 
 /** Zero is a word, not $0.00 — that reads as an amount due. */
@@ -33,6 +34,16 @@ const LOWER_WORDS = new Set([
   "the",
   "and",
 ])
+
+/** OCR merchant fills the one bill name when the room still has a fallback title. */
+export function ocrSeedsBillName(
+  currentName: string,
+  nameFromTicket: boolean
+): boolean {
+  if (nameFromTicket) return true
+  const name = currentName.trim()
+  return !name || isDefaultDinnerName(name)
+}
 
 /** Tickets print the place in capitals; a room title reads better in title case. */
 export function tidyPlaceName(raw: string): string {

@@ -700,7 +700,7 @@ export const renameRoom = createServerFn({ method: "POST" })
     limitWrites("rename-room")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
-      select: { kind: true, ownerUserId: true },
+      select: { id: true, kind: true, ownerUserId: true },
     })
     if (!room) throw new Error("Room not found")
     assertHostDinnerEdit(room, await getAuthUserId())
@@ -708,6 +708,12 @@ export const renameRoom = createServerFn({ method: "POST" })
       where: { code: data.code },
       data: { name: data.name },
     })
+    if (room.kind === "DINNER") {
+      await prisma.check.updateMany({
+        where: { roomId: room.id },
+        data: { merchant: data.name },
+      })
+    }
     const loaded = await loadRoomByCode(data.code)
     if (!loaded) throw new Error("Room not found")
     return loaded

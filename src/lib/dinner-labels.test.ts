@@ -1,6 +1,20 @@
 import { describe, expect, test } from "vitest"
 
-import { owingAmount, tidyPlaceName } from "./dinner-labels"
+import { ocrSeedsBillName, owingAmount, tidyPlaceName } from "./dinner-labels"
+
+describe("ocrSeedsBillName", () => {
+  test("scan-first always seeds the bill name from the ticket", () => {
+    expect(ocrSeedsBillName("Tuesday lunch", true)).toBe(true)
+    expect(ocrSeedsBillName("Pedido de Amazon", true)).toBe(true)
+  })
+
+  test("later scans seed only a blank or meal-of-day fallback", () => {
+    expect(ocrSeedsBillName("Thursday dinner", false)).toBe(true)
+    expect(ocrSeedsBillName("  ", false)).toBe(true)
+    expect(ocrSeedsBillName("Pedido de Amazon", false)).toBe(false)
+    expect(ocrSeedsBillName("Amazon", false)).toBe(false)
+  })
+})
 
 describe("tidyPlaceName", () => {
   test("title-cases a place printed in capitals", () => {
