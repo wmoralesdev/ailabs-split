@@ -32,7 +32,7 @@ export function SiteLogo({ className }: { className?: string }) {
       />
       <span
         aria-hidden="true"
-        className="inline-flex items-baseline gap-[0.28em] font-display text-[16px] leading-none font-extrabold tracking-[-0.03em]"
+        className="inline-flex items-baseline gap-[0.28em] font-display text-[16px] leading-none font-normal tracking-[-0.03em]"
       >
         <span className="text-[#8B7BC7]">Ai</span>
         <span className="text-[#303030] dark:text-[#EDEDED]">Labs</span>

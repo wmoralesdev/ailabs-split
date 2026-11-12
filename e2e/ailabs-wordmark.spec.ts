@@ -35,12 +35,13 @@ async function assertLockup(page: Page) {
   })
   const labsStyle = await labs.evaluate((el) => {
     const s = getComputedStyle(el)
-    return { color: s.color, family: s.fontFamily }
+    return { color: s.color, family: s.fontFamily, weight: s.fontWeight }
   })
 
   expect(aiStyle.family).toMatch(/Plus Jakarta Sans/i)
   expect(labsStyle.family).toMatch(/Plus Jakarta Sans/i)
-  expect(Number(aiStyle.weight)).toBeGreaterThanOrEqual(700)
+  expect(Number(aiStyle.weight)).toBe(400)
+  expect(Number(labsStyle.weight)).toBe(400)
   expect(aiStyle.color).toBe("rgb(139, 123, 199)")
   expect(labsStyle.color).toBe("rgb(48, 48, 48)")
 
