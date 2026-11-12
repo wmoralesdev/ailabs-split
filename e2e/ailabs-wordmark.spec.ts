@@ -7,7 +7,11 @@ import { skipCookieBanner, waitForHydration } from "./dinner-helpers"
 
 const SHOTS = "/cursor/stores/self/media/ailabs-wordmark"
 
-const SHOT_FILES = ["landing-mobile.png", "landing-desktop.png"] as const
+const SHOT_FILES = [
+  "landing-mobile.png",
+  "landing-desktop.png",
+  "header-mobile.png",
+] as const
 
 async function openLanding(page: Page) {
   await skipCookieBanner(page)
@@ -15,7 +19,7 @@ async function openLanding(page: Page) {
   await expect(page.getByRole("heading", { name: "Split" })).toBeVisible()
   await waitForHydration(page)
   await page.evaluate(async () => {
-    await document.fonts.load('400 16px "Plus Jakarta Sans"')
+    await document.fonts.load('500 16px "Plus Jakarta Sans"')
     await document.fonts.ready
   })
   const lockup = page.getByRole("img", { name: "Ai Labs" })
@@ -54,13 +58,13 @@ async function assertLockup(page: Page) {
   expect(aiStyle.family).toMatch(/^["']?Plus Jakarta Sans["']?/)
   expect(labsStyle.family).toMatch(/^["']?Plus Jakarta Sans["']?/)
   expect(aiStyle.family).not.toMatch(/Variable/i)
-  expect(Number(aiStyle.weight)).toBe(400)
-  expect(Number(labsStyle.weight)).toBe(400)
+  expect(Number(aiStyle.weight)).toBe(500)
+  expect(Number(labsStyle.weight)).toBe(500)
   expect(aiStyle.synthesis).toMatch(/none/)
-  const regularLoaded = await page.evaluate(() =>
-    document.fonts.check('400 16px "Plus Jakarta Sans"')
+  const mediumLoaded = await page.evaluate(() =>
+    document.fonts.check('500 16px "Plus Jakarta Sans"')
   )
-  expect(regularLoaded).toBe(true)
+  expect(mediumLoaded).toBe(true)
   expect(aiStyle.color).toBe("rgb(139, 123, 199)")
   expect(labsStyle.color).toBe("rgb(48, 48, 48)")
 
