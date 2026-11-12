@@ -13,12 +13,13 @@ import {
 } from "./dinner-helpers"
 
 const SHOTS = "/cursor/stores/self/media/item-row-hover"
+const FIRST_SHOTS = "/cursor/stores/self/media/everyone-first"
 
 const GUESTS = ["Borea", "Freddy", "Gabriel", "Hector", "Ro", "Saul"]
 
-function shot(page: Page, name: string, locator?: Locator) {
-  mkdirSync(SHOTS, { recursive: true })
-  const dest = path.join(SHOTS, name)
+function shot(page: Page, name: string, locator?: Locator, dir = SHOTS) {
+  mkdirSync(dir, { recursive: true })
+  const dest = path.join(dir, name)
   if (locator) return locator.screenshot({ path: dest, animations: "disabled" })
   return page.screenshot({ path: dest, animations: "disabled" })
 }
@@ -44,6 +45,7 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   page,
 }) => {
   mkdirSync(SHOTS, { recursive: true })
+  mkdirSync(FIRST_SHOTS, { recursive: true })
   await createDinner(page, "Walter")
   await openBill(page)
   await addPeople(page, GUESTS)
@@ -101,21 +103,22 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
     exact: true,
   })
 
+  await expect(firstEveryone).toHaveCount(1)
+  await expect(lastEveryone).toHaveCount(1)
   await expect(firstChipButtons.first()).toHaveText("Everyone")
-  await expect(firstChipButtons.last()).toHaveText("Everyone")
-  await expect(firstChipButtons).toHaveCount(1 + GUESTS.length + 2)
+  await expect(firstChipButtons.last()).not.toHaveText("Everyone")
+  await expect(firstChipButtons).toHaveCount(1 + GUESTS.length + 1)
   await expect(firstChips).toHaveCSS("flex-wrap", "nowrap")
   const chipsBox = await firstChips.boundingBox()
   expect(chipsBox?.height ?? 0, "chip row should be one line").toBeLessThan(56)
-  await expect(lastEveryone).toHaveCount(2)
 
-  const everyonePaint = await paint(firstEveryone.first())
+  const everyonePaint = await paint(firstEveryone)
   const personPaint = await paint(boreaChip)
   const accentPaint = await paint(
     page.getByRole("button", { name: "Confirm bill" })
   )
   expect(everyonePaint.bg).not.toBe(personPaint.bg)
-  await expect(firstEveryone.first()).toHaveCSS("color", accentPaint.bg)
+  await expect(firstEveryone).toHaveCSS("color", accentPaint.bg)
 
   await page.locator(".item-row-chips").evaluateAll((els) => {
     for (const el of els) el.scrollLeft = 0
@@ -137,6 +140,7 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await shot(page, "everyone-accent.png", itemsList)
   await shot(page, "scroll-right.png", firstAssign)
   await shot(page, "390-chips-start.png", firstChips)
+  await shot(page, "row-start.png", firstAssign, FIRST_SHOTS)
   await firstChips.evaluate((el) => {
     el.scrollLeft = el.scrollWidth
   })
@@ -144,6 +148,7 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await page.waitForTimeout(80)
   await shot(page, "scroll-left.png", firstAssign)
   await shot(page, "390-chips-end.png", firstChips)
+  await shot(page, "scroll-end.png", firstAssign, FIRST_SHOTS)
   await shot(page, "390-items-end.png", itemsList)
   await firstChips.evaluate((el) => {
     el.scrollLeft = 0
@@ -213,14 +218,10 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await page.keyboard.press("Escape")
   await expect(page.getByRole("listbox")).toHaveCount(0)
 
-  await lastEveryone.first().click()
-  await expect(lastEveryone.first()).toHaveAttribute("aria-pressed", "true")
-  await expect(lastEveryone.last()).toHaveAttribute("aria-pressed", "true")
+  await lastEveryone.click()
+  await expect(lastEveryone).toHaveAttribute("aria-pressed", "true")
   await page.mouse.move(0, 0)
-  await expect(lastEveryone.first()).toHaveCSS(
-    "background-color",
-    accentPaint.bg
-  )
+  await expect(lastEveryone).toHaveCSS("background-color", accentPaint.bg)
   const selectedPerson = await paint(
     last.getByRole("button", { name: "Walter", exact: true })
   )

@@ -1253,9 +1253,6 @@ function ItemCard({
                 </button>
               )
             )}
-            {readOnly ? null : members.length > 1 ? (
-              <EveryoneChip pressed={everyone} onClick={onEveryone} />
-            ) : null}
           </ChipRow>
         ) : (
           <ChipRow>
