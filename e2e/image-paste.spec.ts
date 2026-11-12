@@ -93,7 +93,10 @@ test.describe("image paste on upload surfaces", () => {
     await expect(review).toBeVisible({ timeout: 40_000 })
     await waitForHydration(page)
     await shot(page, "390-scan-pasted.png")
-    await expect(page.getByLabel("Place")).not.toHaveValue("")
+    const bill = page.getByRole("textbox", { name: "Bill" })
+    await expect(bill).not.toHaveValue("")
+    await expect(bill).not.toHaveValue(/breakfast|lunch|dinner$/i)
+    await expect(page.getByLabel("Place")).toHaveCount(0)
   })
 
   test("desktop scan hint mentions paste", async ({ page }) => {
@@ -113,7 +116,6 @@ test.describe("image paste on upload surfaces", () => {
     const { name: dinnerName } = await createDinner(page, "Ana")
     await openBill(page)
     await addPeople(page, ["Ben", "Cam"])
-    await page.getByLabel("Place").fill("Pizza night")
     await addCheckItem(page, "Pizza Margherita", "24.00")
     await addCheckItem(page, "Pizza Pepperoni", "24.00")
     await assignEqual(page, "Pizza Margherita", ["Ana", "Ben", "Cam"])

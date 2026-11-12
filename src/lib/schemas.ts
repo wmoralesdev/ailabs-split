@@ -175,7 +175,7 @@ export const renameRoomSchema = z.object({
 export const upsertCheckSchema = z.object({
   code: roomCodeSchema,
   checkId: z.string().min(1).optional(),
-  merchant: z.string().trim().min(1, "Name the place").max(80),
+  merchant: z.string().trim().min(1, "Name the bill").max(80),
   paidById: z.string().min(1, "Pick who paid"),
   isPrecuenta: z.boolean().default(false),
   payload: checkPayloadSchema,

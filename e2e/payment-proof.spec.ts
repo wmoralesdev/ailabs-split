@@ -61,7 +61,6 @@ test("optional payment proof: empty and with photo", async ({ page }) => {
   const { name: dinnerName } = await createDinner(page, "Ana")
   await openBill(page)
   await addPeople(page, ["Ben", "Cam"])
-  await page.getByLabel("Place").fill("Pizza night")
   await addCheckItem(page, "Pizza Margherita", "24.00")
   await addCheckItem(page, "Pizza Pepperoni", "24.00")
   await assignEqual(page, "Pizza Margherita", ["Ana", "Ben", "Cam"])

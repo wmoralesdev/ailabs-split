@@ -55,6 +55,18 @@ async function requireDinnerRoom(code: string) {
   return room
 }
 
+async function syncRoomNameToBill(
+  room: { id: string; name: string },
+  merchant: string
+) {
+  const name = merchant.trim().slice(0, 60)
+  if (!name || name === room.name) return
+  await prisma.room.update({
+    where: { id: room.id },
+    data: { name },
+  })
+}
+
 async function loadCheckDto(checkId: string): Promise<CheckDto> {
   const check = await prisma.check.findUnique({
     where: { id: checkId },
@@ -195,6 +207,7 @@ export const upsertCheck = createServerFn({ method: "POST" })
             status: "CONFIRMED",
           },
         })
+        await syncRoomNameToBill(room, data.merchant)
         return await loadCheckDto(existing.id)
       }
 
@@ -207,6 +220,7 @@ export const upsertCheck = createServerFn({ method: "POST" })
           payload: data.payload,
         },
       })
+      await syncRoomNameToBill(room, data.merchant)
       return await loadCheckDto(existing.id)
     }
 
@@ -221,6 +235,7 @@ export const upsertCheck = createServerFn({ method: "POST" })
         status: "DRAFT",
       },
     })
+    await syncRoomNameToBill(room, data.merchant)
     return await loadCheckDto(check.id)
   })
 

@@ -108,9 +108,10 @@ test.describe("bill copy", () => {
       sheet.getByRole("heading", { name: "Bill name" })
     ).toBeVisible()
     await expect(sheet.getByRole("textbox", { name: "Bill" })).toHaveValue(name)
-    await expect(
-      sheet.getByText("The bill title. Place on the bill is separate.")
-    ).toBeVisible()
+    await expect(sheet.getByText("What to call this bill.")).toBeVisible()
+    await expect(sheet.getByText("Place on the bill is separate")).toHaveCount(
+      0
+    )
     await shot(page, "bill-name-sheet.png")
     await sheet.getByRole("button", { name: "Save name" }).click()
     await expect(sheet).toBeHidden()

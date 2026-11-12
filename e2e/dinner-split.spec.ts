@@ -8,8 +8,10 @@ import {
   assignEqual,
   assignEqualInSheet,
   assignQuantities,
+  billNameField,
   confirmCheck,
   createDinner,
+  fillBillName,
   openDinnerCreate,
   recordPayment,
   signInE2e,
@@ -30,10 +32,7 @@ test.describe("dinner split", () => {
     page,
     browser,
   }) => {
-    const { code: dinnerCode, name: dinnerName } = await createDinner(
-      page,
-      "Ana"
-    )
+    const { code: dinnerCode } = await createDinner(page, "Ana")
     await expect(page.getByText("You · Ana")).toBeVisible()
     await expect(page.getByText(/1 person/)).toBeVisible()
     await expect(page.getByLabel("Add people")).toHaveCount(0)
@@ -41,7 +40,7 @@ test.describe("dinner split", () => {
     await openBill(page)
     await addPeople(page, ["Ben", "Cam"])
     await expect(page.getByText("3 people")).toBeVisible()
-    await page.getByLabel("Place").fill("Pizza night")
+    await fillBillName(page, "Pizza night")
     await expect(page.getByRole("group", { name: "Paid by" })).toContainText(
       "Ana"
     )
@@ -67,8 +66,9 @@ test.describe("dinner split", () => {
     await expect(page.getByText("Add tip")).toBeVisible()
 
     await confirmCheck(page)
-    await expect(page.getByRole("heading", { name: dinnerName })).toBeVisible()
-    await expect(page.getByText("Pizza night")).toBeVisible()
+    await expect(
+      page.getByRole("heading", { name: "Pizza night" })
+    ).toBeVisible()
     await expect(page.getByText("$48.00").first()).toBeVisible()
     await expect(page.getByText(/New check/)).toHaveCount(0)
     await expect(page.getByRole("heading", { name: "Checks" })).toHaveCount(0)
@@ -90,12 +90,13 @@ test.describe("dinner split", () => {
 
     await dinnerNav(page).getByRole("link", { name: "Home" }).click()
     await openBill(page)
-    await expect(page.getByLabel("Place")).toHaveValue("Pizza night")
+    await expect(billNameField(page)).toHaveValue("Pizza night")
+    await expect(page.getByLabel("Place")).toHaveCount(0)
     await expect(
       page.getByRole("button", { name: /Pizza Margherita/ })
     ).toBeVisible()
     await page.goto(`/r/${dinnerCode}/check`)
-    await expect(page.getByLabel("Place")).toHaveValue("Pizza night")
+    await expect(billNameField(page)).toHaveValue("Pizza night")
     await page.getByRole("button", { name: "Back", exact: true }).click()
 
     const guest = await browser.newContext()
@@ -104,15 +105,14 @@ test.describe("dinner split", () => {
     await waitForHydration(guestPage)
     await guestPage.getByRole("tab", { name: "Join" }).click()
     await guestPage.getByLabel("Code", { exact: true }).fill(dinnerCode)
-    await expect(guestPage.getByText(dinnerName)).toBeVisible()
+    await expect(guestPage.getByText("Pizza night")).toBeVisible()
     await guestPage.getByRole("button", { name: /add my name/i }).click()
     await guestPage.getByLabel("Your name").fill("Dee")
     await guestPage.getByRole("button", { name: "Continue" }).click()
     await expect(
-      guestPage.getByRole("heading", { name: dinnerName })
+      guestPage.getByRole("heading", { name: "Pizza night" })
     ).toBeVisible()
     await expect(guestPage.getByText("You · Dee")).toBeVisible()
-    await expect(guestPage.getByText("Pizza night")).toBeVisible()
     await guest.close()
   })
 
@@ -120,7 +120,7 @@ test.describe("dinner split", () => {
     await createDinner(page, "Ana")
     await openBill(page)
     await addPeople(page, ["Ben", "Cam"])
-    await page.getByLabel("Place").fill("Panchimalco")
+    await fillBillName(page, "Panchimalco")
     await addCheckItem(page, "Pupusa Frijol", "6.75", 3)
     await assignQuantities(page, "Pupusa Frijol", {
       Ana: 1,
@@ -212,12 +212,14 @@ test.describe("dinner split", () => {
       page.getByRole("heading", { name: "Check the ticket" })
     ).toBeVisible({ timeout: 40_000 })
     await expect(page.getByText("Bill ready")).toHaveCount(0)
-    await expect(page.getByLabel("Place")).not.toHaveValue("")
+    const bill = billNameField(page)
+    await expect(bill).not.toHaveValue("")
+    await expect(bill).not.toHaveValue(/breakfast|lunch|dinner$/i)
 
-    const place = await page.getByLabel("Place").inputValue()
+    const name = await bill.inputValue()
     await page.getByRole("button", { name: "Back" }).click()
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      place.slice(0, 24)
+      name.slice(0, 24)
     )
     await expect(page.getByText("You · Ana")).toBeVisible()
 

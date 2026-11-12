@@ -415,9 +415,11 @@ function BillCard({
         className="group-list group-row-hit mt-2.5 w-full text-left"
       >
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold">{bill.merchant}</p>
+          <p className="truncate text-[15px] font-semibold">
+            {bill.paidByName} paid
+          </p>
           <p className="truncate text-[13px] text-muted-foreground">
-            {bill.paidByName} paid · {bill.payload.items.length}{" "}
+            {bill.payload.items.length}{" "}
             {bill.payload.items.length === 1 ? "line" : "lines"} ·{" "}
             {formatRelativeTime(bill.createdAt)}
           </p>

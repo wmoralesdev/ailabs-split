@@ -48,11 +48,19 @@ export function rememberCurrency(currency: string) {
   write(CURRENCY_KEY, currency)
 }
 
+const DEFAULT_DINNER_NAME =
+  /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) (breakfast|lunch|dinner)$/
+
 export function defaultDinnerName(now = new Date()): string {
   const day = now.toLocaleDateString("en-US", { weekday: "long" })
   const hour = now.getHours()
   const meal = hour < 11 ? "breakfast" : hour < 16 ? "lunch" : "dinner"
   return `${day} ${meal}`
+}
+
+/** Fallback meal-of-day titles; OCR merchant can replace these as the bill name. */
+export function isDefaultDinnerName(name: string): boolean {
+  return DEFAULT_DINNER_NAME.test(name.trim())
 }
 
 /** Split typed text on commas/newlines and merge into `existing`, case-insensitively. */

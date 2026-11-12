@@ -34,7 +34,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import { itemSplitSummary, tidyPlaceName } from "@/lib/dinner-labels"
+import {
+  itemSplitSummary,
+  ocrSeedsBillName,
+  tidyPlaceName,
+} from "@/lib/dinner-labels"
 import { dinnerCanEdit } from "@/lib/dinner-bill"
 import {
   assignRestToMember,
@@ -91,7 +95,8 @@ export function CheckEditor({
   const fd = currencyFractionDigits(room.currency)
 
   const [checkId, setCheckId] = useState<string | null>(check?.id ?? null)
-  const [merchant, setMerchant] = useState(check?.merchant ?? "")
+  const [billName, setBillName] = useState(room.name)
+  const savedNameRef = useRef(room.name)
   const [isPrecuenta, setIsPrecuenta] = useState(check?.isPrecuenta ?? false)
   const [paidById, setPaidById] = useState(
     check?.paidById ??
@@ -157,11 +162,12 @@ export function CheckEditor({
       if (readOnly) {
         throw new Error("Only the person who started this can edit it")
       }
+      const name = (billName.trim() || room.name.trim() || "Bill").slice(0, 60)
       const saved = await upsertCheck({
         data: {
           code: room.code,
           checkId: checkId ?? undefined,
-          merchant: merchant.trim() || "Bill",
+          merchant: name,
           paidById,
           isPrecuenta,
           payload,
@@ -219,14 +225,15 @@ export function CheckEditor({
       : emptyCheckPayload()
     setPayload(next)
     const place = tidyPlaceName(draft.check?.merchant ?? draft.title ?? "")
-    if (place) setMerchant(place)
-    if (draft.check?.isPrecuenta) setIsPrecuenta(true)
-    setPhase(next.items.length > 0 ? "review" : "assign")
-    if (nameFromTicket && place) {
-      void renameRoom({ data: { code: room.code, name: place.slice(0, 60) } })
+    if (place && ocrSeedsBillName(room.name, nameFromTicket)) {
+      const nextName = place.slice(0, 60)
+      setBillName(nextName)
+      void renameRoom({ data: { code: room.code, name: nextName } })
         .then(invalidate)
         .catch(() => undefined)
     }
+    if (draft.check?.isPrecuenta) setIsPrecuenta(true)
+    setPhase(next.items.length > 0 ? "review" : "assign")
   }
 
   async function awaitOcrDraft(
@@ -269,6 +276,13 @@ export function CheckEditor({
   }
 
   const pendingTaken = useRef(false)
+  useEffect(() => {
+    setBillName((current) =>
+      current === savedNameRef.current ? room.name : current
+    )
+    savedNameRef.current = room.name
+  }, [room.name])
+
   useEffect(() => {
     if (check || pendingTaken.current) return
     pendingTaken.current = true
@@ -437,18 +451,12 @@ export function CheckEditor({
         <div className="mt-4 flex flex-col gap-5 pb-6">
           <DinnerNameField
             code={room.code}
-            name={room.name}
+            value={billName}
+            savedName={room.name}
+            onChange={setBillName}
             id="dinner-name-review"
             readOnly={readOnly}
           />
-          <div className="grid gap-2">
-            <Label htmlFor="merchant">Place</Label>
-            <Input
-              id="merchant"
-              value={merchant}
-              onChange={(event) => setMerchant(event.target.value)}
-            />
-          </div>
           {isPrecuenta ? (
             <p className="text-sm text-muted-foreground">Marked as precuenta</p>
           ) : null}
@@ -473,7 +481,7 @@ export function CheckEditor({
 
   return (
     <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
-      <EditorHeader title={merchant.trim() || "The bill"} onBack={backHome} />
+      <EditorHeader title={billName.trim() || "The bill"} onBack={backHome} />
 
       <div className="mt-3 flex flex-col gap-6 pb-6">
         {payload.items.length === 0 && isOnline && !readOnly ? (
@@ -498,29 +506,12 @@ export function CheckEditor({
 
         <DinnerNameField
           code={room.code}
-          name={room.name}
+          value={billName}
+          savedName={room.name}
+          onChange={setBillName}
           id="dinner-name-assign"
           readOnly={readOnly}
         />
-        {readOnly ? (
-          <div className="grid gap-1.5">
-            <p className="text-[13px] font-medium text-muted-foreground">
-              Place
-            </p>
-            <p className="text-[15px]">{merchant.trim() || "No place yet"}</p>
-          </div>
-        ) : (
-          <div className="grid gap-1.5">
-            <Label htmlFor="merchant-assign">Place</Label>
-            <Input
-              id="merchant-assign"
-              value={merchant}
-              onChange={(event) => setMerchant(event.target.value)}
-              placeholder="Celeste Imperio"
-              enterKeyHint="next"
-            />
-          </div>
-        )}
 
         <BillPeople
           room={room}

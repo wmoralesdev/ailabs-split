@@ -32,7 +32,10 @@ test.describe("Pastaria OCR keeps last extras", () => {
     ).toBeVisible({ timeout: 40_000 })
     await waitForHydration(page)
 
-    await expect(page.getByLabel("Place")).toHaveValue(/pastaria/i)
+    await expect(page.getByRole("textbox", { name: "Bill" })).toHaveValue(
+      /pastaria/i
+    )
+    await expect(page.getByLabel("Place")).toHaveCount(0)
     await expect(page.getByText(/insalata caesar/i).first()).toBeVisible()
     await expect(page.getByText("$0.00").first()).toBeVisible()
     await page

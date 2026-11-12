@@ -67,16 +67,16 @@ test("item rows hover as a full rounded card; Paid by looks enabled", async ({
   await expect(page.locator("select")).toHaveCount(0)
 
   const paidBy = page.getByRole("button", { name: /Paid by/ })
-  const place = page.getByLabel("Place")
+  const bill = page.getByRole("textbox", { name: "Bill" })
   await expect(paidBy).toBeVisible()
   await paidBy.scrollIntoViewIfNeeded()
 
   const paidPaint = await paint(paidBy)
-  const placePaint = await paint(place)
+  const billPaint = await paint(bill)
   expect(paidPaint.opacity).toBe("1")
   expect(Number.parseFloat(paidPaint.borderW)).toBeGreaterThan(0)
-  expect(paidPaint.bg).toBe(placePaint.bg)
-  expect(paidPaint.border).toBe(placePaint.border)
+  expect(paidPaint.bg).toBe(billPaint.bg)
+  expect(paidPaint.border).toBe(billPaint.border)
 
   const itemsList = page
     .locator("ul.group-list")

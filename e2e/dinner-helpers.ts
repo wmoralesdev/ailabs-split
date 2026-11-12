@@ -199,7 +199,20 @@ export async function openBill(page: Page) {
     await bill.click()
   }
   await waitForHydration(page)
-  await expect(page.getByLabel("Place")).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Bill" })).toBeVisible()
+  await expect(page.getByLabel("Place")).toHaveCount(0)
+}
+
+export function billNameField(page: Page) {
+  return page.getByRole("textbox", { name: "Bill" })
+}
+
+export async function fillBillName(page: Page, name: string) {
+  const field = billNameField(page)
+  await expect(field).toBeVisible()
+  await field.fill(name)
+  await field.blur()
+  await expect(field).toHaveValue(name)
 }
 
 export async function addCheckItem(

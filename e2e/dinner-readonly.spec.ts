@@ -51,7 +51,6 @@ test.describe("dinner read-only for non-creators", () => {
     const { code, name: dinnerName } = await createDinner(page, "Ana")
     await openBill(page)
     await addPeople(page, ["Ben", "Cam"])
-    await page.getByLabel("Place").fill("Pizza night")
     await addCheckItem(page, "Pizza Margherita", "24.00")
     await assignEqual(page, "Pizza Margherita", ["Ana", "Ben"])
 
@@ -126,7 +125,8 @@ test.describe("dinner read-only for non-creators", () => {
       .getByRole("link", { name: "Open the bill" })
       .click()
     await waitForHydration(guestPage)
-    await expect(guestPage.getByText("Pizza night")).toBeVisible()
+    await expect(guestPage.getByText(dinnerName).first()).toBeVisible()
+    await expect(guestPage.getByLabel("Place")).toHaveCount(0)
     await expect(guestPage.getByLabel("Add people")).toHaveCount(0)
     await expect(
       guestPage.getByRole("button", { name: "Add item" })
