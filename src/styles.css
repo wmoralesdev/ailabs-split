@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@clerk/ui/themes/shadcn.css";
 @import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource/plus-jakarta-sans/latin-400.css";
 @import "@fontsource-variable/dm-sans";
 
 @custom-variant dark (&:is(.dark *));
@@ -215,6 +216,17 @@
 @layer utilities {
   .font-display {
     font-family: var(--font-display);
+  }
+
+  /* Static Regular 400 only — not the variable face, not faux-bold. */
+  .ailabs-wordmark {
+    font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 400;
+    font-style: normal;
+    font-size: 16px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-synthesis: none;
   }
 
   .shadow-soft {

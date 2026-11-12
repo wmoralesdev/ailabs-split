@@ -180,7 +180,7 @@ function LandingPage() {
         className="overflow-hidden"
         innerClassName="flex min-h-dvh flex-col items-center justify-center pb-12 pt-5"
       >
-        <SiteLogo showWordmark={false} markClassName="size-8" />
+        <SiteLogo />
         <p className="mt-6 text-sm text-muted-foreground">Opening your trip…</p>
       </PageShell>
     )
@@ -194,7 +194,7 @@ function LandingPage() {
   return (
     <PageShell innerClassName="flex min-h-dvh flex-col pt-2">
       <header className="flex h-11 items-center justify-between">
-        <SiteLogo showWordmark={false} markClassName="size-7" />
+        <SiteLogo />
         <div className="flex items-center gap-1">
           <AuthControls />
           <ThemeToggle />
