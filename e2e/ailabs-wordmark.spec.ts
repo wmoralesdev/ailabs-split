@@ -14,7 +14,10 @@ async function openLanding(page: Page) {
   await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
   await expect(page.getByRole("heading", { name: "Split" })).toBeVisible()
   await waitForHydration(page)
-  await page.evaluate(() => document.fonts.ready)
+  await page.evaluate(async () => {
+    await document.fonts.load('400 16px "Plus Jakarta Sans"')
+    await document.fonts.ready
+  })
   const lockup = page.getByRole("img", { name: "Ai Labs" })
   await expect(lockup).toBeVisible()
   await expect(lockup.locator("img:visible")).toHaveCount(1)
@@ -31,17 +34,33 @@ async function assertLockup(page: Page) {
 
   const aiStyle = await ai.evaluate((el) => {
     const s = getComputedStyle(el)
-    return { color: s.color, family: s.fontFamily, weight: s.fontWeight }
+    return {
+      color: s.color,
+      family: s.fontFamily,
+      weight: s.fontWeight,
+      synthesis: s.fontSynthesis,
+    }
   })
   const labsStyle = await labs.evaluate((el) => {
     const s = getComputedStyle(el)
-    return { color: s.color, family: s.fontFamily, weight: s.fontWeight }
+    return {
+      color: s.color,
+      family: s.fontFamily,
+      weight: s.fontWeight,
+      synthesis: s.fontSynthesis,
+    }
   })
 
-  expect(aiStyle.family).toMatch(/Plus Jakarta Sans/i)
-  expect(labsStyle.family).toMatch(/Plus Jakarta Sans/i)
+  expect(aiStyle.family).toMatch(/^["']?Plus Jakarta Sans["']?/)
+  expect(labsStyle.family).toMatch(/^["']?Plus Jakarta Sans["']?/)
+  expect(aiStyle.family).not.toMatch(/Variable/i)
   expect(Number(aiStyle.weight)).toBe(400)
   expect(Number(labsStyle.weight)).toBe(400)
+  expect(aiStyle.synthesis).toMatch(/none/)
+  const regularLoaded = await page.evaluate(() =>
+    document.fonts.check('400 16px "Plus Jakarta Sans"')
+  )
+  expect(regularLoaded).toBe(true)
   expect(aiStyle.color).toBe("rgb(139, 123, 199)")
   expect(labsStyle.color).toBe("rgb(48, 48, 48)")
 

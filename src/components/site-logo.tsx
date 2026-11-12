@@ -4,7 +4,7 @@ const MARK_DARK = "/brand/ailabs-iso-dark.svg"
 const MARK_LIGHT = "/brand/ailabs-iso-light.svg"
 
 /**
- * Official Ai Labs lockup: brand isotype + live Plus Jakarta Sans wordmark.
+ * Official Ai Labs lockup: brand isotype + live Plus Jakarta Sans Regular 400.
  * Inks match public/brand/ailabs-dark.svg (Ai #8B7BC7, Labs #303030).
  */
 export function SiteLogo({ className }: { className?: string }) {
@@ -32,10 +32,12 @@ export function SiteLogo({ className }: { className?: string }) {
       />
       <span
         aria-hidden="true"
-        className="inline-flex items-baseline gap-[0.28em] font-display text-[16px] leading-none font-normal tracking-[-0.03em]"
+        className="ailabs-wordmark inline-flex items-baseline gap-[0.28em]"
       >
-        <span className="text-[#8B7BC7]">Ai</span>
-        <span className="text-[#303030] dark:text-[#EDEDED]">Labs</span>
+        <span className="font-normal text-[#8B7BC7]">Ai</span>
+        <span className="font-normal text-[#303030] dark:text-[#EDEDED]">
+          Labs
+        </span>
       </span>
     </span>
   )
