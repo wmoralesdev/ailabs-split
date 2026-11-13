@@ -10,29 +10,31 @@ datasource db {
 }
 
 model Room {
-  id          String       @id @default(cuid())
-  code        String       @unique
-  name        String
-  // TRIP (default) or DINNER — dinner is a one-time room, not a trip.
-  kind        String       @default("TRIP")
+  id                   String              @id @default(cuid())
+  code                 String              @unique
+  name                 String
+  // TRIP (default), DINNER, or HOUSEHOLD — dinner is a one-time bill; household is the house.
+  kind                 String              @default("TRIP")
   // Base/settlement currency for the room (e.g. the members' home currency).
-  currency    String
+  currency             String
   // Allowed currencies for expenses (includes the base currency).
-  currencies  String[]     @default([])
+  currencies           String[]            @default([])
   // Exchange rates as units of the currency per 1 base currency, e.g. { "CRC": 505 }.
-  fxRates     Json?
+  fxRates              Json?
   // Bank FX markup in basis points from multi-sample calibration (87 = +0.87%).
-  fxAdjustmentBps Int @default(0)
+  fxAdjustmentBps      Int                 @default(0)
   // Calibration samples: [{ appCents, bankCents, expenseId? }].
   fxCalibrationSamples Json?
   // Clerk user id of whoever created the room (null for anonymous creates).
-  ownerUserId String?
-  createdAt   DateTime     @default(now())
-  members     Member[]
-  expenses    Expense[]
-  settlements Settlement[]
-  checks      Check[]
-  hides       RoomHide[]
+  // HOUSEHOLD: required by the server, not by this column.
+  ownerUserId          String?
+  createdAt            DateTime            @default(now())
+  members              Member[]
+  expenses             Expense[]
+  settlements          Settlement[]
+  checks               Check[]
+  hides                RoomHide[]
+  templates            RecurringTemplate[]
 
   @@index([ownerUserId])
 }
@@ -50,44 +52,67 @@ model RoomHide {
 }
 
 model Member {
-  id                         String         @id @default(cuid())
+  id                         String              @id @default(cuid())
   roomId                     String
   name                       String
-  room                       Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  paidExpenses               Expense[]      @relation("ExpensePaidBy")
-  paidChecks                 Check[]        @relation("CheckPaidBy")
+  // Clerk user id of the housemate who claimed this seat. HOUSEHOLD only.
+  userId                     String?
+  // HOUSEHOLD: guest (not in charges or templates by default). Trips/bills: always false.
+  isGuest                    Boolean             @default(false)
+  // HOUSEHOLD: move-in / move-out dates (day, no time).
+  joinedOn                   DateTime?           @db.Date
+  leftOn                     DateTime?           @db.Date
+  createdAt                  DateTime            @default(now())
+  room                       Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  paidExpenses               Expense[]           @relation("ExpensePaidBy")
+  paidChecks                 Check[]             @relation("CheckPaidBy")
   shares                     ExpenseShare[]
-  settlementPaymentsSent     Settlement[]   @relation("SettlementFrom")
-  settlementPaymentsReceived Settlement[]   @relation("SettlementTo")
+  settlementPaymentsSent     Settlement[]        @relation("SettlementFrom")
+  settlementPaymentsReceived Settlement[]        @relation("SettlementTo")
+  createdExpenses            Expense[]           @relation("ExpenseCreatedBy")
+  createdSettlements         Settlement[]        @relation("SettlementCreatedBy")
+  templatesPaid              RecurringTemplate[] @relation("TemplatePaidBy")
+  templateShares             RecurringShare[]
 
+  @@unique([roomId, userId])
   @@index([roomId])
+  @@index([userId])
 }
 
 model Expense {
-  id          String         @id @default(cuid())
-  roomId      String
-  title       String
-  amountCents Int
-  category    String?
+  id                String               @id @default(cuid())
+  roomId            String
+  title             String
+  amountCents       Int
+  category          String?
   // Currency this expense was recorded in; null falls back to the room base currency.
-  currency    String?
+  currency          String?
   // How shares were derived: EQUAL | PARTS | AMOUNT.
-  splitMode   String         @default("EQUAL")
+  splitMode         String               @default("EQUAL")
   // Personal expenses are only visible to the payer and do not affect group settle.
-  isPersonal  Boolean        @default(false)
-  paidById    String
-  createdAt   DateTime       @default(now())
+  isPersonal        Boolean              @default(false)
+  paidById          String
+  createdAt         DateTime             @default(now())
   // Manual display order (lower first). New expenses get min(sortIndex)-1 so
   // they appear at the top. Ties fall back to createdAt desc.
-  sortIndex   Int            @default(0)
-  room        Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  paidBy      Member         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
-  shares      ExpenseShare[]
-  check       Check?
+  sortIndex         Int                  @default(0)
+  // HOUSEHOLD: month the charge covers, "YYYY-MM" (Oct power paid in Nov → "2026-10").
+  periodMonth       String?
+  // HOUSEHOLD: day the charge was paid.
+  paidOn            DateTime?            @db.Date
+  // Author (edit/delete permission). Null on older trips/bills.
+  createdByMemberId String?
+  room              Room                 @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  paidBy            Member               @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
+  createdBy         Member?              @relation("ExpenseCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  shares            ExpenseShare[]
+  check             Check?
+  occurrence        RecurringOccurrence?
 
   @@index([roomId])
   @@index([paidById])
   @@index([roomId, sortIndex])
+  @@index([roomId, periodMonth])
 }
 
 model ExpenseShare {
@@ -125,22 +150,75 @@ model Check {
 }
 
 model Settlement {
-  id           String   @id @default(cuid())
-  roomId       String
-  fromMemberId String
-  toMemberId   String
-  amountCents  Int
-  currency     String
-  createdAt    DateTime @default(now())
+  id                String   @id @default(cuid())
+  roomId            String
+  fromMemberId      String
+  toMemberId        String
+  amountCents       Int
+  currency          String
+  createdAt         DateTime @default(now())
   // Optional transfer screenshot. Never required to settle. Omitted from room
   // list queries; fetched by settlement id when someone opens the photo.
-  proofBytes     Bytes?
-  proofMimeType  String?
-  room         Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  fromMember   Member   @relation("SettlementFrom", fields: [fromMemberId], references: [id], onDelete: Restrict)
-  toMember     Member   @relation("SettlementTo", fields: [toMemberId], references: [id], onDelete: Restrict)
+  proofBytes        Bytes?
+  proofMimeType     String?
+  // Who recorded it (may delete it, or the recipient may).
+  createdByMemberId String?
+  room              Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  fromMember        Member   @relation("SettlementFrom", fields: [fromMemberId], references: [id], onDelete: Restrict)
+  toMember          Member   @relation("SettlementTo", fields: [toMemberId], references: [id], onDelete: Restrict)
+  createdBy         Member?  @relation("SettlementCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
 
   @@index([roomId])
   @@index([fromMemberId])
   @@index([toMemberId])
+}
+
+model RecurringTemplate {
+  id                String                @id @default(cuid())
+  roomId            String
+  title             String
+  category          String
+  // FIXED: known amount. VARIABLE: amount empty until the month is confirmed.
+  kind              String
+  amountCents       Int?
+  dueDay            Int
+  paidById          String
+  splitMode         String                @default("EQUAL")
+  startMonth        String
+  archivedAt        DateTime?
+  createdByMemberId String?
+  createdAt         DateTime              @default(now())
+  room              Room                  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  paidBy            Member                @relation("TemplatePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
+  shares            RecurringShare[]
+  occurrences       RecurringOccurrence[]
+
+  @@index([roomId])
+}
+
+model RecurringShare {
+  id          String            @id @default(cuid())
+  templateId  String
+  memberId    String
+  weight      Int?
+  amountCents Int?
+  template    RecurringTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  member      Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, memberId])
+}
+
+// A month already handled for a template: confirmed (with its Expense) or skipped.
+model RecurringOccurrence {
+  id                String            @id @default(cuid())
+  templateId        String
+  periodMonth       String
+  status            String
+  expenseId         String?           @unique
+  createdByMemberId String?
+  createdAt         DateTime          @default(now())
+  template          RecurringTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  expense           Expense?          @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, periodMonth])
 }
