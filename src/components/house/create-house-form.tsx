@@ -3,12 +3,11 @@ import type { useNavigate } from "@tanstack/react-router"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
+import { HouseDateChips } from "@/components/house/house-date-chips"
 import { NameListInput } from "@/components/name-list-input"
 import { WithDisplayName } from "@/components/with-display-name"
 import { Button } from "@/components/ui/button"
@@ -35,7 +34,6 @@ import {
 } from "@/lib/landing-prefs"
 import { rememberMember } from "@/lib/member-storage"
 import { markInstallEligible } from "@/lib/pwa-install"
-import { cn } from "@/lib/utils"
 import { createHouse } from "@/server/houses"
 
 const houseSchema = z.object({
@@ -214,70 +212,47 @@ function CreateHouseFields({
                 : []
             }
           />
-        </FieldGroup>
 
-        <ul className="group-list">
           <FormField
             control={form.control}
             name="joinedOn"
             render={({ field }) => (
-              <li>
-                <SettingRow
-                  label="Moved in"
-                  value={movedInLabel(field.value, today, yesterday)}
-                  open={editMovedIn}
-                  onToggle={() => setEditMovedIn((open) => !open)}
-                />
+              <Field>
                 {editMovedIn ? (
-                  <div
-                    className="flex flex-wrap items-center gap-1.5 px-4 pb-3"
-                    role="group"
-                    aria-label="Moved in"
-                  >
-                    <DateChip
-                      label="Today"
-                      pressed={field.value === today}
-                      onClick={() => {
-                        field.onChange(today)
-                        setEditMovedIn(false)
+                  <>
+                    <FieldLabel>Moved in</FieldLabel>
+                    <HouseDateChips
+                      label="Moved in"
+                      value={field.value}
+                      onChange={(next) => {
+                        if (!next) return
+                        field.onChange(next)
+                        if (next === today || next === yesterday) {
+                          setEditMovedIn(false)
+                        }
                       }}
                     />
-                    <DateChip
-                      label="Yesterday"
-                      pressed={field.value === yesterday}
-                      onClick={() => {
-                        field.onChange(yesterday)
-                        setEditMovedIn(false)
-                      }}
-                    />
-                    <Input
-                      type="date"
-                      value={isIsoDate(field.value) ? field.value : today}
-                      onChange={(event) => {
-                        const next = event.target.value
-                        if (isIsoDate(next)) field.onChange(next)
-                      }}
-                      aria-label="Pick a date"
-                      className="h-9 w-[9.5rem] rounded-full px-3 text-[13px]"
-                    />
-                  </div>
-                ) : null}
-              </li>
+                  </>
+                ) : (
+                  <SummaryRow
+                    lead="Moved in"
+                    value={movedInLabel(field.value, today, yesterday)}
+                    action="Change date"
+                    onAction={() => setEditMovedIn(true)}
+                  />
+                )}
+              </Field>
             )}
           />
+
           <FormField
             control={form.control}
             name="currency"
             render={({ field }) => (
-              <li>
-                <SettingRow
-                  label="Currency"
-                  value={currency}
-                  open={editCurrency}
-                  onToggle={() => setEditCurrency((open) => !open)}
-                />
+              <Field>
                 {editCurrency ? (
-                  <div className="px-4 pb-3">
+                  <>
+                    <FieldLabel>Currency</FieldLabel>
                     <BaseCurrencyPicker
                       value={field.value}
                       onChange={(next) => {
@@ -285,12 +260,19 @@ function CreateHouseFields({
                         setEditCurrency(false)
                       }}
                     />
-                  </div>
-                ) : null}
-              </li>
+                  </>
+                ) : (
+                  <SummaryRow
+                    lead="Paying in"
+                    value={currency}
+                    action="Change currency"
+                    onAction={() => setEditCurrency(true)}
+                  />
+                )}
+              </Field>
             )}
           />
-        </ul>
+        </FieldGroup>
 
         <div className="form-dock">
           <Button
@@ -307,69 +289,35 @@ function CreateHouseFields({
 }
 
 function movedInLabel(value: string, today: string, yesterday: string) {
-  if (value === today) return "Today"
-  if (value === yesterday) return "Yesterday"
-  return isIsoDate(value) ? formatDay(value) : "Today"
+  if (value === today) return "today"
+  if (value === yesterday) return "yesterday"
+  return isIsoDate(value) ? formatDay(value) : "today"
 }
 
-function SettingRow({
-  label,
+function SummaryRow({
+  lead,
   value,
-  open,
-  onToggle,
+  action,
+  onAction,
 }: {
-  label: string
+  lead: string
   value: string
-  open: boolean
-  onToggle: () => void
+  action: string
+  onAction: () => void
 }) {
   return (
-    <button
-      type="button"
-      aria-expanded={open}
-      onClick={onToggle}
-      className="group-row-hit min-h-11 w-full justify-between text-left"
-    >
-      <span className="text-foreground">{label}</span>
-      <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
-        {value}
-        <HugeiconsIcon
-          icon={ArrowRight01Icon}
-          size={16}
-          strokeWidth={2}
-          className={cn(
-            "transition-transform duration-200",
-            open && "rotate-90"
-          )}
-        />
-      </span>
-    </button>
-  )
-}
-
-function DateChip({
-  label,
-  pressed,
-  onClick,
-}: {
-  label: string
-  pressed: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={cn(
-        "h-9 rounded-full px-3 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        pressed
-          ? "bg-foreground text-background"
-          : "bg-muted text-foreground hover:bg-foreground/10"
-      )}
-    >
-      {label}
-    </button>
+    <div className="-mt-1 flex min-h-11 items-center justify-between gap-3">
+      <p className="text-[15px] text-muted-foreground">
+        {lead} <span className="font-semibold text-foreground">{value}</span>
+      </p>
+      <button
+        type="button"
+        className="text-action text-[15px]"
+        onClick={onAction}
+      >
+        {action}
+      </button>
+    </div>
   )
 }
 
