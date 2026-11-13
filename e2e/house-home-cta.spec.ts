@@ -48,7 +48,7 @@ test.describe("House home CTA", () => {
     const startHouse = page.getByRole("button", { name: "Start house" })
     await expect(startHouse).toBeVisible()
     await expect(startHouse).toHaveClass(/cta-lg/)
-    await expect(page.getByRole("link", { name: "Open house" })).toHaveCount(0)
+    await expect(page.getByRole("link", { name: /^Open / })).toHaveCount(0)
     await expect(
       page.getByRole("button", { name: "Start another house" })
     ).toHaveCount(0)
@@ -71,7 +71,7 @@ test.describe("House home CTA", () => {
     await waitForHydration(page)
     await pickHouseMode(page)
 
-    const openHouse = page.getByRole("link", { name: "Open house" })
+    const openHouse = page.getByRole("link", { name: `Open ${houseName}` })
     await expect(openHouse).toBeVisible()
     await expect(openHouse).toHaveClass(/split-cta/)
     await expect(page.getByRole("button", { name: "Start house" })).toHaveCount(
@@ -84,17 +84,30 @@ test.describe("House home CTA", () => {
     await expect(startAnother).toHaveClass(/text-action/)
     await expect(page.getByLabel("Name your house")).toHaveCount(0)
 
+    const yours = page.getByRole("region", { name: "Your bills and trips" })
+    await expect(yours.getByText(houseName)).toBeVisible()
+    await expect(
+      page.getByRole("region", { name: "Recent trips" }).getByText(houseName)
+    ).toHaveCount(0)
+
     await startAnother.click()
     await expect(page.getByLabel("Name your house")).toBeVisible()
     await expect(
       page.getByRole("button", { name: "Start house" })
     ).toBeVisible()
-    await expect(page.getByRole("link", { name: "Open house" })).toHaveCount(0)
-    await page.getByRole("button", { name: "Open house" }).click()
-
-    await openHouse.click()
+    await expect(openHouse).toHaveCount(0)
+    await page
+      .getByRole("tabpanel")
+      .getByRole("button", { name: `Open ${houseName}` })
+      .click()
     await expect(page.getByRole("heading", { name: houseName })).toBeVisible()
     await expect(page.getByText("House · 2 housemates")).toBeVisible()
+
+    await page.getByRole("link", { name: "Split home" }).click()
+    await waitForHydration(page)
+    await pickHouseMode(page)
+    await openHouse.click()
+    await expect(page.getByRole("heading", { name: houseName })).toBeVisible()
   })
 
   for (const scheme of ["light", "dark"] as const) {
@@ -132,11 +145,23 @@ test.describe("House home CTA", () => {
       await expect(page.getByRole("heading", { name: "Split" })).toBeVisible()
       await waitForHydration(page)
       await pickHouseMode(page)
-      await expect(page.getByRole("link", { name: "Open house" })).toBeVisible()
       await expect(
-        page.getByRole("button", { name: "Start another house" })
+        page.getByRole("link", { name: `Open ${houseName}` })
       ).toBeVisible()
+      const startAnother = page.getByRole("button", {
+        name: "Start another house",
+      })
+      await expect(startAnother).toBeVisible()
       await shot(page, `${scheme}-one-house.png`)
+
+      await startAnother.click()
+      await expect(page.getByLabel("Name your house")).toBeVisible()
+      await expect(
+        page
+          .getByRole("tabpanel")
+          .getByRole("button", { name: `Open ${houseName}` })
+      ).toBeVisible()
+      await shot(page, `${scheme}-start-another.png`)
       await context.close()
     })
   }

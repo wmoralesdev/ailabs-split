@@ -18,37 +18,7 @@ export function HouseLanding({
   houses: OwnedRoomDto[]
 }) {
   const [creating, setCreating] = useState(false)
-
-  if (houses.length === 0 || creating) {
-    return (
-      <CreateHouseForm
-        navigate={navigate}
-        displayName={displayName}
-        secondaryAction={
-          houses.length > 0
-            ? {
-                label: "Open house",
-                onClick: () => setCreating(false),
-              }
-            : undefined
-        }
-      />
-    )
-  }
-
-  return (
-    <HouseOpenCta houses={houses} onCreateAnother={() => setCreating(true)} />
-  )
-}
-
-function HouseOpenCta({
-  houses,
-  onCreateAnother,
-}: {
-  houses: OwnedRoomDto[]
-  onCreateAnother: () => void
-}) {
-  const [code, setCode] = useState(houses[0]?.code ?? "")
+  const [code, setCode] = useState(houses.at(0)?.code ?? "")
 
   useEffect(() => {
     const preferred = pickPreferredHouse(
@@ -58,13 +28,33 @@ function HouseOpenCta({
     if (preferred) setCode(preferred.code)
   }, [houses])
 
-  const house = houses.find((row) => row.code === code) ?? houses[0]
-  if (!house) return null
+  const house = houses.find((row) => row.code === code) ?? houses.at(0)
+
+  if (!house || creating) {
+    return (
+      <CreateHouseForm
+        navigate={navigate}
+        displayName={displayName}
+        secondaryAction={
+          house
+            ? {
+                label: `Open ${house.name}`,
+                onClick: () =>
+                  void navigate({
+                    to: "/r/$code",
+                    params: { code: house.code },
+                  }),
+              }
+            : undefined
+        }
+      />
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {houses.length > 1 ? (
-        <ChipRow role="group" aria-label="Your houses">
+        <ChipRow role="group" aria-label="Your houses" bleed>
           {houses.map((row) => (
             <button
               key={row.code}
@@ -81,14 +71,14 @@ function HouseOpenCta({
       <Link
         to="/r/$code"
         params={{ code: house.code }}
-        className="cta-lg split-cta w-full"
+        className="split-cta cta-lg w-full"
       >
-        Open house
+        <span className="truncate">Open {house.name}</span>
       </Link>
       <button
         type="button"
-        className="text-action gap-1.5 self-center text-[15px]"
-        onClick={onCreateAnother}
+        className="text-action self-center text-[15px]"
+        onClick={() => setCreating(true)}
       >
         Start another house
       </button>

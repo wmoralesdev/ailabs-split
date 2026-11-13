@@ -232,10 +232,7 @@ function LandingPage() {
         </p>
       </div>
 
-      <Tabs
-        defaultValue={defaultTab}
-        className="animate-rise-delay mt-5 flex-1"
-      >
+      <Tabs defaultValue={defaultTab} className="animate-rise-delay mt-5">
         <TabsList className="segmented w-full grid-cols-2 group-data-horizontal/tabs:h-9">
           <TabsTrigger value="create" className="segmented-item">
             Create

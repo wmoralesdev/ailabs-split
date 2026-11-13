@@ -35,8 +35,14 @@ export function RecentTripsList({
   }, [yours])
 
   const refresh = useCallback(() => {
-    setTrips(listRecentTrips())
-  }, [])
+    setTrips(
+      listRecentTrips().filter(
+        (trip) =>
+          parseRoomKind(trip.kind ?? "TRIP") !== "HOUSEHOLD" ||
+          !yoursByCode.has(trip.code)
+      )
+    )
+  }, [yoursByCode])
 
   const refreshAndNotify = useCallback(() => {
     refresh()
