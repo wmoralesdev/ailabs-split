@@ -1,3 +1,5 @@
+import { dinnerCanEdit } from "@/lib/dinner-bill"
+import { parseRoomKind } from "@/lib/room-kind"
 import type { RoomDto } from "@/server/rooms"
 
 const STORAGE_PREFIX = "split:room-cache:"
@@ -21,12 +23,12 @@ function isRoomDto(value: unknown): value is RoomDto {
 }
 
 function normalizeRoomDto(room: RoomDto): RoomDto {
-  const kind = room.kind === "DINNER" ? "DINNER" : "TRIP"
+  const kind = parseRoomKind(room.kind)
   return {
     ...room,
     kind,
     owned: room.owned === true,
-    canEdit: kind !== "DINNER" ? true : room.canEdit !== false,
+    canEdit: dinnerCanEdit({ kind, canEdit: room.canEdit }),
     fxAdjustmentBps: Number.isFinite(room.fxAdjustmentBps)
       ? room.fxAdjustmentBps
       : 0,

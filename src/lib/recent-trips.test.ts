@@ -57,6 +57,30 @@ describe("recent-trips", () => {
     expect(listRecentTrips()[0]?.kind).toBe("DINNER")
   })
 
+  it("stores a House kind without coercing it to Trip", () => {
+    rememberRecentTrip({
+      code: "hhhhhh",
+      name: "Casa Escalón",
+      kind: "HOUSEHOLD",
+    })
+    expect(listRecentTrips()[0]?.kind).toBe("HOUSEHOLD")
+  })
+
+  it("reads a stored HOUSEHOLD row", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        {
+          code: "HOUSE01",
+          name: "Casa",
+          updatedAt: Date.now(),
+          kind: "HOUSEHOLD",
+        },
+      ])
+    )
+    expect(listRecentTrips()[0]?.kind).toBe("HOUSEHOLD")
+  })
+
   it("caps at 10 trips", () => {
     for (let i = 0; i < 12; i++) {
       vi.setSystemTime(new Date(Date.UTC(2026, 6, 15, 12, i)))

@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
+import type { ReactNode } from "react"
 import { useNavigate, useRouter } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -21,23 +22,11 @@ import { forgetRoomCache } from "@/lib/room-cache"
 import { roomKeys } from "@/lib/room-query"
 import { useSignedInUserId } from "@/lib/use-auth-user"
 import { cn } from "@/lib/utils"
+import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 import { deleteRoom, hideRoom } from "@/server/rooms"
 
-type RoomKind = "DINNER" | "TRIP"
 type Placement = "row" | "page"
-
-function roomNoun(kind: RoomKind): "bill" | "trip" {
-  switch (kind) {
-    case "DINNER":
-      return "bill"
-    case "TRIP":
-      return "trip"
-    default: {
-      const _never: never = kind
-      throw new Error(`Unknown room kind: ${String(_never)}`)
-    }
-  }
-}
 
 function deleteConfirmDetail(kind: RoomKind): string {
   switch (kind) {
@@ -45,6 +34,8 @@ function deleteConfirmDetail(kind: RoomKind): string {
       return "It's gone for everyone at the table. This cannot be undone."
     case "TRIP":
       return "It's gone for everyone on this trip. This cannot be undone."
+    case "HOUSEHOLD":
+      return "Charges, payments, and recurring for everyone are gone."
     default: {
       const _never: never = kind
       throw new Error(`Unknown room kind: ${String(_never)}`)
@@ -58,6 +49,8 @@ function deletedToast(kind: RoomKind): string {
       return "Bill deleted"
     case "TRIP":
       return "Trip deleted"
+    case "HOUSEHOLD":
+      return "House deleted"
     default: {
       const _never: never = kind
       throw new Error(`Unknown room kind: ${String(_never)}`)
@@ -80,7 +73,8 @@ export function RoomExitControl({
   placement: Placement
   onDone?: () => void
 }) {
-  const noun = roomNoun(kind)
+  const parsed = parseRoomKind(kind)
+  const noun = roomKindNoun(parsed)
   const userId = useSignedInUserId()
   const router = useRouter()
   const navigate = useNavigate()
@@ -121,7 +115,7 @@ export function RoomExitControl({
       forgetMember(code)
     },
     onSuccess: async () => {
-      toast.success(deletedToast(kind))
+      toast.success(deletedToast(parsed))
       setConfirmOpen(false)
       await leaveHome()
     },
@@ -200,7 +194,7 @@ export function RoomExitControl({
               Delete this {noun}?
             </SheetTitle>
             <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
-              {deleteConfirmDetail(kind)}
+              {deleteConfirmDetail(parsed)}
             </SheetDescription>
           </SheetHeader>
           <SheetFooter className="mt-4 flex-col gap-2 p-0">

@@ -49,6 +49,7 @@ import {
 import { compressImageForOcr } from "@/lib/compress-image"
 import { rememberLastCurrency, resolveLastCurrency } from "@/lib/last-currency"
 import { useOnlineStatus } from "@/lib/online-status"
+import { parseRoomKind } from "@/lib/room-kind"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { useRequireSignIn } from "@/lib/use-auth-user"
 import { CURRENCY_OPTIONS } from "@/lib/room-code"
@@ -135,8 +136,18 @@ function AddExpensePage() {
   if (!room) {
     return isPending ? <AddExpenseSkeleton /> : null
   }
-  if (room.kind === "DINNER") {
-    return <Navigate to="/r/$code/check" params={{ code }} />
+  const kind = parseRoomKind(room.kind)
+  switch (kind) {
+    case "DINNER":
+      return <Navigate to="/r/$code/check" params={{ code }} />
+    case "HOUSEHOLD":
+      return <Navigate to="/r/$code" params={{ code }} />
+    case "TRIP":
+      break
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
   }
   return (
     <AddExpenseForm

@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router"
 
 import { RoomExitControl } from "@/components/room-exit-control"
 import { formatRecentTripOpened } from "@/lib/recent-trips"
+import { roomKindLabel } from "@/lib/room-kind"
 import type { OwnedRoomDto } from "@/server/rooms"
 
 export function YourRoomsList({
@@ -25,7 +26,7 @@ export function YourRoomsList({
       </h2>
       <ul className="group-list mt-2">
         {rooms.map((room) => {
-          const kind = room.kind === "DINNER" ? "Bill" : "Trip"
+          const kind = roomKindLabel(room.kind)
           return (
             <li key={room.code} className="flex items-stretch">
               <button

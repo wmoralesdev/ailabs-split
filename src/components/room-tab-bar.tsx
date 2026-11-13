@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { Link, useMatchRoute } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
@@ -8,6 +9,8 @@ import {
 } from "@hugeicons/core-free-icons"
 import type { IconSvgElement } from "@hugeicons/react"
 
+import { parseRoomKind, roomKindLabel } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 import { cn } from "@/lib/utils"
 
 /** Fixed bottom navigation: Home · Add (a trip) or the bill (a dinner) · Settle. */
@@ -16,7 +19,7 @@ export function RoomTabBar({
   kind = "TRIP",
 }: {
   code: string
-  kind?: "TRIP" | "DINNER"
+  kind?: RoomKind
 }) {
   const matchRoute = useMatchRoute()
   const onHome = !!matchRoute({ to: "/r/$code", params: { code } })
@@ -26,13 +29,46 @@ export function RoomTabBar({
     params: { code },
     fuzzy: true,
   })
-  const isDinner = kind === "DINNER"
+  const parsed = parseRoomKind(kind)
 
   if (onCheck) return null
 
+  let addControl: ReactNode
+  switch (parsed) {
+    case "DINNER":
+      addControl = (
+        <Link
+          to="/r/$code/check"
+          params={{ code }}
+          aria-label="Open the bill"
+          className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
+        >
+          <HugeiconsIcon icon={Invoice03Icon} size={22} strokeWidth={2} />
+        </Link>
+      )
+      break
+    case "TRIP":
+    case "HOUSEHOLD":
+      addControl = (
+        <Link
+          to="/r/$code/new"
+          params={{ code }}
+          aria-label="Add expense"
+          className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
+        >
+          <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
+        </Link>
+      )
+      break
+    default: {
+      const _never: never = parsed
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
+  }
+
   return (
     <nav
-      aria-label={isDinner ? "Bill navigation" : "Trip navigation"}
+      aria-label={`${roomKindLabel(parsed)} navigation`}
       className="pb-safe relative z-30 shrink-0 border-t border-border bg-background"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-1">
@@ -43,27 +79,7 @@ export function RoomTabBar({
           label="Home"
           active={onHome}
         />
-        <div className="flex justify-center">
-          {isDinner ? (
-            <Link
-              to="/r/$code/check"
-              params={{ code }}
-              aria-label="Open the bill"
-              className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
-            >
-              <HugeiconsIcon icon={Invoice03Icon} size={22} strokeWidth={2} />
-            </Link>
-          ) : (
-            <Link
-              to="/r/$code/new"
-              params={{ code }}
-              aria-label="Add expense"
-              className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
-            </Link>
-          )}
-        </div>
+        <div className="flex justify-center">{addControl}</div>
         <TabLink
           to="/r/$code/settle"
           code={code}

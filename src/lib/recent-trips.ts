@@ -1,12 +1,12 @@
 import { isRoomHidden } from "@/lib/hidden-rooms"
-
-export type RoomKindLabel = "TRIP" | "DINNER"
+import { isRoomKind, parseRoomKind } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 
 export type RecentTrip = {
   code: string
   name: string
   updatedAt: number
-  kind?: RoomKindLabel
+  kind?: RoomKind
 }
 
 const STORAGE_KEY = "split:recent-trips"
@@ -22,7 +22,7 @@ function isRecentTrip(value: unknown): value is RecentTrip {
     typeof trip.name === "string" &&
     typeof trip.updatedAt === "number" &&
     Number.isFinite(trip.updatedAt) &&
-    (kind === undefined || kind === "TRIP" || kind === "DINNER")
+    (kind === undefined || isRoomKind(kind))
   )
 }
 
@@ -57,7 +57,7 @@ export function listRecentTrips(): RecentTrip[] {
 export function rememberRecentTrip(input: {
   code: string
   name: string
-  kind?: RoomKindLabel
+  kind?: RoomKind
 }): void {
   if (typeof window === "undefined") return
   const code = input.code.trim().toUpperCase()
@@ -69,7 +69,7 @@ export function rememberRecentTrip(input: {
     code,
     name,
     updatedAt: Date.now(),
-    kind: input.kind === "DINNER" ? "DINNER" : "TRIP",
+    kind: parseRoomKind(input.kind ?? "TRIP"),
   }
   const without = readTrips().filter((trip) => trip.code.toUpperCase() !== code)
   writeTrips([next, ...without].slice(0, MAX_RECENT))

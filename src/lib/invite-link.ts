@@ -1,3 +1,6 @@
+import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
+
 const FALLBACK_ORIGIN = "https://split.ailabs.sv"
 
 function appOrigin(): string {
@@ -24,11 +27,11 @@ export type ShareInviteResult = "shared" | "copied" | "cancelled"
 export async function shareOrCopyInvite(opts: {
   code: string
   name: string
-  kind?: "TRIP" | "DINNER"
+  kind?: RoomKind
 }): Promise<ShareInviteResult> {
   const url = inviteLink(opts.code)
   const title = opts.name
-  const noun = opts.kind === "DINNER" ? "bill" : "trip"
+  const noun = roomKindNoun(parseRoomKind(opts.kind ?? "TRIP"))
   const text = `Join "${opts.name}" on Split — ${noun} code ${opts.code}`
 
   if (

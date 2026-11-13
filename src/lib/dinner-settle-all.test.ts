@@ -158,6 +158,19 @@ describe("candidateDinnerCodes", () => {
       })
     ).toEqual(["AAA111", "BBB222"])
   })
+
+  it("excludes houses from To settle", () => {
+    expect(
+      candidateDinnerCodes({
+        recent: [
+          { code: "house1", kind: "HOUSEHOLD" },
+          { code: "aaa111", kind: "DINNER" },
+        ],
+        yours: [{ code: "house2", kind: "HOUSEHOLD" }],
+        hidden: [],
+      })
+    ).toEqual(["AAA111"])
+  })
 })
 
 describe("readHiddenDinnerCodes", () => {
@@ -199,10 +212,12 @@ describe("dinnerSettleLine + card", () => {
       oweAnaCents: 1200,
     })
     const trip: RoomDto = { ...biblioteca, kind: "TRIP" }
+    const house: RoomDto = { ...biblioteca, kind: "HOUSEHOLD" }
     const square = dinnerSettleLine(biblioteca, "ana")
     expect(square).not.toBeNull()
     expect(dinnerSettleLine(draft, "ana")).toBeNull()
     expect(dinnerSettleLine(trip, "ana")).toBeNull()
+    expect(dinnerSettleLine(house, "ana")).toBeNull()
     expect(dinnerSettleLine(biblioteca, "nobody")).toBeNull()
   })
 

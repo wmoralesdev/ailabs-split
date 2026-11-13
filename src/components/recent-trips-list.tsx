@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { mergeHiddenRoomCodes } from "@/lib/hidden-rooms"
 import { formatRecentTripOpened, listRecentTrips } from "@/lib/recent-trips"
+import { parseRoomKind, roomKindLabel } from "@/lib/room-kind"
 
 export function RecentTripsList({
   ownedCodes,
@@ -43,7 +44,7 @@ export function RecentTripsList({
       </h2>
       <ul className="group-list mt-2">
         {trips.map((trip, index) => {
-          const kind = trip.kind === "DINNER" ? "Bill" : "Trip"
+          const kind = roomKindLabel(parseRoomKind(trip.kind ?? "TRIP"))
           const isContinue = index === 0
           const isOwned = owned.has(trip.code)
           return (
@@ -88,7 +89,7 @@ export function RecentTripsList({
               <RoomExitControl
                 code={trip.code}
                 name={trip.name}
-                kind={trip.kind === "DINNER" ? "DINNER" : "TRIP"}
+                kind={parseRoomKind(trip.kind ?? "TRIP")}
                 owned={isOwned}
                 placement="row"
                 onDone={refreshAndNotify}

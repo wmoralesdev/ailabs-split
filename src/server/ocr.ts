@@ -11,6 +11,7 @@ import { zodTextFormat } from "openai/helpers/zod"
 
 import { requireSignedInUserId } from "@/server/auth-user.server"
 import { assertHostDinnerEdit } from "@/lib/dinner-bill"
+import { assertNotHousehold } from "@/lib/room-kind"
 import {
   RECEIPT_VISION_INSTRUCTIONS,
   draftFromExtract,
@@ -57,6 +58,7 @@ async function assertCanScanRoom(code: string, userId: string) {
   if (!room) {
     throw new Error("Trip not found")
   }
+  assertNotHousehold(room.kind)
   assertHostDinnerEdit(room, userId)
   return room
 }

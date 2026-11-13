@@ -31,8 +31,9 @@ export const memberNameSchema = z
 export const splitModeSchema = z.enum(["EQUAL", "PARTS", "AMOUNT"])
 export type SplitMode = z.infer<typeof splitModeSchema>
 
+export type { RoomKind } from "./room-kind"
+/** createRoom stays Bill/Trip. Houses use createHouse in a later PR. */
 export const roomKindSchema = z.enum(["TRIP", "DINNER"])
-export type RoomKind = z.infer<typeof roomKindSchema>
 
 export const checkStatusSchema = z.enum(["DRAFT", "CONFIRMED"])
 export type CheckStatus = z.infer<typeof checkStatusSchema>
