@@ -29,6 +29,7 @@ import { formatMonth, isMovedOutOn, localIsoDate } from "@/lib/house-month"
 import { canDeletePayment, canRecordPayment } from "@/lib/house-permissions"
 import { copyText } from "@/lib/invite-link"
 import { roomKeys } from "@/lib/room-query"
+import { cn } from "@/lib/utils"
 import { formatMoney } from "@/lib/settle"
 import type { Transfer } from "@/lib/settle"
 import { deleteHousePayment, recordHousePayment } from "@/server/houses"
@@ -283,7 +284,14 @@ export function HouseSettle({ room }: { room: RoomDto }) {
                       </span>
                     ) : null}
                   </span>
-                  <span className="shrink-0 text-[13px] text-muted-foreground tabular-nums">
+                  <span
+                    className={cn(
+                      "max-w-[9.75rem] shrink-0 text-right text-[13px] leading-snug tabular-nums",
+                      net === 0
+                        ? "text-muted-foreground"
+                        : "font-medium text-foreground"
+                    )}
+                  >
                     {houseBalanceCopy(member.name, net, room.currency)}
                   </span>
                 </button>

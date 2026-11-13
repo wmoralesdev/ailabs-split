@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router"
 
+import { HouseRowBalance } from "@/components/house/house-row-balance"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { formatRecentTripOpened } from "@/lib/recent-trips"
 import { roomKindLabel } from "@/lib/room-kind"
@@ -52,15 +53,22 @@ export function YourRoomsList({
                     <span>{kind}</span>
                   </span>
                 </span>
-                <span className="shrink-0 self-center text-[13px] text-muted-foreground tabular-nums">
-                  {formatRecentTripOpened(new Date(room.createdAt).getTime())}
-                </span>
+                {room.kind === "HOUSEHOLD" ? (
+                  <HouseRowBalance
+                    balanceCents={room.balanceCents}
+                    currency={room.currency}
+                  />
+                ) : (
+                  <span className="shrink-0 self-center text-[13px] text-muted-foreground tabular-nums">
+                    {formatRecentTripOpened(new Date(room.createdAt).getTime())}
+                  </span>
+                )}
               </button>
               <RoomExitControl
                 code={room.code}
                 name={room.name}
                 kind={room.kind}
-                owned
+                owned={room.owned}
                 placement="row"
                 onDone={onChanged}
               />

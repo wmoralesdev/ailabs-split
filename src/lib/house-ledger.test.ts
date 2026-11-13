@@ -5,6 +5,7 @@ import {
   dueThisMonth,
   houseBalanceCopy,
   houseNets,
+  houseRowBalanceCopy,
   memberHasHouseLedger,
   monthBreakdown,
   movedOutSubtitle,
@@ -169,6 +170,12 @@ describe("houseBalanceCopy", () => {
     expect(viewerHeroCopy(0, "USD", { guestWithoutCharges: true })).toBe(
       "You're not on any charges"
     )
+  })
+
+  it("prints the home row balance", () => {
+    expect(houseRowBalanceCopy(-14200, "USD")).toBe("You owe $142.00")
+    expect(houseRowBalanceCopy(14200, "USD")).toBe("You get back $142.00")
+    expect(houseRowBalanceCopy(0, "USD")).toBe("Square")
   })
 })
 

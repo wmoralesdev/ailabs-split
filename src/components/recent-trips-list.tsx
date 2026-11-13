@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { useQuery } from "@tanstack/react-query"
 
+import { HouseRowBalance } from "@/components/house/house-row-balance"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { mergeHiddenRoomCodes } from "@/lib/hidden-rooms"
+import { recallMember } from "@/lib/member-storage"
 import { formatRecentTripOpened, listRecentTrips } from "@/lib/recent-trips"
 import { parseRoomKind, roomKindLabel } from "@/lib/room-kind"
+import { getHouseRowBalances } from "@/server/houses"
+import type { HouseRowBalanceDto } from "@/server/houses"
+import type { OwnedRoomDto } from "@/server/rooms"
 
 export function RecentTripsList({
   ownedCodes,
+  yours = [],
   serverHiddenCodes,
   onChanged,
 }: {
   ownedCodes: readonly string[]
+  yours?: readonly OwnedRoomDto[]
   serverHiddenCodes: readonly string[]
   onChanged?: () => void
 }) {
@@ -20,6 +28,11 @@ export function RecentTripsList({
   const owned = useMemo(() => new Set(ownedCodes), [ownedCodes])
   const ownedKey = ownedCodes.join(",")
   const hiddenKey = serverHiddenCodes.join(",")
+  const yoursByCode = useMemo(() => {
+    const map = new Map<string, OwnedRoomDto>()
+    for (const room of yours) map.set(room.code, room)
+    return map
+  }, [yours])
 
   const refresh = useCallback(() => {
     setTrips(listRecentTrips())
@@ -35,6 +48,33 @@ export function RecentTripsList({
     refresh()
   }, [hiddenKey, ownedKey, refresh, serverHiddenCodes])
 
+  const fetchItems = useMemo(() => {
+    const items: Array<{ code: string; memberId: string }> = []
+    for (const trip of trips) {
+      if (parseRoomKind(trip.kind ?? "TRIP") !== "HOUSEHOLD") continue
+      const ownedRoom = yoursByCode.get(trip.code)
+      if (ownedRoom && ownedRoom.balanceCents !== undefined) continue
+      const memberId = recallMember(trip.code)
+      if (!memberId) continue
+      items.push({ code: trip.code, memberId })
+    }
+    return items
+  }, [trips, yoursByCode])
+
+  const balancesQuery = useQuery({
+    queryKey: ["house-row-balances", fetchItems],
+    queryFn: () => getHouseRowBalances({ data: { items: fetchItems } }),
+    enabled: fetchItems.length > 0,
+  })
+
+  const fetchedByCode = useMemo(() => {
+    const map = new Map<string, HouseRowBalanceDto>()
+    for (const row of balancesQuery.data?.items ?? []) {
+      map.set(row.code, row)
+    }
+    return map
+  }, [balancesQuery.data])
+
   if (trips.length === 0) return null
 
   return (
@@ -44,9 +84,12 @@ export function RecentTripsList({
       </h2>
       <ul className="group-list mt-2">
         {trips.map((trip, index) => {
-          const kind = roomKindLabel(parseRoomKind(trip.kind ?? "TRIP"))
+          const kindParsed = parseRoomKind(trip.kind ?? "TRIP")
+          const kind = roomKindLabel(kindParsed)
           const isContinue = index === 0
-          const isOwned = owned.has(trip.code)
+          const ownedRoom = yoursByCode.get(trip.code)
+          const isOwned = ownedRoom?.owned ?? owned.has(trip.code)
+          const fetched = fetchedByCode.get(trip.code)
           return (
             <li key={trip.code} className="flex items-stretch">
               <button
@@ -82,14 +125,23 @@ export function RecentTripsList({
                     <span>{kind}</span>
                   </span>
                 </span>
-                <span className="shrink-0 self-center text-[13px] text-muted-foreground tabular-nums">
-                  {formatRecentTripOpened(trip.updatedAt)}
-                </span>
+                {kindParsed === "HOUSEHOLD" ? (
+                  <HouseRowBalance
+                    balanceCents={
+                      ownedRoom?.balanceCents ?? fetched?.balanceCents
+                    }
+                    currency={ownedRoom?.currency ?? fetched?.currency}
+                  />
+                ) : (
+                  <span className="shrink-0 self-center text-[13px] text-muted-foreground tabular-nums">
+                    {formatRecentTripOpened(trip.updatedAt)}
+                  </span>
+                )}
               </button>
               <RoomExitControl
                 code={trip.code}
                 name={trip.name}
-                kind={parseRoomKind(trip.kind ?? "TRIP")}
+                kind={kindParsed}
                 owned={isOwned}
                 placement="row"
                 onDone={refreshAndNotify}

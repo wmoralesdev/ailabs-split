@@ -145,6 +145,52 @@ export function houseTransfers(
   return simplifyTransfers(houseNets(members, expenses, settlements))
 }
 
+export function houseNetForMember(
+  members: Array<{ id: string; name: string }>,
+  expenses: HouseLedgerExpense[],
+  settlements: HouseLedgerSettlement[],
+  memberId: string
+): number {
+  return (
+    houseNets(members, expenses, settlements).find(
+      (row) => row.memberId === memberId
+    )?.netCents ?? 0
+  )
+}
+
+/** Ledger rows as stored on Room — enough to compute a home-row balance. */
+export function houseNetFromRows(
+  members: Array<{ id: string; name: string }>,
+  expenses: Array<{
+    paidById: string
+    isPersonal?: boolean
+    shares: Array<{ memberId: string; amountCents: number }>
+  }>,
+  settlements: Array<{
+    fromMemberId: string
+    toMemberId: string
+    amountCents: number
+  }>,
+  memberId: string
+): number {
+  return houseNetForMember(
+    members,
+    expenses.map((expense) => ({
+      paidById: expense.paidById,
+      periodMonth: null,
+      isPersonal: expense.isPersonal,
+      shares: expense.shares,
+    })),
+    settlements.map((settlement) => ({
+      fromMemberId: settlement.fromMemberId,
+      toMemberId: settlement.toMemberId,
+      amountCents: settlement.amountCents,
+      createdAt: "",
+    })),
+    memberId
+  )
+}
+
 export function houseBalanceCopy(
   name: string,
   netCents: number,
@@ -156,6 +202,18 @@ export function houseBalanceCopy(
   }
   return `${name} is square`
 }
+
+/** Home `/` house row, shorter than the in-house hero. */
+export function houseRowBalanceCopy(
+  netCents: number,
+  currency: string
+): string {
+  if (netCents < 0) return `You owe ${formatMoney(-netCents, currency)}`
+  if (netCents > 0) return `You get back ${formatMoney(netCents, currency)}`
+  return "Square"
+}
+
+export const HOUSE_ROW_SIGN_IN = "Sign in to see your balance"
 
 export function viewerHeroCopy(
   netCents: number,
