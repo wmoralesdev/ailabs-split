@@ -1,7 +1,9 @@
+import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
+import { HouseReceiptDialog } from "@/components/house/house-receipt-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -32,6 +34,7 @@ export function HouseChargeSheet({
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [photoOpen, setPhotoOpen] = useState(false)
   const role = room.house?.viewer.role ?? "VISITOR"
   const actorId = room.house?.viewer.memberId ?? null
   const isAuthor = Boolean(
@@ -95,6 +98,15 @@ export function HouseChargeSheet({
             <p className="font-display text-3xl font-semibold tabular-nums">
               {formatMoney(expense.amountCents, expense.currency)}
             </p>
+            {expense.hasReceipt ? (
+              <button
+                type="button"
+                className="text-action self-start text-[15px]"
+                onClick={() => setPhotoOpen(true)}
+              >
+                View photo
+              </button>
+            ) : null}
             <div>
               <h3 className="text-sm font-medium">Your share</h3>
               <ul className="mt-2 divide-y divide-border/60">
@@ -158,6 +170,13 @@ export function HouseChargeSheet({
           </SheetFooter>
         </div>
       </SheetContent>
+      <HouseReceiptDialog
+        open={photoOpen}
+        onOpenChange={setPhotoOpen}
+        code={room.code}
+        expenseId={expense.id}
+        label={expense.title}
+      />
     </Sheet>
   )
 }

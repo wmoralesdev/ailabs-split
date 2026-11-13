@@ -14,6 +14,7 @@ import {
   viewerHeroCopy,
 } from "@/lib/house-ledger"
 import { formatDay, formatMonth } from "@/lib/house-month"
+import { canAddCharge } from "@/lib/house-permissions"
 import { useOnlineStatus } from "@/lib/online-status"
 import { formatMoney } from "@/lib/settle"
 import type { ExpenseDto, RoomDto } from "@/server/rooms"
@@ -51,6 +52,7 @@ export function HouseHome({
     housemates.length === 1 ? "1 housemate" : `${housemates.length} housemates`
   const role = room.house?.viewer.role ?? "VISITOR"
   const actorId = room.house?.viewer.memberId
+  const canAdd = canAddCharge(role)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const nets = useMemo(
@@ -93,6 +95,18 @@ export function HouseHome({
             </Link>
           ) : null}
         </div>
+        {canAdd ? (
+          <p className="mt-2">
+            <Link
+              to="/r/$code/new"
+              params={{ code: room.code }}
+              search={{}}
+              className="text-action text-[15px]"
+            >
+              Scan a receipt
+            </Link>
+          </p>
+        ) : null}
 
         <DueThisMonth room={room} />
 

@@ -41,6 +41,7 @@ function normalizeRoomDto(room: RoomDto): RoomDto {
       periodMonth: expense.periodMonth ?? null,
       paidOn: expense.paidOn ?? null,
       createdByMemberId: expense.createdByMemberId ?? null,
+      hasReceipt: expense.hasReceipt === true,
     })),
     settlements: room.settlements.map((settlement) => ({
       ...settlement,

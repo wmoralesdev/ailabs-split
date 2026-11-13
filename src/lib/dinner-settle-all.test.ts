@@ -76,6 +76,7 @@ function expense(input: {
     periodMonth: null,
     paidOn: null,
     createdByMemberId: null,
+    hasReceipt: false,
     shares: input.shares.map((share) => ({
       memberId: share.memberId,
       memberName: share.memberId === "ana" ? "Ana" : "Walter",

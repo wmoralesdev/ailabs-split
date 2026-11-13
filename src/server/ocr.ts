@@ -11,7 +11,19 @@ import { zodTextFormat } from "openai/helpers/zod"
 
 import { requireSignedInUserId } from "@/server/auth-user.server"
 import { assertHostDinnerEdit } from "@/lib/dinner-bill"
-import { assertNotHousehold } from "@/lib/room-kind"
+import { resolveHouseViewer } from "@/lib/house-actor"
+import {
+  canAddCharge,
+  guestsCantAddChargesMessage,
+} from "@/lib/house-permissions"
+import {
+  HOUSE_RECEIPT_VISION_INSTRUCTIONS,
+  draftFromHouseExtract,
+  fixtureHouseExtract,
+  houseReceiptExtractSchema,
+  parseHouseReceiptExtract,
+} from "@/lib/house-receipt-ocr"
+import type { HouseScanDraft } from "@/lib/house-receipt-ocr"
 import {
   RECEIPT_VISION_INSTRUCTIONS,
   draftFromExtract,
@@ -28,6 +40,7 @@ import {
   PASTARIA_MESA_M11_MD,
 } from "@/lib/receipt-ocr-fixtures"
 import { normalizeRoomCode } from "@/lib/room-code"
+import { assertNotHousehold, parseRoomKind } from "@/lib/room-kind"
 
 const ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -119,7 +132,10 @@ function fixtureDraft(mode: OcrScanMode): OcrDraft {
   }
 }
 
-function ocrErrorMessage(error: unknown): string {
+function ocrErrorMessage(
+  error: unknown,
+  fallback = "Could not read ticket"
+): string {
   if (error instanceof AuthenticationError) {
     return "OPENAI_API_KEY is invalid"
   }
@@ -135,46 +151,87 @@ function ocrErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message
   }
-  return "Could not read ticket"
+  return fallback
+}
+
+function parseOcrImagePayload(
+  data: unknown,
+  codeRequired: string
+): { code: string; imageBase64: string; mimeType: string } {
+  if (typeof data !== "object" || data === null) {
+    throw new Error("Invalid payload")
+  }
+  const body = data as Record<string, unknown>
+  const code = normalizeRoomCode(typeof body.code === "string" ? body.code : "")
+  if (code.length < 6 || code.length > 8) {
+    throw new Error(codeRequired)
+  }
+
+  const imageBase64 = body.imageBase64
+  const mimeTypeRaw =
+    typeof body.mimeType === "string" && body.mimeType.trim()
+      ? body.mimeType.trim().toLowerCase()
+      : "image/jpeg"
+  const mimeType = mimeTypeRaw === "image/jpg" ? "image/jpeg" : mimeTypeRaw
+
+  if (!ALLOWED_MIME.has(mimeType)) {
+    throw new Error("Unsupported image type. Use JPEG, PNG, or WebP.")
+  }
+  if (typeof imageBase64 !== "string" || imageBase64.length < 32) {
+    throw new Error("Image data is required")
+  }
+  if (imageBase64.length > MAX_BASE64_CHARS) {
+    throw new Error("Image is too large (max ~1MB). Try a clearer crop.")
+  }
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(imageBase64.slice(0, 200))) {
+    throw new Error("Invalid image encoding")
+  }
+
+  return { code, imageBase64, mimeType }
+}
+
+async function assertCanScanHouse(code: string, userId: string) {
+  const room = await prisma.room.findUnique({
+    where: { code },
+    select: {
+      kind: true,
+      ownerUserId: true,
+      members: {
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          isGuest: true,
+          joinedOn: true,
+          leftOn: true,
+        },
+      },
+    },
+  })
+  if (!room || parseRoomKind(room.kind) !== "HOUSEHOLD") {
+    throw new Error("House not found")
+  }
+  const viewer = resolveHouseViewer({
+    ownerUserId: room.ownerUserId,
+    members: room.members,
+    authUserId: userId,
+  })
+  if (!canAddCharge(viewer.role)) {
+    throw new Error(guestsCantAddChargesMessage())
+  }
+}
+
+function houseFixtureKind(): "utility" | "grocery" {
+  const requested = getRequestHeader("x-ocr-fixture")?.trim().toLowerCase()
+  return requested === "grocery" ? "grocery" : "utility"
 }
 
 export const scanReceipt = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
-    if (typeof data !== "object" || data === null) {
-      throw new Error("Invalid payload")
-    }
+    const parsed = parseOcrImagePayload(data, "Trip code is required for OCR")
     const body = data as Record<string, unknown>
-    const code = normalizeRoomCode(
-      typeof body.code === "string" ? body.code : ""
-    )
-    if (code.length < 6 || code.length > 8) {
-      throw new Error("Trip code is required for OCR")
-    }
-
-    const imageBase64 = body.imageBase64
-    const mimeTypeRaw =
-      typeof body.mimeType === "string" && body.mimeType.trim()
-        ? body.mimeType.trim().toLowerCase()
-        : "image/jpeg"
-    const mimeType = mimeTypeRaw === "image/jpg" ? "image/jpeg" : mimeTypeRaw
-
-    if (!ALLOWED_MIME.has(mimeType)) {
-      throw new Error("Unsupported image type. Use JPEG, PNG, or WebP.")
-    }
-    if (typeof imageBase64 !== "string" || imageBase64.length < 32) {
-      throw new Error("Image data is required")
-    }
-    if (imageBase64.length > MAX_BASE64_CHARS) {
-      throw new Error("Image is too large (max ~1MB). Try a clearer crop.")
-    }
-    // Reject obvious non-base64 payloads early.
-    if (!/^[A-Za-z0-9+/=\s]+$/.test(imageBase64.slice(0, 200))) {
-      throw new Error("Invalid image encoding")
-    }
-
     const mode: OcrScanMode = body.mode === "dinner" ? "dinner" : "trip"
-
-    return { code, imageBase64, mimeType, mode }
+    return { ...parsed, mode }
   })
   .handler(async ({ data }): Promise<OcrDraft> => {
     const userId = await requireSignedInUserId()
@@ -254,5 +311,87 @@ export const scanReceipt = createServerFn({ method: "POST" })
       return draftFromExtract(extracted, data.mode)
     } catch (error) {
       throw new Error(ocrErrorMessage(error))
+    }
+  })
+
+export const scanHouseReceipt = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    parseOcrImagePayload(data, "House code is required for OCR")
+  )
+  .handler(async ({ data }): Promise<HouseScanDraft> => {
+    const userId = await requireSignedInUserId()
+    assertRateLimit(`ocr:user:${userId}`, {
+      limit: 8,
+      windowMs: 60_000,
+      label: "receipt scans",
+    })
+
+    if (process.env.OCR_FIXTURE === "1") {
+      await assertCanScanHouse(data.code, userId)
+      return draftFromHouseExtract(fixtureHouseExtract(houseFixtureKind()))
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not configured")
+    }
+
+    const ip = clientKey()
+    assertRateLimit(`ocr:ip:${ip}`, {
+      limit: 8,
+      windowMs: 60_000,
+      label: "receipt scans",
+    })
+    assertRateLimit(`ocr:house:${data.code}`, {
+      limit: 20,
+      windowMs: 60_000,
+      label: "receipt scans for this house",
+    })
+
+    await assertCanScanHouse(data.code, userId)
+
+    const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })
+    try {
+      const response = await withTimeout(
+        client.responses.parse({
+          model: OCR_VISION_MODEL,
+          reasoning: { effort: "low" },
+          max_output_tokens: OCR_MAX_OUTPUT_TOKENS,
+          instructions: HOUSE_RECEIPT_VISION_INSTRUCTIONS,
+          input: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: "Extract this household utility bill or grocery ticket.",
+                },
+                {
+                  type: "input_image",
+                  detail: "high",
+                  image_url: `data:${data.mimeType};base64,${data.imageBase64}`,
+                },
+              ],
+            },
+          ],
+          text: {
+            format: zodTextFormat(
+              houseReceiptExtractSchema,
+              "house_receipt_extract"
+            ),
+          },
+        }),
+        OCR_TIMEOUT_MS,
+        "Receipt scan timed out. Try again with a smaller image."
+      )
+
+      const extracted =
+        response.output_parsed ?? parseHouseReceiptExtract(response.output_text)
+      if (!extracted) {
+        throw new Error("Could not read that photo. Try a clearer crop.")
+      }
+      return draftFromHouseExtract(extracted)
+    } catch (error) {
+      throw new Error(ocrErrorMessage(error, "Could not read receipt"))
     }
   })

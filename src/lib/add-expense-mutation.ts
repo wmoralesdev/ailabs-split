@@ -104,6 +104,7 @@ export function buildOptimisticExpense(
     periodMonth: null,
     paidOn: null,
     createdByMemberId: null,
+    hasReceipt: false,
     shares: buildOptimisticShares(room, vars),
   }
 }

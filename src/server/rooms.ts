@@ -82,6 +82,7 @@ export type ExpenseDto = {
   periodMonth: string | null
   paidOn: string | null
   createdByMemberId: string | null
+  hasReceipt: boolean
   shares: ExpenseShareDto[]
 }
 
@@ -299,6 +300,7 @@ function expenseToDto(
     periodMonth?: string | null
     paidOn?: Date | null
     createdByMemberId?: string | null
+    receiptMimeType?: string | null
     shares: Array<{
       memberId: string
       amountCents: number
@@ -328,6 +330,7 @@ function expenseToDto(
     periodMonth: expense.periodMonth ?? null,
     paidOn: expense.paidOn ? isoDateFromUtc(expense.paidOn) : null,
     createdByMemberId: expense.createdByMemberId ?? null,
+    hasReceipt: Boolean(expense.receiptMimeType),
     shares: redacted
       ? [
           {
@@ -411,7 +414,20 @@ async function loadRoomByCode(
       members: { orderBy: { name: "asc" } },
       expenses: {
         orderBy: [{ sortIndex: "asc" }, { createdAt: "desc" }],
-        include: {
+        select: {
+          id: true,
+          title: true,
+          amountCents: true,
+          category: true,
+          currency: true,
+          splitMode: true,
+          isPersonal: true,
+          paidById: true,
+          createdAt: true,
+          periodMonth: true,
+          paidOn: true,
+          createdByMemberId: true,
+          receiptMimeType: true,
           paidBy: true,
           shares: { include: { member: true } },
         },

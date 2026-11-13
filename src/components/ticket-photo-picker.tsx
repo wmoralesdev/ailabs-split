@@ -15,6 +15,9 @@ type TicketPhotoPickerProps = {
   pending: boolean
   onFile: (file: File | null) => void
   pendingLabel?: string
+  actionLabel?: string
+  dropHint?: string
+  dropOverlay?: string
   /** Card with a title and hint; omit both for bare stacked buttons. */
   title?: string
   hint?: string
@@ -27,6 +30,9 @@ export function TicketPhotoPicker({
   pending,
   onFile,
   pendingLabel = "Reading ticket…",
+  actionLabel = "Scan ticket",
+  dropHint = "Or drop or paste a ticket photo",
+  dropOverlay = "Drop ticket photo",
   title,
   hint,
   beforePick,
@@ -103,7 +109,7 @@ export function TicketPhotoPicker({
         ) : (
           <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
         )}
-        {pending && !framed ? pendingLabel : "Scan ticket"}
+        {pending && !framed ? pendingLabel : actionLabel}
       </button>
       <button
         type="button"
@@ -174,7 +180,7 @@ export function TicketPhotoPicker({
       {buttons}
       {dropping ? null : (
         <p className="mt-2 hidden text-center text-[13px] text-muted-foreground [@media(hover:hover)_and_(pointer:fine)]:block">
-          Or drop or paste a ticket photo
+          {dropHint}
         </p>
       )}
       {dropping ? (
@@ -182,7 +188,7 @@ export function TicketPhotoPicker({
           className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-card text-[15px] font-semibold text-foreground"
           aria-hidden
         >
-          Drop ticket photo
+          {dropOverlay}
         </div>
       ) : null}
     </div>

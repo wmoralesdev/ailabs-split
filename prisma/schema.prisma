@@ -102,6 +102,9 @@ model Expense {
   paidOn            DateTime?            @db.Date
   // Author (edit/delete permission). Null on older trips/bills.
   createdByMemberId String?
+  // HOUSEHOLD 1B: receipt photo on the charge. Not OCR text. Null on trips/bills.
+  receiptBytes      Bytes?
+  receiptMimeType   String?
   room              Room                 @relation(fields: [roomId], references: [id], onDelete: Cascade)
   paidBy            Member               @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: Restrict)
   createdBy         Member?              @relation("ExpenseCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)

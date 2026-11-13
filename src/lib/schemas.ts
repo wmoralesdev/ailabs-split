@@ -297,6 +297,17 @@ export const expenseSplitSchema = z.object({
   amountCents: z.number().int().min(0).optional(),
 })
 
+export const paymentProofSchema = z.object({
+  base64: z
+    .string()
+    .min(32, "Photo is too small")
+    .max(
+      PAYMENT_PROOF_MAX_BASE64_CHARS,
+      "Photo is too large (max ~1MB). Try a closer crop."
+    ),
+  mimeType: z.enum(PAYMENT_PROOF_MIME_TYPES),
+})
+
 const houseChargeWriteBaseSchema = houseActorSchema.extend({
   title: z.string().trim().min(1, "What was it?").max(80, "Title is too long"),
   amountCents: z.number().int().positive("Enter a valid amount"),
@@ -306,6 +317,7 @@ const houseChargeWriteBaseSchema = houseActorSchema.extend({
   paidOn: isoDateSchema,
   splitMode: splitModeSchema.default("EQUAL"),
   splits: z.array(expenseSplitSchema).min(1, "Pick at least one person"),
+  receipt: paymentProofSchema.optional(),
 })
 
 function validateHouseChargeWrite(
@@ -439,6 +451,7 @@ export const confirmDueChargeSchema = houseActorSchema.extend({
   paidOn: isoDateSchema.optional(),
   splitMode: splitModeSchema.optional(),
   splits: z.array(expenseSplitSchema).min(1).optional(),
+  receipt: paymentProofSchema.optional(),
 })
 
 export const skipDueChargeSchema = houseActorSchema.extend({
@@ -538,17 +551,6 @@ export const reorderExpensesSchema = z.object({
   expenseIds: z.array(z.string().min(1)).min(1, "Nothing to reorder"),
 })
 
-export const paymentProofSchema = z.object({
-  base64: z
-    .string()
-    .min(32, "Photo is too small")
-    .max(
-      PAYMENT_PROOF_MAX_BASE64_CHARS,
-      "Photo is too large (max ~1MB). Try a closer crop."
-    ),
-  mimeType: z.enum(PAYMENT_PROOF_MIME_TYPES),
-})
-
 export const recordHousePaymentSchema = houseActorSchema.extend({
   fromMemberId: z.string().min(1, "Pick who paid"),
   toMemberId: z.string().min(1, "Pick who received"),
@@ -596,6 +598,11 @@ export const deleteSettlementsSchema = z.object({
 export const getSettlementProofSchema = z.object({
   code: roomCodeSchema,
   settlementId: z.string().min(1, "Missing settlement"),
+})
+
+export const getHouseReceiptPhotoSchema = z.object({
+  code: roomCodeSchema,
+  expenseId: z.string().min(1, "Missing charge"),
 })
 
 export const getHouseRowBalancesSchema = z.object({
@@ -671,5 +678,8 @@ export type DeleteSettlementInput = z.input<typeof deleteSettlementSchema>
 export type DeleteSettlementsInput = z.input<typeof deleteSettlementsSchema>
 export type GetSettlementProofInput = z.input<typeof getSettlementProofSchema>
 export type GetHouseRowBalancesInput = z.input<typeof getHouseRowBalancesSchema>
+export type GetHouseReceiptPhotoInput = z.input<
+  typeof getHouseReceiptPhotoSchema
+>
 export type CalibrateRoomFxInput = z.input<typeof calibrateRoomFxSchema>
 export type ExpenseSplitInput = z.input<typeof expenseSplitSchema>
