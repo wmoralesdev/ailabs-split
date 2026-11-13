@@ -5,19 +5,34 @@ import type { ZodType } from "zod"
 import {
   alreadyInHouseMessage,
   housemateNameTakenMessage,
+  resolveHouseViewer,
   spotClaimedMessage,
 } from "@/lib/house-actor"
-import { isoDateToUtc, localIsoDate } from "@/lib/house-month"
+import { memberHasHouseLedger } from "@/lib/house-ledger"
+import { isMovedOutOn, isoDateToUtc, localIsoDate } from "@/lib/house-month"
+import {
+  canManagePeople,
+  canSetMemberDates,
+  canTransferHouse,
+  hasChargesMoveOutMessage,
+  transferBeforeMoveOutMessage,
+} from "@/lib/house-permissions"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
 import { parseRoomKind } from "@/lib/room-kind"
 import {
+  addHousePeopleSchema,
   claimHouseGuestSchema,
   claimHousemateSchema,
   createHouseSchema,
   joinHouseAsGuestSchema,
   joinHouseAsHousemateSchema,
+  removeHouseMemberSchema,
+  renameHouseMemberSchema,
+  setHouseMemberKindSchema,
+  setHouseMemberStaySchema,
+  transferHouseSchema,
 } from "@/lib/schemas"
 import { getAuthUserId } from "@/server/auth-user.server"
 import { getRoomByCode } from "@/server/rooms"
@@ -59,12 +74,46 @@ function sameName(
 async function loadHouseRow(code: string) {
   const room = await prisma.room.findUnique({
     where: { code },
-    include: { members: true },
+    include: {
+      members: true,
+      expenses: { include: { shares: { select: { memberId: true } } } },
+      settlements: {
+        select: { fromMemberId: true, toMemberId: true },
+      },
+      templates: { include: { shares: { select: { memberId: true } } } },
+    },
   })
   if (!room || parseRoomKind(room.kind) !== "HOUSEHOLD") {
     throw new Error("House not found")
   }
   return room
+}
+
+async function resolveHouseContext(code: string, viewerMemberId?: string) {
+  const house = await loadHouseRow(code)
+  const authUserId = await getAuthUserId()
+  const viewer = resolveHouseViewer({
+    ownerUserId: house.ownerUserId,
+    members: house.members,
+    authUserId,
+    viewerMemberId,
+  })
+  const actor = viewer.memberId
+    ? (house.members.find((member) => member.id === viewer.memberId) ?? null)
+    : null
+  return { house, viewer, actor, authUserId }
+}
+
+async function reloadHouse(code: string, viewerMemberId?: string) {
+  const room = await getRoomByCode({
+    data: { code, ...(viewerMemberId ? { viewerMemberId } : {}) },
+  })
+  if (!room) throw new Error("House not found")
+  return room
+}
+
+function onlyHousematesMessage(): string {
+  return "Only housemates can add people"
 }
 
 function uniqueNames(names: string[]): string[] {
@@ -267,4 +316,208 @@ export const claimHouseGuest = createServerFn({ method: "POST" })
     })
     if (!room) throw new Error("House not found")
     return { room, memberId: seat.id }
+  })
+
+export const addHousePeople = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(addHousePeopleSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("add-house-people")
+    const { house, viewer } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!canManagePeople(viewer.role)) {
+      throw new Error(onlyHousematesMessage())
+    }
+    const names = uniqueNames(data.names)
+    if (names.length === 0) throw new Error("Add a name")
+    for (const name of names) {
+      if (sameName(house.members, name)) {
+        throw new Error("That name is already in this house")
+      }
+    }
+    const joinedOn = isoDateToUtc(localIsoDate())
+    await prisma.member.createMany({
+      data: names.map((name) => ({
+        roomId: house.id,
+        name,
+        isGuest: data.isGuest,
+        joinedOn,
+      })),
+    })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const renameHouseMember = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(renameHouseMemberSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("rename-house-member")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    const target = house.members.find((member) => member.id === data.memberId)
+    if (!target) throw new Error("Person not found")
+    const self = actor?.id === target.id
+    if (!self && !canManagePeople(viewer.role)) {
+      throw new Error(onlyHousematesMessage())
+    }
+    if (!self && target.userId) {
+      throw new Error("They've claimed this spot.")
+    }
+    if (
+      house.members.some(
+        (member) =>
+          member.id !== target.id &&
+          member.name.toLowerCase() === data.name.toLowerCase()
+      )
+    ) {
+      throw new Error("That name is already in this house")
+    }
+    if (target.name !== data.name) {
+      await prisma.member.update({
+        where: { id: target.id },
+        data: { name: data.name },
+      })
+    }
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const setHouseMemberStay = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(setHouseMemberStaySchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("set-house-stay")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    const target = house.members.find((member) => member.id === data.memberId)
+    if (!target) throw new Error("Person not found")
+    if (!canSetMemberDates(viewer.role, actor?.id ?? null, target.id)) {
+      throw new Error(onlyHousematesMessage())
+    }
+    const nextJoined =
+      data.joinedOn === undefined
+        ? target.joinedOn
+        : data.joinedOn
+          ? isoDateToUtc(data.joinedOn)
+          : null
+    const nextLeft =
+      data.leftOn === undefined
+        ? target.leftOn
+        : data.leftOn
+          ? isoDateToUtc(data.leftOn)
+          : null
+    const previousLeft = target.leftOn
+      ? target.leftOn.toISOString().slice(0, 10)
+      : null
+    const leaving =
+      data.leftOn !== undefined &&
+      data.leftOn != null &&
+      data.leftOn !== previousLeft
+    const targetIsOwner = Boolean(
+      house.ownerUserId && target.userId && target.userId === house.ownerUserId
+    )
+    if (leaving && targetIsOwner) {
+      throw new Error(transferBeforeMoveOutMessage())
+    }
+    if (nextJoined && nextLeft && nextLeft < nextJoined) {
+      throw new Error("Moved out can't be before they moved in")
+    }
+    await prisma.member.update({
+      where: { id: target.id },
+      data: {
+        ...(data.joinedOn !== undefined ? { joinedOn: nextJoined } : {}),
+        ...(data.leftOn !== undefined ? { leftOn: nextLeft } : {}),
+      },
+    })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const setHouseMemberKind = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(setHouseMemberKindSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("set-house-kind")
+    const { house, viewer } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!canManagePeople(viewer.role)) {
+      throw new Error(onlyHousematesMessage())
+    }
+    const target = house.members.find((member) => member.id === data.memberId)
+    if (!target) throw new Error("Person not found")
+    if (target.userId && data.isGuest) {
+      throw new Error("They've claimed this spot.")
+    }
+    const targetIsOwner = Boolean(
+      house.ownerUserId && target.userId && target.userId === house.ownerUserId
+    )
+    if (targetIsOwner) {
+      throw new Error(transferBeforeMoveOutMessage())
+    }
+    await prisma.member.update({
+      where: { id: target.id },
+      data: { isGuest: data.isGuest },
+    })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const removeHouseMember = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(removeHouseMemberSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("remove-house-member")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!canManagePeople(viewer.role)) {
+      throw new Error(onlyHousematesMessage())
+    }
+    const target = house.members.find((member) => member.id === data.memberId)
+    if (!target) throw new Error("Person not found")
+    if (actor?.id === target.id) {
+      throw new Error("That's you")
+    }
+    const targetIsOwner = Boolean(
+      house.ownerUserId && target.userId && target.userId === house.ownerUserId
+    )
+    if (targetIsOwner) {
+      throw new Error(transferBeforeMoveOutMessage())
+    }
+    const onLedger = memberHasHouseLedger(target.id, {
+      expenses: house.expenses,
+      settlements: house.settlements,
+      templates: house.templates,
+    })
+    if (onLedger || target.userId) {
+      throw new Error(hasChargesMoveOutMessage(target.name))
+    }
+    await prisma.member.delete({ where: { id: target.id } })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const transferHouse = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(transferHouseSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("transfer-house")
+    const { house, viewer } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!canTransferHouse(viewer.role)) {
+      throw new Error("Only the person who started this can transfer it")
+    }
+    const target = house.members.find((member) => member.id === data.toMemberId)
+    if (!target?.userId || target.isGuest) {
+      throw new Error("Pick a housemate who has claimed their spot")
+    }
+    if (isMovedOutOn(target.leftOn, localIsoDate())) {
+      throw new Error("Pick a housemate who has claimed their spot")
+    }
+    await prisma.room.update({
+      where: { id: house.id },
+      data: { ownerUserId: target.userId },
+    })
+    return reloadHouse(house.code, data.viewerMemberId)
   })

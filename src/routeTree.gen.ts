@@ -17,6 +17,7 @@ import { Route as SignInSsoCallbackRouteImport } from './routes/sign-in_.sso-cal
 import { Route as RCodeIndexRouteImport } from './routes/r.$code/index'
 import { Route as RCodeCheckRouteImport } from './routes/r.$code/check'
 import { Route as RCodeNewRouteImport } from './routes/r.$code/new'
+import { Route as RCodePeopleRouteImport } from './routes/r.$code/people'
 import { Route as RCodeSettleRouteImport } from './routes/r.$code/settle'
 import { Route as RCodeCheckIndexRouteImport } from './routes/r.$code/check.index'
 import { Route as RCodeCheckCheckIdRouteImport } from './routes/r.$code/check.$checkId'
@@ -61,6 +62,11 @@ const RCodeNewRoute = RCodeNewRouteImport.update({
   path: '/new',
   getParentRoute: () => RCodeRoute,
 } as any)
+const RCodePeopleRoute = RCodePeopleRouteImport.update({
+  id: '/people',
+  path: '/people',
+  getParentRoute: () => RCodeRoute,
+} as any)
 const RCodeSettleRoute = RCodeSettleRouteImport.update({
   id: '/settle',
   path: '/settle',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/sign-in/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
+  '/r/$code/people': typeof RCodePeopleRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code/': typeof RCodeIndexRoute
   '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/sign-in/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/new': typeof RCodeNewRoute
+  '/r/$code/people': typeof RCodePeopleRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code': typeof RCodeIndexRoute
   '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/sign-in_/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
+  '/r/$code/people': typeof RCodePeopleRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code/': typeof RCodeIndexRoute
   '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/sign-in/sso-callback'
     | '/r/$code/check'
     | '/r/$code/new'
+    | '/r/$code/people'
     | '/r/$code/settle'
     | '/r/$code/'
     | '/r/$code/check/$checkId'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/sign-in/sso-callback'
     | '/r/$code/new'
+    | '/r/$code/people'
     | '/r/$code/settle'
     | '/r/$code'
     | '/r/$code/check/$checkId'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/sign-in_/sso-callback'
     | '/r/$code/check'
     | '/r/$code/new'
+    | '/r/$code/people'
     | '/r/$code/settle'
     | '/r/$code/'
     | '/r/$code/check/$checkId'
@@ -221,6 +233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RCodeNewRouteImport
       parentRoute: typeof RCodeRoute
     }
+    '/r/$code/people': {
+      id: '/r/$code/people'
+      path: '/people'
+      fullPath: '/r/$code/people'
+      preLoaderRoute: typeof RCodePeopleRouteImport
+      parentRoute: typeof RCodeRoute
+    }
     '/r/$code/settle': {
       id: '/r/$code/settle'
       path: '/settle'
@@ -262,6 +281,7 @@ const RCodeCheckRouteWithChildren = RCodeCheckRoute._addFileChildren(
 interface RCodeRouteChildren {
   RCodeCheckRoute: typeof RCodeCheckRouteWithChildren
   RCodeNewRoute: typeof RCodeNewRoute
+  RCodePeopleRoute: typeof RCodePeopleRoute
   RCodeSettleRoute: typeof RCodeSettleRoute
   RCodeIndexRoute: typeof RCodeIndexRoute
 }
@@ -269,6 +289,7 @@ interface RCodeRouteChildren {
 const RCodeRouteChildren: RCodeRouteChildren = {
   RCodeCheckRoute: RCodeCheckRouteWithChildren,
   RCodeNewRoute: RCodeNewRoute,
+  RCodePeopleRoute: RCodePeopleRoute,
   RCodeSettleRoute: RCodeSettleRoute,
   RCodeIndexRoute: RCodeIndexRoute,
 }
