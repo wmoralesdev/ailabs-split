@@ -59,14 +59,20 @@ function addDaysIsoSafe(iso: string, days: number): string {
 export function CreateHouseForm({
   navigate,
   displayName = "",
+  secondaryAction,
 }: {
   navigate: ReturnType<typeof useNavigate>
   displayName?: string
+  secondaryAction?: { label: string; onClick: () => void }
 }) {
   return (
     <WithDisplayName serverName={displayName}>
       {(resolved) => (
-        <CreateHouseFields navigate={navigate} displayName={resolved} />
+        <CreateHouseFields
+          navigate={navigate}
+          displayName={resolved}
+          secondaryAction={secondaryAction}
+        />
       )}
     </WithDisplayName>
   )
@@ -75,9 +81,11 @@ export function CreateHouseForm({
 function CreateHouseFields({
   navigate,
   displayName,
+  secondaryAction,
 }: {
   navigate: ReturnType<typeof useNavigate>
   displayName: string
+  secondaryAction?: { label: string; onClick: () => void }
 }) {
   const today = localIsoDate()
   const yesterday = addDaysIsoSafe(today, -1)
@@ -271,7 +279,7 @@ function CreateHouseFields({
           />
         </FieldGroup>
 
-        <div className="form-dock">
+        <div className="form-dock flex flex-col items-center gap-1">
           <Button
             type="submit"
             disabled={mutation.isPending}
@@ -279,6 +287,15 @@ function CreateHouseFields({
           >
             {mutation.isPending ? "Starting…" : "Start house"}
           </Button>
+          {secondaryAction ? (
+            <button
+              type="button"
+              className="text-action text-[15px]"
+              onClick={secondaryAction.onClick}
+            >
+              {secondaryAction.label}
+            </button>
+          ) : null}
         </div>
       </form>
     </Form>

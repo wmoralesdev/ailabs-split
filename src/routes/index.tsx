@@ -15,10 +15,8 @@ import {
 
 import { AuthControls } from "@/components/auth-controls"
 import { CreateDinnerForm } from "@/components/dinner/create-dinner-form"
-import {
-  CreateHouseForm,
-  SignInToStartHouse,
-} from "@/components/house/create-house-form"
+import { SignInToStartHouse } from "@/components/house/create-house-form"
+import { HouseLanding } from "@/components/house/house-landing"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { NameListInput } from "@/components/name-list-input"
 import { RecentTripsList } from "@/components/recent-trips-list"
@@ -54,6 +52,7 @@ import {
   rememberName,
 } from "@/lib/landing-prefs"
 import type { LandingKind } from "@/lib/landing-prefs"
+import { householdRooms } from "@/lib/preferred-house"
 import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
 import { rememberMember } from "@/lib/member-storage"
 import { useSignedInUserId } from "@/lib/use-auth-user"
@@ -280,6 +279,7 @@ function LandingPage() {
             navigate,
             displayName,
             signedIn: Boolean(userId),
+            yours,
           })}
         </TabsContent>
         <TabsContent value="join" className="tab-panel mt-6 text-base">
@@ -328,6 +328,7 @@ function landingCreateForm(
     navigate: ReturnType<typeof useNavigate>
     displayName: string
     signedIn: boolean
+    yours: OwnedRoomDto[]
   }
 ) {
   switch (kind) {
@@ -356,9 +357,10 @@ function landingCreateForm(
         )
       }
       return (
-        <CreateHouseForm
+        <HouseLanding
           navigate={input.navigate}
           displayName={input.displayName}
+          houses={householdRooms(input.yours)}
         />
       )
     default: {
