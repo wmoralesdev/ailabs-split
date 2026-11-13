@@ -7,7 +7,7 @@ import { DueThisMonth } from "@/components/house/due-this-month"
 import { HouseChargeSheet } from "@/components/house/house-charge-sheet"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { RoomExitControl } from "@/components/room-exit-control"
-import { houseCategoryDisplay } from "@/lib/house-categories"
+import { houseCategoryHint } from "@/lib/house-categories"
 import {
   houseMemberOnCharges,
   houseNets,
@@ -63,6 +63,9 @@ export function HouseHome({
   const guestWithoutCharges =
     role === "GUEST" &&
     (!actorId || !houseMemberOnCharges(actorId, room.expenses))
+  const recurringCount = (room.house?.templates ?? []).filter(
+    (template) => !template.archivedAt
+  ).length
   const months = chargesByMonth(room.expenses.filter((row) => !row.redacted))
   const selected =
     selectedId == null
@@ -111,7 +114,7 @@ export function HouseHome({
         <DueThisMonth room={room} />
 
         {months.length === 0 ? (
-          <div className="mt-8">
+          <div className="surface mt-8 px-4 py-4">
             <p className="font-medium text-foreground">No charges yet</p>
             <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
               Add the rent, a grocery run, or anything you share.
@@ -153,11 +156,18 @@ export function HouseHome({
                               {expense.title}
                             </span>
                             <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">
-                              {houseCategoryDisplay(expense.category)} · Paid by{" "}
-                              {paidBy}
-                              {expense.paidOn
-                                ? ` · ${formatDay(expense.paidOn)}`
-                                : ""}
+                              {[
+                                houseCategoryHint(
+                                  expense.category,
+                                  expense.title
+                                ),
+                                `Paid by ${paidBy}`,
+                                expense.paidOn
+                                  ? formatDay(expense.paidOn)
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </span>
                           </span>
                           <span className="shrink-0 text-right">
@@ -193,7 +203,11 @@ export function HouseHome({
                 className="group-row-hit w-full"
               >
                 <span className="min-w-0 flex-1 font-medium">People</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {room.house?.members.length ?? 0}
+                </span>
                 <HugeiconsIcon
+                  className="-ml-1.5 text-muted-foreground"
                   icon={ArrowRight01Icon}
                   size={16}
                   strokeWidth={2}
@@ -207,7 +221,13 @@ export function HouseHome({
                 className="group-row-hit w-full"
               >
                 <span className="min-w-0 flex-1 font-medium">Recurring</span>
+                {recurringCount > 0 ? (
+                  <span className="text-muted-foreground tabular-nums">
+                    {recurringCount}
+                  </span>
+                ) : null}
                 <HugeiconsIcon
+                  className="-ml-1.5 text-muted-foreground"
                   icon={ArrowRight01Icon}
                   size={16}
                   strokeWidth={2}

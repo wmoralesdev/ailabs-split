@@ -99,7 +99,10 @@ export function TicketPhotoPicker({
     >
       <button
         type="button"
-        className="split-cta"
+        className={cn(
+          "split-cta",
+          framed && "gap-1.5 px-3 whitespace-nowrap [&_svg]:shrink-0"
+        )}
         disabled={pending}
         aria-busy={pending}
         onClick={() => open(cameraRef.current)}
@@ -113,7 +116,10 @@ export function TicketPhotoPicker({
       </button>
       <button
         type="button"
-        className="split-cta-tinted"
+        className={cn(
+          "split-cta-tinted",
+          framed && "gap-1.5 px-3 whitespace-nowrap [&_svg]:shrink-0"
+        )}
         disabled={pending}
         onClick={() => open(galleryRef.current)}
       >

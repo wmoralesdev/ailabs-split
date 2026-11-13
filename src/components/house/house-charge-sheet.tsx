@@ -58,7 +58,6 @@ export function HouseChargeSheet({
       await queryClient.invalidateQueries({
         queryKey: roomKeys.room(room.code),
       })
-      toast.success("Charge deleted")
       onOpenChange(false)
     },
     onError: (error) => {

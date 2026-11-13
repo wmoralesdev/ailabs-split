@@ -3,6 +3,8 @@ import type { useNavigate } from "@tanstack/react-router"
 import { useMutation } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -19,7 +21,12 @@ import {
 import { Form, FormField } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { nextCreatorName } from "@/lib/clerk-display-name"
-import { addDaysIso, isIsoDate, localIsoDate } from "@/lib/house-month"
+import {
+  addDaysIso,
+  formatDay,
+  isIsoDate,
+  localIsoDate,
+} from "@/lib/house-month"
 import {
   getLastCurrency,
   getLastName,
@@ -87,6 +94,7 @@ function CreateHouseFields({
   })
   const nameEdited = Boolean(form.formState.dirtyFields.creatorName)
   const [editCurrency, setEditCurrency] = useState(false)
+  const [editMovedIn, setEditMovedIn] = useState(false)
   const [housemates, setHousemates] = useState<string[]>([])
   const [housemateDraft, setHousemateDraft] = useState("")
   const currency = form.watch("currency")
@@ -121,7 +129,6 @@ function CreateHouseFields({
       const memberId = room.house?.viewer.memberId ?? room.members[0]?.id
       if (memberId) rememberMember(room.code, memberId)
       markInstallEligible()
-      toast.success("House created")
       await navigate({
         to: "/r/$code",
         params: { code: room.code },
@@ -207,51 +214,70 @@ function CreateHouseFields({
                 : []
             }
           />
+        </FieldGroup>
 
+        <ul className="group-list">
           <FormField
             control={form.control}
             name="joinedOn"
             render={({ field }) => (
-              <Field>
-                <FieldLabel>Moved in</FieldLabel>
-                <div
-                  className="flex flex-wrap items-center gap-1.5"
-                  role="group"
-                  aria-label="Moved in"
-                >
-                  <DateChip
-                    label="Today"
-                    pressed={field.value === today}
-                    onClick={() => field.onChange(today)}
-                  />
-                  <DateChip
-                    label="Yesterday"
-                    pressed={field.value === yesterday}
-                    onClick={() => field.onChange(yesterday)}
-                  />
-                  <Input
-                    type="date"
-                    value={isIsoDate(field.value) ? field.value : today}
-                    onChange={(event) => {
-                      const next = event.target.value
-                      if (isIsoDate(next)) field.onChange(next)
-                    }}
-                    aria-label="Pick a date"
-                    className="h-9 w-[9.5rem] rounded-full px-3 text-[13px]"
-                  />
-                </div>
-              </Field>
+              <li>
+                <SettingRow
+                  label="Moved in"
+                  value={movedInLabel(field.value, today, yesterday)}
+                  open={editMovedIn}
+                  onToggle={() => setEditMovedIn((open) => !open)}
+                />
+                {editMovedIn ? (
+                  <div
+                    className="flex flex-wrap items-center gap-1.5 px-4 pb-3"
+                    role="group"
+                    aria-label="Moved in"
+                  >
+                    <DateChip
+                      label="Today"
+                      pressed={field.value === today}
+                      onClick={() => {
+                        field.onChange(today)
+                        setEditMovedIn(false)
+                      }}
+                    />
+                    <DateChip
+                      label="Yesterday"
+                      pressed={field.value === yesterday}
+                      onClick={() => {
+                        field.onChange(yesterday)
+                        setEditMovedIn(false)
+                      }}
+                    />
+                    <Input
+                      type="date"
+                      value={isIsoDate(field.value) ? field.value : today}
+                      onChange={(event) => {
+                        const next = event.target.value
+                        if (isIsoDate(next)) field.onChange(next)
+                      }}
+                      aria-label="Pick a date"
+                      className="h-9 w-[9.5rem] rounded-full px-3 text-[13px]"
+                    />
+                  </div>
+                ) : null}
+              </li>
             )}
           />
-
           <FormField
             control={form.control}
             name="currency"
             render={({ field }) => (
-              <Field>
+              <li>
+                <SettingRow
+                  label="Currency"
+                  value={currency}
+                  open={editCurrency}
+                  onToggle={() => setEditCurrency((open) => !open)}
+                />
                 {editCurrency ? (
-                  <>
-                    <FieldLabel>Currency</FieldLabel>
+                  <div className="px-4 pb-3">
                     <BaseCurrencyPicker
                       value={field.value}
                       onChange={(next) => {
@@ -259,28 +285,12 @@ function CreateHouseFields({
                         setEditCurrency(false)
                       }}
                     />
-                  </>
-                ) : (
-                  <div className="-mt-1 flex min-h-11 items-center justify-between gap-3">
-                    <p className="text-[15px] text-muted-foreground">
-                      Paying in{" "}
-                      <span className="font-semibold text-foreground">
-                        {currency}
-                      </span>
-                    </p>
-                    <button
-                      type="button"
-                      className="text-action text-[15px]"
-                      onClick={() => setEditCurrency(true)}
-                    >
-                      Change currency
-                    </button>
                   </div>
-                )}
-              </Field>
+                ) : null}
+              </li>
             )}
           />
-        </FieldGroup>
+        </ul>
 
         <div className="form-dock">
           <Button
@@ -293,6 +303,47 @@ function CreateHouseFields({
         </div>
       </form>
     </Form>
+  )
+}
+
+function movedInLabel(value: string, today: string, yesterday: string) {
+  if (value === today) return "Today"
+  if (value === yesterday) return "Yesterday"
+  return isIsoDate(value) ? formatDay(value) : "Today"
+}
+
+function SettingRow({
+  label,
+  value,
+  open,
+  onToggle,
+}: {
+  label: string
+  value: string
+  open: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      className="group-row-hit min-h-11 w-full justify-between text-left"
+    >
+      <span className="text-foreground">{label}</span>
+      <span className="flex items-center gap-1 text-muted-foreground tabular-nums">
+        {value}
+        <HugeiconsIcon
+          icon={ArrowRight01Icon}
+          size={16}
+          strokeWidth={2}
+          className={cn(
+            "transition-transform duration-200",
+            open && "rotate-90"
+          )}
+        />
+      </span>
+    </button>
   )
 }
 
@@ -314,7 +365,7 @@ function DateChip({
         "h-9 rounded-full px-3 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
         pressed
           ? "bg-foreground text-background"
-          : "bg-card text-foreground hover:bg-muted"
+          : "bg-muted text-foreground hover:bg-foreground/10"
       )}
     >
       {label}

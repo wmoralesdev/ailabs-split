@@ -26,11 +26,12 @@ test.describe("House people", () => {
       housemates: ["Ana"],
     })
     await page.getByRole("link", { name: "People" }).click()
-    await page.getByLabel("Housemates").fill("Luis")
-    await page.getByLabel("Housemates").press("Enter")
-    await page.getByRole("button", { name: "Add people" }).click()
+    await page.getByLabel("Add a housemate").fill("Luis")
+    await page.getByLabel("Add a housemate").press("Enter")
     await expect(
-      page.getByRole("button", { name: /Luis/ }).filter({ hasNotText: "Remove" })
+      page
+        .getByRole("button", { name: /Luis/ })
+        .filter({ hasNotText: "Remove" })
     ).toBeVisible()
     await page
       .getByRole("button", { name: /Luis/ })

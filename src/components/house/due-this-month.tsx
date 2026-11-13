@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { houseCategoryDisplay } from "@/lib/house-categories"
+import { houseCategoryHint } from "@/lib/house-categories"
 import { dueThisMonth } from "@/lib/house-ledger"
 import { formatMonth, monthKey } from "@/lib/house-month"
 import { canConfirmDue } from "@/lib/house-permissions"
@@ -18,10 +18,11 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
   const role = room.house?.viewer.role ?? "VISITOR"
   const actorId = room.house?.viewer.memberId ?? null
   const canAct = canConfirmDue(role)
+  const currentMonth = monthKey()
   const items = dueThisMonth(
     room.house?.templates ?? [],
     room.house?.occurrences ?? [],
-    monthKey()
+    currentMonth
   )
 
   const invalidate = () =>
@@ -36,15 +37,8 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
           ...input,
         },
       }),
-    onSuccess: async (_room, vars) => {
+    onSuccess: async () => {
       await invalidate()
-      const title =
-        items.find(
-          (item) =>
-            item.templateId === vars.templateId &&
-            item.periodMonth === vars.periodMonth
-        )?.title ?? "Charge"
-      toast.success(`${title} added for ${formatMonth(vars.periodMonth)}`)
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Could not confirm")
@@ -105,33 +99,50 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
           const paidBy =
             room.house?.members.find((member) => member.id === item.paidById)
               ?.name ?? "Someone"
-          const amount =
-            item.kind === "VARIABLE" || item.amountCents == null
-              ? "Amount changes every month"
-              : formatMoney(item.amountCents, room.currency)
+          const variable = item.kind === "VARIABLE" || item.amountCents == null
           const pending =
             confirmMutation.isPending ||
             skipMutation.isPending ||
             undoMutation.isPending
+          const meta = [
+            houseCategoryHint(item.category, item.title),
+            `${paidBy} pays`,
+            item.periodMonth === currentMonth
+              ? null
+              : formatMonth(item.periodMonth),
+          ]
+            .filter(Boolean)
+            .join(" · ")
           return (
             <li
               key={`${item.templateId}:${item.periodMonth}`}
-              className="px-4 py-2.5"
+              className="px-4 py-3"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{item.title}</p>
-                  <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                    {houseCategoryDisplay(item.category)} ·{" "}
-                    {formatMonth(item.periodMonth)} · {amount} · {paidBy} pays
-                  </p>
-                </div>
-                {canAct ? (
-                  item.kind === "VARIABLE" ? (
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate font-medium">{item.title}</p>
+                <p
+                  className={
+                    variable
+                      ? "shrink-0 text-[13px] text-muted-foreground"
+                      : "shrink-0 font-medium tabular-nums"
+                  }
+                >
+                  {variable
+                    ? "Varies"
+                    : formatMoney(item.amountCents ?? 0, room.currency)}
+                </p>
+              </div>
+              <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+                {meta}
+              </p>
+              {canAct ? (
+                <div className="mt-2.5 flex items-center gap-4">
+                  {variable ? (
                     <Button
                       type="button"
                       size="sm"
                       variant="secondary"
+                      className="bg-muted px-3.5 text-primary hover:bg-foreground/10"
                       disabled={pending}
                       onClick={() =>
                         void navigate({
@@ -150,6 +161,8 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
                     <Button
                       type="button"
                       size="sm"
+                      variant="secondary"
+                      className="bg-muted px-3.5 text-primary hover:bg-foreground/10"
                       disabled={pending}
                       onClick={() =>
                         confirmMutation.mutate({
@@ -160,28 +173,26 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
                     >
                       Confirm
                     </Button>
-                  )
-                ) : null}
-              </div>
-              {canAct ? (
-                <div className="mt-1 flex gap-3">
-                  <button
-                    type="button"
-                    className="text-action text-[13px]"
-                    disabled={pending}
-                    onClick={() =>
-                      void navigate({
-                        to: "/r/$code/new",
-                        params: { code: room.code },
-                        search: {
-                          template: item.templateId,
-                          month: item.periodMonth,
-                        },
-                      })
-                    }
-                  >
-                    Edit first
-                  </button>
+                  )}
+                  {variable ? null : (
+                    <button
+                      type="button"
+                      className="text-action text-[13px]"
+                      disabled={pending}
+                      onClick={() =>
+                        void navigate({
+                          to: "/r/$code/new",
+                          params: { code: room.code },
+                          search: {
+                            template: item.templateId,
+                            month: item.periodMonth,
+                          },
+                        })
+                      }
+                    >
+                      Edit first
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="text-action text-[13px]"
