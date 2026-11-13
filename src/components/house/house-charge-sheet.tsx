@@ -2,6 +2,8 @@ import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Delete02Icon, Edit02Icon } from "@hugeicons/core-free-icons"
 
 import { HouseReceiptDialog } from "@/components/house/house-receipt-dialog"
 import { Button } from "@/components/ui/button"
@@ -107,7 +109,7 @@ export function HouseChargeSheet({
               </button>
             ) : null}
             <div>
-              <h3 className="text-sm font-medium">Your share</h3>
+              <h3 className="text-sm font-medium">Share breakdown</h3>
               <ul className="mt-2 divide-y divide-border/60">
                 {expense.shares.map((share) => (
                   <li
@@ -140,6 +142,11 @@ export function HouseChargeSheet({
                       })
                     }}
                   >
+                    <HugeiconsIcon
+                      icon={Edit02Icon}
+                      size={14}
+                      strokeWidth={2}
+                    />
                     Edit
                   </Button>
                 ) : (
@@ -161,6 +168,11 @@ export function HouseChargeSheet({
                       deleteMutation.mutate()
                     }}
                   >
+                    <HugeiconsIcon
+                      icon={Delete02Icon}
+                      size={14}
+                      strokeWidth={2}
+                    />
                     {deleteMutation.isPending ? "Deleting…" : "Delete"}
                   </Button>
                 ) : null}

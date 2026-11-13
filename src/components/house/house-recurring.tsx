@@ -77,9 +77,12 @@ export function HouseRecurring({ room }: { room: RoomDto }) {
       </div>
 
       {active.length === 0 ? (
-        <p className="mt-6 text-[15px] text-muted-foreground">
-          Nothing recurring yet
-        </p>
+        <div className="surface mt-6 px-4 py-4">
+          <p className="font-medium text-foreground">Nothing recurring yet</p>
+          <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
+            Rent, internet, or anything that comes back every month.
+          </p>
+        </div>
       ) : (
         <ul className="group-list mt-6">
           {active.map((template) => (
