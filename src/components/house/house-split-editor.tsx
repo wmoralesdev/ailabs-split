@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon, MinusSignIcon } from "@hugeicons/core-free-icons"
 
+import { ChipRow, EveryoneChip } from "@/components/chip-row"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -65,7 +66,9 @@ export function HouseSplitEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[13px] font-medium text-muted-foreground">Split</p>
+      <p className="text-[13px] font-medium text-muted-foreground">
+        Split between
+      </p>
       <Tabs
         value={splitMode}
         onValueChange={(value) => onSplitModeChange(value as SplitMode)}
@@ -85,19 +88,8 @@ export function HouseSplitEditor({
 
       {splitMode === "EQUAL" ? (
         <div className="flex flex-col gap-2">
-          <div
-            className="flex gap-1.5 overflow-x-auto [mask-image:linear-gradient(to_right,black_85%,transparent)] pb-1"
-            role="group"
-            aria-label="Split"
-          >
-            <button
-              type="button"
-              aria-pressed={allMainOn}
-              onClick={onEveryone}
-              className="person-chip"
-            >
-              Everyone
-            </button>
+          <ChipRow role="group" aria-label="Split" bleed>
+            <EveryoneChip pressed={allMainOn} onClick={onEveryone} />
             {main.map((member) => (
               <button
                 key={member.id}
@@ -109,13 +101,13 @@ export function HouseSplitEditor({
                 {member.name}
               </button>
             ))}
-          </div>
+          </ChipRow>
           {others.length > 0 ? (
             <div>
               <p className="px-1 pb-1 text-[13px] text-muted-foreground">
                 Others
               </p>
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
+              <ChipRow role="group" aria-label="Others" bleed>
                 {others.map((member) => (
                   <button
                     key={member.id}
@@ -127,7 +119,7 @@ export function HouseSplitEditor({
                     {member.name}
                   </button>
                 ))}
-              </div>
+              </ChipRow>
             </div>
           ) : null}
         </div>

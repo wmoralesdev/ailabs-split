@@ -497,8 +497,24 @@
     display: none;
   }
 
-  .item-row-chips .person-chip {
+  .item-row-chips > * {
     @apply shrink-0;
+  }
+
+  /* Page or sheet row: chips scroll to the screen edge, not the card inset. */
+  .chip-row-bleed {
+    @apply -my-1.5;
+    margin-inline: calc(var(--chip-bleed, var(--space-gutter)) * -1);
+  }
+
+  .chip-row-bleed .item-row-chips {
+    @apply py-1.5;
+    padding-inline: var(--chip-bleed, var(--space-gutter));
+    touch-action: pan-x pan-y;
+  }
+
+  [data-slot="sheet-content"] {
+    --chip-bleed: 1rem;
   }
 
   .item-everyone {

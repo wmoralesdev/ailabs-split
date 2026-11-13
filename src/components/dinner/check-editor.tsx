@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   onlineManager,
@@ -21,6 +14,7 @@ import {
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
+import { ChipRow, EveryoneChip } from "@/components/chip-row"
 import { BillPeople } from "@/components/dinner/bill-people"
 import { DinnerNameField } from "@/components/dinner/dinner-name"
 import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
@@ -1069,77 +1063,6 @@ export function CheckEditor({
         }}
       />
     </main>
-  )
-}
-
-function ChipRow({
-  children,
-  role,
-  "aria-label": ariaLabel,
-}: {
-  children: ReactNode
-  role?: string
-  "aria-label"?: string
-}) {
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const scrollerRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    const wrap = wrapRef.current
-    if (!scroller || !wrap) return
-
-    const update = () => {
-      const max = Math.max(0, scroller.scrollWidth - scroller.clientWidth)
-      wrap.toggleAttribute("data-scroll-left", scroller.scrollLeft > 1)
-      wrap.toggleAttribute("data-scroll-right", max - scroller.scrollLeft > 1)
-    }
-
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(scroller)
-    const mo = new MutationObserver(update)
-    mo.observe(scroller, { childList: true, subtree: true })
-    scroller.addEventListener("scroll", update, { passive: true })
-    window.addEventListener("resize", update)
-    return () => {
-      ro.disconnect()
-      mo.disconnect()
-      scroller.removeEventListener("scroll", update)
-      window.removeEventListener("resize", update)
-    }
-  }, [])
-
-  return (
-    <div ref={wrapRef} className="item-row-assign">
-      <div
-        ref={scrollerRef}
-        className="item-row-chips"
-        role={role}
-        aria-label={ariaLabel}
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function EveryoneChip({
-  pressed,
-  onClick,
-}: {
-  pressed: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      className="person-chip person-chip-everyone"
-      aria-pressed={pressed}
-      onClick={onClick}
-    >
-      Everyone
-    </button>
   )
 }
 
