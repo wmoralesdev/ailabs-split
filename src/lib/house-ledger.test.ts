@@ -8,6 +8,7 @@ import {
   memberHasHouseLedger,
   monthBreakdown,
   movedOutSubtitle,
+  overpayNote,
   viewerHeroCopy,
 } from "./house-ledger"
 import type {
@@ -107,6 +108,47 @@ describe("houseNets", () => {
     const walterNet = nets.find((row) => row.memberId === "w1")?.netCents
     expect(anaNet).toBe(-7100 + 10000)
     expect(walterNet).toBe(7100 - 10000)
+  })
+})
+
+describe("overpayNote", () => {
+  it("names who will owe after a larger payment", () => {
+    expect(
+      overpayNote({
+        actorId: "a1",
+        fromId: "a1",
+        fromName: "Ana",
+        toId: "w1",
+        toName: "Walter",
+        amountCents: 15000,
+        suggestedCents: 14200,
+        currency: "USD",
+      })
+    ).toBe("Walter will owe you $8.00 after this")
+    expect(
+      overpayNote({
+        actorId: "w1",
+        fromId: "a1",
+        fromName: "Ana",
+        toId: "w1",
+        toName: "Walter",
+        amountCents: 15000,
+        suggestedCents: 14200,
+        currency: "USD",
+      })
+    ).toBe("You will owe Ana $8.00 after this")
+    expect(
+      overpayNote({
+        actorId: "a1",
+        fromId: "a1",
+        fromName: "Ana",
+        toId: "w1",
+        toName: "Walter",
+        amountCents: 10000,
+        suggestedCents: 14200,
+        currency: "USD",
+      })
+    ).toBeNull()
   })
 })
 

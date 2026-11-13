@@ -175,6 +175,29 @@ export function formatHouseTransfer(
   return `${transfer.fromName} pays ${transfer.toName} ${formatMoney(transfer.amountCents, currency)}`
 }
 
+/** Note when a payment is larger than the suggested transfer. */
+export function overpayNote(input: {
+  actorId: string | null
+  fromId: string
+  fromName: string
+  toId: string
+  toName: string
+  amountCents: number
+  suggestedCents: number
+  currency: string
+}): string | null {
+  const extra = input.amountCents - input.suggestedCents
+  if (input.suggestedCents <= 0 || extra <= 0) return null
+  const money = formatMoney(extra, input.currency)
+  if (input.actorId === input.fromId) {
+    return `${input.toName} will owe you ${money} after this`
+  }
+  if (input.actorId === input.toId) {
+    return `You will owe ${input.fromName} ${money} after this`
+  }
+  return `${input.toName} will owe ${input.fromName} ${money} after this`
+}
+
 function monthOfIso(value: string): string {
   return value.slice(0, 7)
 }

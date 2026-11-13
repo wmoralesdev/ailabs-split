@@ -17,6 +17,7 @@ type MemberPickerProps = {
   onChange: (id: string) => void
   placeholder?: string
   id?: string
+  label?: string
 }
 
 const CHIP_THRESHOLD = 5
@@ -27,10 +28,11 @@ export function MemberPicker({
   onChange,
   placeholder = "Who paid?",
   id,
+  label = "Paid by",
 }: MemberPickerProps) {
   if (members.length < CHIP_THRESHOLD) {
     return (
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Paid by">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
         {members.map((member) => (
           <button
             key={member.id}
@@ -53,6 +55,7 @@ export function MemberPicker({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      label={label}
     />
   )
 }
@@ -63,6 +66,7 @@ function SearchableMemberSelect({
   onChange,
   placeholder,
   id,
+  label = "Paid by",
 }: MemberPickerProps) {
   const listId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -147,7 +151,7 @@ function SearchableMemberSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        aria-label={selected ? `Paid by, ${selected.name}` : "Paid by"}
+        aria-label={selected ? `${label}, ${selected.name}` : label}
         onClick={() => setOpen((prev) => !prev)}
         className="picker-trigger"
       >

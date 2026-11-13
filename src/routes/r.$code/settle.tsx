@@ -15,6 +15,7 @@ import {
   formatAdjustmentPercent,
   formatFxAdjustmentLabel,
 } from "@/components/bank-fx-calibration-sheet"
+import { HouseSettle } from "@/components/house/house-settle"
 import {
   PaymentProofButton,
   PaymentProofDialog,
@@ -194,6 +195,9 @@ function SettlePage() {
   }, [room])
 
   if (!room) return null
+  if (parseRoomKind(room.kind) === "HOUSEHOLD") {
+    return <HouseSettle room={room} />
+  }
 
   const adjustmentBps = room.fxAdjustmentBps
   const sampleCount = room.fxCalibrationSamples.length
