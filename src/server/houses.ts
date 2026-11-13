@@ -22,7 +22,10 @@ import {
   monthStart,
   stayOverlapsMonth,
 } from "@/lib/house-month"
-import { paymentProofBytesFromPayload } from "@/lib/payment-proof"
+import {
+  encodePaymentProof,
+  paymentProofBytesFromPayload,
+} from "@/lib/payment-proof"
 import {
   canAddCharge,
   canConfirmDue,
@@ -54,6 +57,7 @@ import {
   createHouseSchema,
   deleteHouseChargeSchema,
   deleteHousePaymentSchema,
+  getHouseReceiptPhotoSchema,
   getHouseRowBalancesSchema,
   joinHouseAsGuestSchema,
   joinHouseAsHousemateSchema,
@@ -148,6 +152,17 @@ async function reloadHouse(code: string, viewerMemberId?: string) {
 
 function onlyHousematesMessage(): string {
   return "Only housemates can add people"
+}
+
+function receiptFieldsFromPayload(receipt: {
+  base64: string
+  mimeType: "image/jpeg" | "image/png" | "image/webp"
+}): { receiptBytes: Uint8Array<ArrayBuffer>; receiptMimeType: string } {
+  const stored = paymentProofBytesFromPayload(receipt)
+  return {
+    receiptBytes: new Uint8Array(stored.bytes),
+    receiptMimeType: stored.mimeType,
+  }
 }
 
 function uniqueNames(names: string[]): string[] {
@@ -635,6 +650,7 @@ export const addHouseCharge = createServerFn({ method: "POST" })
         periodMonth: data.periodMonth,
         paidOn: isoDateToUtc(data.paidOn),
         createdByMemberId: actor.id,
+        ...(data.receipt ? receiptFieldsFromPayload(data.receipt) : {}),
         shares: {
           create: shares.map((share) => ({
             memberId: share.memberId,
@@ -691,6 +707,7 @@ export const updateHouseCharge = createServerFn({ method: "POST" })
           paidById: data.paidById,
           periodMonth: data.periodMonth,
           paidOn: isoDateToUtc(data.paidOn),
+          ...(data.receipt ? receiptFieldsFromPayload(data.receipt) : {}),
           shares: {
             create: shares.map((share) => ({
               memberId: share.memberId,
@@ -996,6 +1013,7 @@ export const confirmDueCharge = createServerFn({ method: "POST" })
             periodMonth: data.periodMonth,
             paidOn: isoDateToUtc(paidOn),
             createdByMemberId: actor.id,
+            ...(data.receipt ? receiptFieldsFromPayload(data.receipt) : {}),
             shares: {
               create: built.shares.map((share) => ({
                 memberId: share.memberId,
@@ -1156,3 +1174,33 @@ export const getHouseRowBalances = createServerFn({ method: "POST" })
     }
     return { items }
   })
+
+export const getHouseReceiptPhoto = createServerFn({ method: "GET" })
+  .validator((data: unknown) => parseOrThrow(getHouseReceiptPhotoSchema, data))
+  .handler(
+    async ({ data }): Promise<{ mimeType: string; base64: string } | null> => {
+      assertRateLimit(`proof:ip:${clientIp()}`, {
+        limit: 60,
+        windowMs: 60_000,
+        label: "receipt photos",
+      })
+      const house = await prisma.room.findUnique({
+        where: { code: data.code },
+        select: { id: true, kind: true },
+      })
+      if (!house || parseRoomKind(house.kind) !== "HOUSEHOLD") {
+        throw new Error("House not found")
+      }
+      const expense = await prisma.expense.findFirst({
+        where: { id: data.expenseId, roomId: house.id },
+        select: { receiptBytes: true, receiptMimeType: true },
+      })
+      if (!expense?.receiptBytes || expense.receiptBytes.length === 0) {
+        return null
+      }
+      return {
+        mimeType: expense.receiptMimeType ?? "image/jpeg",
+        base64: encodePaymentProof(expense.receiptBytes),
+      }
+    }
+  )

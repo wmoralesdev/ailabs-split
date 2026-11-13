@@ -11,6 +11,7 @@ import { HouseSplitEditor } from "@/components/house/house-split-editor"
 import type { HouseSplitMember } from "@/components/house/house-split-editor"
 import { MonthStepper } from "@/components/house/month-stepper"
 import { MemberPicker } from "@/components/member-picker"
+import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,24 +24,36 @@ import {
   formatAtmAmount,
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
+import { compressImageForOcr } from "@/lib/compress-image"
+import type { CompressedImage } from "@/lib/compress-image"
 import { isHouseCategory } from "@/lib/house-categories"
 import type { HouseCategory } from "@/lib/house-categories"
-import { defaultParticipants } from "@/lib/house-ledger"
-import { formatMonth, isMovedOutOn, localIsoDate } from "@/lib/house-month"
+import { defaultParticipants, dueThisMonth } from "@/lib/house-ledger"
+import {
+  formatMonth,
+  isMovedOutOn,
+  localIsoDate,
+  monthKey,
+} from "@/lib/house-month"
 import {
   canAddCharge,
   canEditCharge,
   guestsCantAddChargesMessage,
   onlyAuthorOrOwnerCanEditMessage,
 } from "@/lib/house-permissions"
+import { extraChargeNote, matchVariableDue } from "@/lib/house-receipt-ocr"
+import type { HouseScanDraft, HouseScanKind } from "@/lib/house-receipt-ocr"
+import { useOnlineStatus } from "@/lib/online-status"
 import { roomKeys } from "@/lib/room-query"
 import type { SplitMode } from "@/lib/schemas"
 import { equalSplitCents, formatMoney, partsSplitCents } from "@/lib/settle"
+import { useRequireSignIn } from "@/lib/use-auth-user"
 import {
   addHouseCharge,
   confirmDueCharge,
   updateHouseCharge,
 } from "@/server/houses"
+import { scanHouseReceipt } from "@/server/ocr"
 import type { ExpenseDto, RoomDto } from "@/server/rooms"
 
 function monthFromPaidOn(paidOn: string): string {
@@ -58,6 +71,8 @@ export function HouseChargeForm({
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const online = useOnlineStatus()
+  const requireSignIn = useRequireSignIn()
   const role = room.house?.viewer.role ?? "VISITOR"
   const actorId = room.house?.viewer.memberId ?? null
   const houseMembers = room.house?.members ?? []
@@ -157,8 +172,23 @@ export function HouseChargeForm({
       )
   )
   const [splitError, setSplitError] = useState<string | null>(null)
+  const [scanPending, setScanPending] = useState(false)
+  const [scanKind, setScanKind] = useState<HouseScanKind | null>(null)
+  const [scanNote, setScanNote] = useState<string | null>(null)
+  const [pendingReceipt, setPendingReceipt] = useState<{
+    base64: string
+    mimeType: CompressedImage["mimeType"]
+  } | null>(null)
+  const [scanDue, setScanDue] = useState<
+    { templateId: string; periodMonth: string } | null | undefined
+  >(undefined)
 
   const amountCents = atmDigitsToCents(amountDigits, fractionDigits)
+  const activeDue = scanDue === undefined ? due : scanDue
+  const activeDueTemplate = activeDue
+    ? (room.house?.templates.find((row) => row.id === activeDue.templateId) ??
+      null)
+    : null
 
   const splitMembers: HouseSplitMember[] = houseMembers.map((member) => ({
     id: member.id,
@@ -251,20 +281,27 @@ export function HouseChargeForm({
         splitMode,
         splits,
       }
+      const receipt = pendingReceipt
+        ? {
+            base64: pendingReceipt.base64,
+            mimeType: pendingReceipt.mimeType,
+          }
+        : undefined
       if (editing) {
         return updateHouseCharge({
-          data: { ...payload, expenseId: editing.id },
+          data: { ...payload, expenseId: editing.id, receipt },
         })
       }
-      if (due) {
+      if (activeDue) {
         return confirmDueCharge({
           data: {
             ...payload,
-            templateId: due.templateId,
+            templateId: activeDue.templateId,
+            receipt,
           },
         })
       }
-      return addHouseCharge({ data: payload })
+      return addHouseCharge({ data: { ...payload, receipt } })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -273,7 +310,7 @@ export function HouseChargeForm({
       toast.success(
         editing
           ? "Charge saved"
-          : due
+          : activeDue
             ? `${title.trim()} added for ${formatMonth(periodMonth)}`
             : "Charge added"
       )
@@ -356,6 +393,97 @@ export function HouseChargeForm({
     )
   }
 
+  function applyDraft(draft: HouseScanDraft, photo: CompressedImage | null) {
+    setTitle(draft.title)
+    if (draft.amountCents) {
+      setAmountDigits(centsToAtmDigits(draft.amountCents, fractionDigits))
+    }
+    setCategory(draft.category)
+    setScanKind(draft.kind)
+    setScanNote(extraChargeNote(draft, room.currency))
+    setPendingReceipt(
+      draft.savePhoto && photo
+        ? { base64: photo.base64, mimeType: photo.mimeType }
+        : null
+    )
+    if (draft.periodMonth) {
+      setPeriodTouched(true)
+      setPeriodMonth(draft.periodMonth)
+      setIncluded(
+        new Set(
+          defaultParticipants(houseMembers, draft.periodMonth).map(
+            (member) => member.id
+          )
+        )
+      )
+    }
+    if (editing) return
+    const match = matchVariableDue(
+      draft.category,
+      draft.periodMonth,
+      dueThisMonth(
+        room.house?.templates ?? [],
+        room.house?.occurrences ?? [],
+        monthKey()
+      )
+    )
+    setScanDue(
+      match
+        ? { templateId: match.templateId, periodMonth: match.periodMonth }
+        : null
+    )
+  }
+
+  async function onScan(file: File | null) {
+    if (!file) return
+    if (!online) {
+      toast.error("Scanning needs a connection")
+      return
+    }
+    setScanPending(true)
+    try {
+      const compressed = await compressImageForOcr(file)
+      const draft = await scanHouseReceipt({
+        data: {
+          code: room.code,
+          imageBase64: compressed.base64,
+          mimeType: compressed.mimeType,
+        },
+      })
+      if (!draft.title && !draft.amountCents) {
+        toast.error("Could not read that photo. Try a clearer crop.")
+        return
+      }
+      applyDraft(draft, compressed)
+      if (!editing) {
+        const match = matchVariableDue(
+          draft.category,
+          draft.periodMonth,
+          dueThisMonth(
+            room.house?.templates ?? [],
+            room.house?.occurrences ?? [],
+            monthKey()
+          )
+        )
+        if (match) {
+          toast.success(
+            `This fills ${match.title} for ${formatMonth(match.periodMonth)}.`
+          )
+        } else {
+          toast.success("Receipt scanned")
+        }
+      } else {
+        toast.success("Receipt scanned")
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not read receipt"
+      )
+    } finally {
+      setScanPending(false)
+    }
+  }
+
   function submit() {
     if (!allowed) {
       toast.error(
@@ -428,6 +556,53 @@ export function HouseChargeForm({
           submit()
         }}
       >
+        {allowed ? (
+          <TicketPhotoPicker
+            pending={scanPending}
+            onFile={(file) => void onScan(file)}
+            beforePick={requireSignIn}
+            pendingLabel="Reading receipt…"
+            actionLabel="Scan receipt"
+            title="Scan a receipt"
+            hint="A utility bill or a grocery ticket."
+            dropHint="Or drop or paste a receipt photo"
+            dropOverlay="Drop receipt photo"
+          />
+        ) : null}
+
+        {activeDue && activeDueTemplate ? (
+          <p
+            className="text-[13px] text-muted-foreground"
+            data-testid="house-scan-due-note"
+          >
+            This fills {activeDueTemplate.title} for{" "}
+            {formatMonth(activeDue.periodMonth)}.
+          </p>
+        ) : null}
+
+        {scanNote ? (
+          <p
+            className="text-[13px] text-muted-foreground"
+            data-testid="house-scan-extra-note"
+          >
+            {scanNote}
+          </p>
+        ) : null}
+
+        {scanKind === "GROCERY" ? (
+          <p className="text-[13px] text-muted-foreground">
+            Grocery tickets keep the title and total. The photo is not saved.
+          </p>
+        ) : pendingReceipt ? (
+          <p className="text-[13px] text-muted-foreground">
+            Receipt photo will be saved with this charge.
+          </p>
+        ) : editing?.hasReceipt ? (
+          <p className="text-[13px] text-muted-foreground">
+            This charge already has a receipt photo.
+          </p>
+        ) : null}
+
         <div className="grid gap-2">
           <Label htmlFor="house-charge-amount">Amount</Label>
           <Input

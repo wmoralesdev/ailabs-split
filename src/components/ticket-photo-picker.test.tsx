@@ -148,3 +148,17 @@ test("desktop hint mentions paste", () => {
   render(<TicketPhotoPicker pending={false} onFile={vi.fn()} />)
   expect(screen.getByText("Or drop or paste a ticket photo")).toBeTruthy()
 })
+
+test("house copy can rename scan and drop labels", () => {
+  render(
+    <TicketPhotoPicker
+      pending={false}
+      onFile={vi.fn()}
+      actionLabel="Scan receipt"
+      dropHint="Or drop or paste a receipt photo"
+      dropOverlay="Drop receipt photo"
+    />
+  )
+  expect(screen.getByRole("button", { name: "Scan receipt" })).toBeTruthy()
+  expect(screen.getByText("Or drop or paste a receipt photo")).toBeTruthy()
+})
