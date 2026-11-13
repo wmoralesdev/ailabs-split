@@ -298,6 +298,7 @@ function LandingPage() {
         />
         <RecentTripsList
           ownedCodes={yours.map((room) => room.code)}
+          yours={yours}
           serverHiddenCodes={hiddenCodes}
           onChanged={() => setListsRevision((n) => n + 1)}
         />

@@ -48,6 +48,7 @@ import {
   mapRecurringOccurrence,
   mapRecurringTemplate,
 } from "@/lib/house-actor"
+import { houseNetFromRows } from "@/lib/house-ledger"
 import { isoDateFromUtc } from "@/lib/house-month"
 import type { HouseStateDto } from "@/lib/house-types"
 import { computeFxAdjustmentBps } from "@/lib/settle"
@@ -123,6 +124,10 @@ export type OwnedRoomDto = {
   name: string
   kind: RoomKind
   createdAt: string
+  owned: boolean
+  currency?: string
+  /** HOUSEHOLD: viewer's net cents. Omitted when they have no seat. */
+  balanceCents?: number
 }
 
 export type RoomDto = {
@@ -1231,14 +1236,75 @@ export const listMyRooms = createServerFn({ method: "GET" }).handler(
       },
       orderBy: { createdAt: "desc" },
       take: 40,
-      select: { code: true, name: true, kind: true, createdAt: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        kind: true,
+        createdAt: true,
+        currency: true,
+        ownerUserId: true,
+      },
     })
-    return rooms.map((room) => ({
-      code: room.code,
-      name: room.name,
-      kind: parseRoomKind(room.kind),
-      createdAt: room.createdAt.toISOString(),
-    }))
+    const householdIds = rooms
+      .filter((room) => parseRoomKind(room.kind) === "HOUSEHOLD")
+      .map((room) => room.id)
+    const ledgers =
+      householdIds.length === 0
+        ? []
+        : await prisma.room.findMany({
+            where: { id: { in: householdIds } },
+            select: {
+              id: true,
+              members: {
+                select: { id: true, name: true, userId: true },
+              },
+              expenses: {
+                select: {
+                  paidById: true,
+                  isPersonal: true,
+                  shares: {
+                    select: { memberId: true, amountCents: true },
+                  },
+                },
+              },
+              settlements: {
+                select: {
+                  fromMemberId: true,
+                  toMemberId: true,
+                  amountCents: true,
+                },
+              },
+            },
+          })
+    const ledgerById = new Map(ledgers.map((row) => [row.id, row]))
+    return rooms.map((room) => {
+      const kind = parseRoomKind(room.kind)
+      const owned = room.ownerUserId === userId
+      const base = {
+        code: room.code,
+        name: room.name,
+        kind,
+        createdAt: room.createdAt.toISOString(),
+        owned,
+      }
+      if (kind !== "HOUSEHOLD") return base
+      const ledger = ledgerById.get(room.id)
+      const member = ledger?.members.find((row) => row.userId === userId)
+      if (!ledger || !member) {
+        return { ...base, currency: room.currency }
+      }
+      return {
+        ...base,
+        currency: room.currency,
+        balanceCents: houseNetFromRows(
+          ledger.members,
+          ledger.expenses,
+          ledger.settlements,
+          member.id
+        ),
+      }
+    })
   }
 )
 

@@ -9,7 +9,7 @@ import {
   spotClaimedMessage,
 } from "@/lib/house-actor"
 import { buildExpenseShares } from "@/lib/expense-shares"
-import { memberHasHouseLedger } from "@/lib/house-ledger"
+import { houseNetFromRows, memberHasHouseLedger } from "@/lib/house-ledger"
 import {
   addMonths,
   formatMonth,
@@ -54,6 +54,7 @@ import {
   createHouseSchema,
   deleteHouseChargeSchema,
   deleteHousePaymentSchema,
+  getHouseRowBalancesSchema,
   joinHouseAsGuestSchema,
   joinHouseAsHousemateSchema,
   recordHousePaymentSchema,
@@ -1071,4 +1072,87 @@ export const undoSkipDue = createServerFn({ method: "POST" })
       },
     })
     return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export type HouseRowBalanceDto = {
+  code: string
+  currency: string
+  /** null when this is a housemate seat and the viewer is signed out. */
+  balanceCents: number | null
+}
+
+export const getHouseRowBalances = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(getHouseRowBalancesSchema, data))
+  .handler(async ({ data }): Promise<{ items: HouseRowBalanceDto[] }> => {
+    if (data.items.length === 0) return { items: [] }
+    const codes = [...new Set(data.items.map((item) => item.code))]
+    const rooms = await prisma.room.findMany({
+      where: { code: { in: codes }, kind: "HOUSEHOLD" },
+      select: {
+        code: true,
+        currency: true,
+        ownerUserId: true,
+        members: {
+          select: {
+            id: true,
+            name: true,
+            userId: true,
+            isGuest: true,
+            joinedOn: true,
+            leftOn: true,
+          },
+        },
+        expenses: {
+          select: {
+            paidById: true,
+            isPersonal: true,
+            shares: { select: { memberId: true, amountCents: true } },
+          },
+        },
+        settlements: {
+          select: {
+            fromMemberId: true,
+            toMemberId: true,
+            amountCents: true,
+          },
+        },
+      },
+    })
+    const byCode = new Map(rooms.map((room) => [room.code, room]))
+    const authUserId = await getAuthUserId()
+    const items: HouseRowBalanceDto[] = []
+    for (const item of data.items) {
+      const room = byCode.get(item.code)
+      if (!room) continue
+      const viewer = resolveHouseViewer({
+        ownerUserId: room.ownerUserId,
+        members: room.members,
+        authUserId,
+        viewerMemberId: item.memberId,
+      })
+      if (viewer.memberId) {
+        items.push({
+          code: room.code,
+          currency: room.currency,
+          balanceCents: houseNetFromRows(
+            room.members,
+            room.expenses,
+            room.settlements,
+            viewer.memberId
+          ),
+        })
+        continue
+      }
+      const requested = room.members.find(
+        (member) => member.id === item.memberId
+      )
+      if (requested && !requested.isGuest) {
+        items.push({
+          code: room.code,
+          currency: room.currency,
+          balanceCents: null,
+        })
+      }
+    }
+    return { items }
   })

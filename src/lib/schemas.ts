@@ -598,6 +598,17 @@ export const getSettlementProofSchema = z.object({
   settlementId: z.string().min(1, "Missing settlement"),
 })
 
+export const getHouseRowBalancesSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        code: roomCodeSchema,
+        memberId: z.string().min(1, "Missing person"),
+      })
+    )
+    .max(20),
+})
+
 export const fxCalibrationSampleSchema = z.object({
   appCents: z.number().int().positive("Enter a valid app amount"),
   bankCents: z.number().int().positive("Enter a valid bank charge"),
@@ -659,5 +670,6 @@ export type RecordSettlementsInput = z.input<typeof recordSettlementsSchema>
 export type DeleteSettlementInput = z.input<typeof deleteSettlementSchema>
 export type DeleteSettlementsInput = z.input<typeof deleteSettlementsSchema>
 export type GetSettlementProofInput = z.input<typeof getSettlementProofSchema>
+export type GetHouseRowBalancesInput = z.input<typeof getHouseRowBalancesSchema>
 export type CalibrateRoomFxInput = z.input<typeof calibrateRoomFxSchema>
 export type ExpenseSplitInput = z.input<typeof expenseSplitSchema>

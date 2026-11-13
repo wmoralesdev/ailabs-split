@@ -235,7 +235,14 @@ export function HousePeople({ room }: { room: RoomDto }) {
                       {memberSubtitle(member, today)}
                     </span>
                   </span>
-                  <span className="shrink-0 text-[13px] text-muted-foreground tabular-nums">
+                  <span
+                    className={cn(
+                      "max-w-[9.75rem] shrink-0 text-right text-[13px] leading-snug tabular-nums",
+                      net === 0
+                        ? "text-muted-foreground"
+                        : "font-medium text-foreground"
+                    )}
+                  >
                     {balance}
                   </span>
                 </button>
