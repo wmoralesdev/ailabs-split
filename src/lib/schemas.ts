@@ -362,6 +362,92 @@ export const deleteHouseChargeSchema = houseActorSchema.extend({
   expenseId: z.string().min(1, "Missing charge"),
 })
 
+export const templateKindSchema = z.enum(["FIXED", "VARIABLE"])
+
+export const saveRecurringTemplateSchema = houseActorSchema
+  .extend({
+    templateId: z.string().min(1).optional(),
+    title: z
+      .string()
+      .trim()
+      .min(1, "What was it?")
+      .max(80, "Title is too long"),
+    category: houseCategorySchema,
+    kind: templateKindSchema,
+    amountCents: z.number().int().positive("Enter a valid amount").nullable(),
+    dueDay: z.number().int().min(1, "Pick a due day").max(28, "Use day 1–28"),
+    paidById: z.string().min(1, "Pick who paid"),
+    splitMode: splitModeSchema.default("EQUAL"),
+    startMonth: monthKeySchema,
+    splits: z.array(expenseSplitSchema).min(1, "Pick at least one person"),
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === "FIXED") {
+      if (value.amountCents == null) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a valid amount",
+          path: ["amountCents"],
+        })
+      }
+      if (value.splitMode === "AMOUNT" && value.amountCents != null) {
+        const sum = value.splits.reduce(
+          (total, split) => total + (split.amountCents ?? 0),
+          0
+        )
+        if (sum !== value.amountCents) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Custom amounts must sum to the total",
+            path: ["splits"],
+          })
+        }
+      }
+    } else if (value.splitMode === "AMOUNT") {
+      ctx.addIssue({
+        code: "custom",
+        message: "Variable templates use Equal or Parts",
+        path: ["splitMode"],
+      })
+    }
+    if (value.splitMode === "PARTS") {
+      const totalWeight = value.splits.reduce(
+        (total, split) => total + (split.weight ?? 0),
+        0
+      )
+      if (totalWeight <= 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Give at least one person some parts",
+          path: ["splits"],
+        })
+      }
+    }
+  })
+
+export const archiveRecurringTemplateSchema = houseActorSchema.extend({
+  templateId: z.string().min(1, "Missing template"),
+})
+
+export const confirmDueChargeSchema = houseActorSchema.extend({
+  templateId: z.string().min(1, "Missing template"),
+  periodMonth: monthKeySchema,
+  title: z.string().trim().min(1).max(80).optional(),
+  amountCents: z.number().int().positive("Enter a valid amount").optional(),
+  category: houseCategorySchema.optional(),
+  paidById: z.string().min(1).optional(),
+  paidOn: isoDateSchema.optional(),
+  splitMode: splitModeSchema.optional(),
+  splits: z.array(expenseSplitSchema).min(1).optional(),
+})
+
+export const skipDueChargeSchema = houseActorSchema.extend({
+  templateId: z.string().min(1, "Missing template"),
+  periodMonth: monthKeySchema,
+})
+
+export const undoSkipDueSchema = skipDueChargeSchema
+
 const expenseWriteBaseSchema = z.object({
   code: roomCodeSchema,
   title: z
@@ -542,6 +628,15 @@ export type TransferHouseInput = z.input<typeof transferHouseSchema>
 export type AddHouseChargeInput = z.input<typeof addHouseChargeSchema>
 export type UpdateHouseChargeInput = z.input<typeof updateHouseChargeSchema>
 export type DeleteHouseChargeInput = z.input<typeof deleteHouseChargeSchema>
+export type SaveRecurringTemplateInput = z.input<
+  typeof saveRecurringTemplateSchema
+>
+export type ArchiveRecurringTemplateInput = z.input<
+  typeof archiveRecurringTemplateSchema
+>
+export type ConfirmDueChargeInput = z.input<typeof confirmDueChargeSchema>
+export type SkipDueChargeInput = z.input<typeof skipDueChargeSchema>
+export type UndoSkipDueInput = z.input<typeof undoSkipDueSchema>
 export type RecordHousePaymentInput = z.input<typeof recordHousePaymentSchema>
 export type DeleteHousePaymentInput = z.input<typeof deleteHousePaymentSchema>
 export type CreateRoomInput = z.input<typeof createRoomSchema>

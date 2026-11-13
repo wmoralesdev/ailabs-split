@@ -63,6 +63,8 @@ import type { ExpenseDto, RoomDto } from "@/server/rooms"
 
 type NewSearch = {
   edit?: string
+  template?: string
+  month?: string
 }
 
 export const Route = createFileRoute("/r/$code/new")({
@@ -70,6 +72,14 @@ export const Route = createFileRoute("/r/$code/new")({
     edit:
       typeof search.edit === "string" && search.edit.trim()
         ? search.edit.trim()
+        : undefined,
+    template:
+      typeof search.template === "string" && search.template.trim()
+        ? search.template.trim()
+        : undefined,
+    month:
+      typeof search.month === "string" && /^\d{4}-\d{2}$/.test(search.month)
+        ? search.month
         : undefined,
   }),
   loader: async ({ params, context }) => {
@@ -140,7 +150,7 @@ function AddExpenseSkeleton() {
 
 function AddExpensePage() {
   const { code } = Route.useParams()
-  const { edit } = Route.useSearch()
+  const { edit, template, month } = Route.useSearch()
   const navigate = useNavigate()
   const { memberId } = useRoomIdentity()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
@@ -159,6 +169,11 @@ function AddExpensePage() {
           expense={
             edit
               ? (room.expenses.find((expense) => expense.id === edit) ?? null)
+              : null
+          }
+          due={
+            template && month
+              ? { templateId: template, periodMonth: month }
               : null
           }
         />
