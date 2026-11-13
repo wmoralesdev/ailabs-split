@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowDown01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 
+import { ChipRow } from "@/components/chip-row"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
@@ -32,7 +33,7 @@ export function MemberPicker({
 }: MemberPickerProps) {
   if (members.length < CHIP_THRESHOLD) {
     return (
-      <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+      <ChipRow role="group" aria-label={label} bleed>
         {members.map((member) => (
           <button
             key={member.id}
@@ -44,7 +45,7 @@ export function MemberPicker({
             {member.name}
           </button>
         ))}
-      </div>
+      </ChipRow>
     )
   }
 

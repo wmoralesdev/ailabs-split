@@ -540,7 +540,7 @@ export function HouseChargeForm({
             beforePick={requireSignIn}
             pendingLabel="Reading receipt…"
             actionLabel="Scan receipt"
-            title="Scan a receipt"
+            title="Receipt (optional)"
             hint="A utility bill or a grocery ticket."
             dropHint="Or drop or paste a receipt photo"
             dropOverlay="Drop receipt photo"

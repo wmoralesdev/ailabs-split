@@ -1,16 +1,38 @@
+import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { CheckmarkCircle02Icon, Edit02Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { houseCategoryHint } from "@/lib/house-categories"
 import { dueThisMonth } from "@/lib/house-ledger"
+import type { DueThisMonthItem } from "@/lib/house-ledger"
 import { formatMonth, monthKey } from "@/lib/house-month"
 import { canConfirmDue } from "@/lib/house-permissions"
 import { roomKeys } from "@/lib/room-query"
 import { formatMoney } from "@/lib/settle"
 import { confirmDueCharge, skipDueCharge, undoSkipDue } from "@/server/houses"
 import type { RoomDto } from "@/server/rooms"
+
+type DueKey = { templateId: string; periodMonth: string }
+
+function dueKey(item: DueKey): string {
+  return `${item.templateId}:${item.periodMonth}`
+}
+
+function isVariable(item: DueThisMonthItem): boolean {
+  return item.kind === "VARIABLE" || item.amountCents == null
+}
 
 export function DueThisMonth({ room }: { room: RoomDto }) {
   const navigate = useNavigate()
@@ -24,12 +46,14 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
     room.house?.occurrences ?? [],
     currentMonth
   )
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const openItem = items.find((item) => dueKey(item) === openKey) ?? null
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(room.code) })
 
   const confirmMutation = useMutation({
-    mutationFn: (input: { templateId: string; periodMonth: string }) =>
+    mutationFn: (input: DueKey) =>
       confirmDueCharge({
         data: {
           code: room.code,
@@ -38,6 +62,7 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
         },
       }),
     onSuccess: async () => {
+      setOpenKey(null)
       await invalidate()
     },
     onError: (error) => {
@@ -46,7 +71,7 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
   })
 
   const skipMutation = useMutation({
-    mutationFn: (input: { templateId: string; periodMonth: string }) =>
+    mutationFn: (input: DueKey) =>
       skipDueCharge({
         data: {
           code: room.code,
@@ -55,15 +80,12 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
         },
       }),
     onSuccess: async (_room, vars) => {
+      setOpenKey(null)
       await invalidate()
       toast.success(`Skipped ${formatMonth(vars.periodMonth)}`, {
         action: {
           label: "Undo",
-          onClick: () =>
-            undoMutation.mutate({
-              templateId: vars.templateId,
-              periodMonth: vars.periodMonth,
-            }),
+          onClick: () => undoMutation.mutate(vars),
         },
       })
     },
@@ -73,7 +95,7 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
   })
 
   const undoMutation = useMutation({
-    mutationFn: (input: { templateId: string; periodMonth: string }) =>
+    mutationFn: (input: DueKey) =>
       undoSkipDue({
         data: {
           code: room.code,
@@ -89,6 +111,27 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
     },
   })
 
+  const pending =
+    confirmMutation.isPending ||
+    skipMutation.isPending ||
+    undoMutation.isPending
+
+  function paidByName(item: DueThisMonthItem): string {
+    return (
+      room.house?.members.find((member) => member.id === item.paidById)?.name ??
+      "Someone"
+    )
+  }
+
+  function editFirst(item: DueThisMonthItem) {
+    setOpenKey(null)
+    void navigate({
+      to: "/r/$code/new",
+      params: { code: room.code },
+      search: { template: item.templateId, month: item.periodMonth },
+    })
+  }
+
   if (items.length === 0) return null
 
   return (
@@ -96,17 +139,9 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
       <h2 className="group-label">Due this month</h2>
       <ul className="group-list mt-1">
         {items.map((item) => {
-          const paidBy =
-            room.house?.members.find((member) => member.id === item.paidById)
-              ?.name ?? "Someone"
-          const variable = item.kind === "VARIABLE" || item.amountCents == null
-          const pending =
-            confirmMutation.isPending ||
-            skipMutation.isPending ||
-            undoMutation.isPending
+          const variable = isVariable(item)
           const meta = [
-            houseCategoryHint(item.category, item.title),
-            `${paidBy} pays`,
+            `${paidByName(item)} pays`,
             item.periodMonth === currentMonth
               ? null
               : formatMonth(item.periodMonth),
@@ -114,104 +149,153 @@ export function DueThisMonth({ room }: { room: RoomDto }) {
             .filter(Boolean)
             .join(" · ")
           return (
-            <li
-              key={`${item.templateId}:${item.periodMonth}`}
-              className="px-4 py-3"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="min-w-0 truncate font-medium">{item.title}</p>
-                <p
-                  className={
-                    variable
-                      ? "shrink-0 text-[13px] text-muted-foreground"
-                      : "shrink-0 font-medium tabular-nums"
-                  }
-                >
-                  {variable
-                    ? "Varies"
-                    : formatMoney(item.amountCents ?? 0, room.currency)}
-                </p>
-              </div>
-              <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-                {meta}
-              </p>
+            <li key={dueKey(item)} className="group-row min-h-14">
+              <button
+                type="button"
+                className="row-hit min-w-0 flex-1 text-left"
+                onClick={() => setOpenKey(dueKey(item))}
+              >
+                <span className="block truncate text-[15px] font-medium">
+                  {item.title}
+                </span>
+                <span className="block truncate text-[13px] text-muted-foreground">
+                  <span
+                    className={
+                      variable ? undefined : "font-semibold text-foreground"
+                    }
+                  >
+                    {variable
+                      ? "Varies"
+                      : formatMoney(item.amountCents ?? 0, room.currency)}
+                  </span>
+                  {` · ${meta}`}
+                </span>
+              </button>
               {canAct ? (
-                <div className="mt-2.5 flex items-center gap-4">
-                  {variable ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="bg-muted px-3.5 text-primary hover:bg-foreground/10"
-                      disabled={pending}
-                      onClick={() =>
-                        void navigate({
-                          to: "/r/$code/new",
-                          params: { code: room.code },
-                          search: {
-                            template: item.templateId,
-                            month: item.periodMonth,
-                          },
-                        })
-                      }
-                    >
-                      Add amount
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="bg-muted px-3.5 text-primary hover:bg-foreground/10"
-                      disabled={pending}
-                      onClick={() =>
-                        confirmMutation.mutate({
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="bg-muted font-semibold text-primary"
+                  disabled={pending}
+                  onClick={() =>
+                    variable
+                      ? editFirst(item)
+                      : confirmMutation.mutate({
                           templateId: item.templateId,
                           periodMonth: item.periodMonth,
                         })
-                      }
-                    >
-                      Confirm
-                    </Button>
-                  )}
-                  {variable ? null : (
-                    <button
-                      type="button"
-                      className="text-action text-[13px]"
-                      disabled={pending}
-                      onClick={() =>
-                        void navigate({
-                          to: "/r/$code/new",
-                          params: { code: room.code },
-                          search: {
-                            template: item.templateId,
-                            month: item.periodMonth,
-                          },
-                        })
-                      }
-                    >
-                      Edit first
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="text-action text-[13px]"
-                    disabled={pending}
-                    onClick={() =>
-                      skipMutation.mutate({
-                        templateId: item.templateId,
-                        periodMonth: item.periodMonth,
-                      })
-                    }
-                  >
-                    Skip this month
-                  </button>
-                </div>
+                  }
+                >
+                  {variable ? "Add amount" : "Confirm"}
+                </Button>
               ) : null}
             </li>
           )
         })}
       </ul>
+
+      <Sheet
+        open={openItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setOpenKey(null)
+        }}
+      >
+        {openItem ? (
+          <SheetContent
+            side="bottom"
+            className="max-h-[85dvh] overflow-y-auto rounded-t-2xl"
+          >
+            <div className="mx-auto flex w-full max-w-content flex-col">
+              <SheetHeader>
+                <SheetTitle>{openItem.title}</SheetTitle>
+                <SheetDescription>
+                  {[
+                    houseCategoryHint(openItem.category, openItem.title),
+                    `${paidByName(openItem)} pays`,
+                    `For ${formatMonth(openItem.periodMonth)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="px-4 pb-2">
+                {isVariable(openItem) ? (
+                  <p className="text-[15px] text-muted-foreground">
+                    The amount changes every month. Add it from the bill.
+                  </p>
+                ) : (
+                  <p className="font-display text-3xl font-semibold tabular-nums">
+                    {formatMoney(openItem.amountCents ?? 0, room.currency)}
+                  </p>
+                )}
+              </div>
+
+              {canAct ? (
+                <SheetFooter>
+                  {isVariable(openItem) ? (
+                    <Button
+                      type="button"
+                      className="cta-lg"
+                      disabled={pending}
+                      onClick={() => editFirst(openItem)}
+                    >
+                      Add amount
+                    </Button>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() => editFirst(openItem)}
+                      >
+                        <HugeiconsIcon
+                          icon={Edit02Icon}
+                          size={14}
+                          strokeWidth={2}
+                        />
+                        Edit first
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          confirmMutation.mutate({
+                            templateId: openItem.templateId,
+                            periodMonth: openItem.periodMonth,
+                          })
+                        }
+                      >
+                        <HugeiconsIcon
+                          icon={CheckmarkCircle02Icon}
+                          size={14}
+                          strokeWidth={2}
+                        />
+                        {confirmMutation.isPending ? "Saving…" : "Confirm"}
+                      </Button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="text-action self-center text-[15px]"
+                    disabled={pending}
+                    onClick={() =>
+                      skipMutation.mutate({
+                        templateId: openItem.templateId,
+                        periodMonth: openItem.periodMonth,
+                      })
+                    }
+                  >
+                    Skip {formatMonth(openItem.periodMonth)}
+                  </button>
+                </SheetFooter>
+              ) : null}
+            </div>
+          </SheetContent>
+        ) : null}
+      </Sheet>
     </section>
   )
 }

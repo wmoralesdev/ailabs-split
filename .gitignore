@@ -33,3 +33,4 @@ playwright/.cache/
 # kit with: npx skills add https://github.com/Leonxlnx/taste-skill --skill design-taste-frontend -a cursor --copy -y
 .taste-skill/
 .agents/skills/design-taste-frontend/assets/
+__pycache__/

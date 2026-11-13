@@ -10,6 +10,11 @@ import {
   PaymentProofDialog,
 } from "@/components/payment-proof-dialog"
 import { PaymentProofSheet } from "@/components/payment-proof-sheet"
+import {
+  SettleEmptyState,
+  TransferCard,
+  transferKey,
+} from "@/components/transfer-card"
 import { Button } from "@/components/ui/button"
 import {
   atmDigitsToCents,
@@ -182,8 +187,51 @@ export function HouseSettle({ room }: { room: RoomDto }) {
   }
 
   async function remind(transfer: Transfer) {
-    await copyText(formatHouseTransfer(transfer, room.currency))
+    const text = formatHouseTransfer(transfer, room.currency)
+    const share = "share" in navigator ? navigator.share.bind(navigator) : null
+    if (share) {
+      try {
+        await share({ text })
+      } catch {
+        // Dismissed share sheet.
+      }
+      return
+    }
+    await copyText(text)
     toast.success("Copied, paste it in the group chat")
+  }
+
+  const mine = transfers.filter(
+    (row) => row.fromId === actorId || row.toId === actorId
+  )
+  const others = transfers.filter(
+    (row) => row.fromId !== actorId && row.toId !== actorId
+  )
+
+  function renderTransfer(transfer: Transfer, emphasis: boolean) {
+    return (
+      <TransferCard
+        key={transferKey(transfer)}
+        transfer={transfer}
+        currency={room.currency}
+        memberId={actorId ?? ""}
+        emphasis={emphasis}
+        pending={
+          recordMutation.isPending &&
+          draft?.fromId === transfer.fromId &&
+          draft.toId === transfer.toId
+        }
+        disabled={recordMutation.isPending}
+        canMark={canRecordPayment(
+          role,
+          actorId,
+          transfer.fromId,
+          transfer.toId
+        )}
+        onMarkPaid={() => openFromTransfer(transfer)}
+        onRemind={() => void remind(transfer)}
+      />
+    )
   }
 
   const canRecordCustom = Boolean(
@@ -203,58 +251,39 @@ export function HouseSettle({ room }: { room: RoomDto }) {
       </p>
 
       {transfers.length === 0 ? (
-        <div className="mt-6">
-          <p className="font-display text-lg font-semibold">
-            {room.expenses.length === 0 ? "Nothing to settle" : "All settled"}
-          </p>
-          <p className="mt-0.5 text-[15px] text-muted-foreground">
-            {room.expenses.length === 0
+        <SettleEmptyState
+          title={
+            room.expenses.length === 0 ? "Nothing to settle" : "All settled"
+          }
+          hint={
+            room.expenses.length === 0
               ? "Add a charge to get started."
-              : "Everyone is square."}
-          </p>
-        </div>
-      ) : (
-        <ul className="mt-5 flex flex-col gap-2.5">
-          {transfers.map((transfer) => {
-            const allowed = canRecordPayment(
-              role,
-              actorId,
-              transfer.fromId,
-              transfer.toId
-            )
-            const iPay = transfer.fromId === actorId
-            const iGet = transfer.toId === actorId
-            return (
-              <li
-                key={`${transfer.fromId}-${transfer.toId}`}
-                className="surface p-4"
-              >
-                <p className="text-[15px] font-medium">
-                  {formatHouseTransfer(transfer, room.currency)}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {allowed ? (
-                    <Button
-                      type="button"
-                      onClick={() => openFromTransfer(transfer)}
-                      disabled={recordMutation.isPending}
-                    >
-                      {iPay ? "I paid" : iGet ? "Mark as received" : "Record"}
-                    </Button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="text-action text-[15px]"
-                    onClick={() => void remind(transfer)}
-                  >
-                    Copy reminder
-                  </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+              : "Everyone is square."
+          }
+        />
+      ) : null}
+
+      {mine.length > 0 ? (
+        <section className="mt-5" aria-labelledby="house-yours-heading">
+          <h2 id="house-yours-heading" className="group-label">
+            Yours
+          </h2>
+          <ul className="flex flex-col gap-2.5">
+            {mine.map((transfer) => renderTransfer(transfer, true))}
+          </ul>
+        </section>
+      ) : null}
+
+      {others.length > 0 ? (
+        <section className="mt-6" aria-labelledby="house-others-heading">
+          <h2 id="house-others-heading" className="group-label">
+            {mine.length > 0 ? "Between others" : "Who pays whom"}
+          </h2>
+          <ul className="group-list">
+            {others.map((transfer) => renderTransfer(transfer, false))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="mt-8">
         <h2 className="group-label">Balances</h2>

@@ -1,6 +1,6 @@
+import { ChipRow } from "@/components/chip-row"
 import { Input } from "@/components/ui/input"
 import { addDaysIso, isIsoDate, localIsoDate } from "@/lib/house-month"
-import { cn } from "@/lib/utils"
 
 function addDaysIsoSafe(iso: string, days: number): string {
   try {
@@ -28,11 +28,7 @@ export function HouseDateChips({
   const picked = value && isIsoDate(value) ? value : today
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-1.5"
-      role="group"
-      aria-label={label}
-    >
+    <ChipRow role="group" aria-label={label} bleed>
       {allowEmpty ? (
         <DateChip
           label={emptyLabel}
@@ -58,9 +54,9 @@ export function HouseDateChips({
           if (isIsoDate(next)) onChange(next)
         }}
         aria-label="Pick a date"
-        className="h-9 w-[9.5rem] rounded-full px-3 text-[13px]"
+        className="h-8 w-[9.5rem] rounded-full px-3 text-sm"
       />
-    </div>
+    </ChipRow>
   )
 }
 
@@ -78,12 +74,7 @@ function DateChip({
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={cn(
-        "h-9 rounded-full px-3 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        pressed
-          ? "bg-foreground text-background"
-          : "bg-card text-foreground hover:bg-muted"
-      )}
+      className="person-chip"
     >
       {label}
     </button>

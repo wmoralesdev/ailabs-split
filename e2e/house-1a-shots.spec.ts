@@ -88,15 +88,21 @@ test.describe("House 1A screenshots", () => {
       await shot(page, `${scheme}-people.png`)
 
       await page.getByRole("link", { name: "Settle", exact: true }).click()
-      await expect(page.getByText("Ana pays Walter $142.00")).toBeVisible()
-      await page.getByRole("button", { name: "Mark as received" }).click()
+      const settleYours = page.getByRole("region", { name: "Yours" })
+      await expect(settleYours.getByText("Ana pays you")).toBeVisible()
+      await expect(
+        settleYours.getByText("$142.00", { exact: true })
+      ).toBeVisible()
+      await page.getByRole("button", { name: "Ana paid me" }).click()
       await expect(page.getByLabel("How much?")).toBeVisible()
       await page.getByLabel("How much?").fill("10000")
       await expect(page.getByText("Suggested $142.00")).toBeVisible()
       await shot(page, `${scheme}-settle-partial.png`)
       await page.getByRole("button", { name: "Continue" }).click()
       await page.getByRole("button", { name: "Skip" }).click()
-      await expect(page.getByText("Ana pays Walter $42.00")).toBeVisible()
+      await expect(
+        settleYours.getByText("$42.00", { exact: true })
+      ).toBeVisible()
 
       await page.getByRole("link", { name: "Home", exact: true }).click()
       await page.getByRole("link", { name: "Recurring" }).click()
@@ -117,6 +123,12 @@ test.describe("House 1A screenshots", () => {
         page.getByRole("heading", { name: "Due this month" })
       ).toBeVisible()
       await shot(page, `${scheme}-due-this-month.png`)
+      await page.getByRole("button", { name: /^Internet/ }).click()
+      await expect(
+        page.getByRole("button", { name: "Edit first" })
+      ).toBeVisible()
+      await shot(page, `${scheme}-due-sheet.png`)
+      await page.keyboard.press("Escape")
 
       await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
       await waitForHydration(page)
