@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
+import { DueDayPicker } from "@/components/house/due-day-picker"
 import { HouseCategoryChips } from "@/components/house/house-category-chips"
 import { HouseSplitEditor } from "@/components/house/house-split-editor"
 import type { HouseSplitMember } from "@/components/house/house-split-editor"
@@ -406,40 +407,21 @@ export function RecurringTemplateSheet({
             </div>
 
             <div className="grid gap-2">
-              <Label>Due day</Label>
-              <div
-                className="flex items-center justify-between gap-2"
-                role="group"
-                aria-label="Due day"
-              >
-                <button
-                  type="button"
-                  className="icon-hit size-11"
-                  aria-label="Previous day"
-                  onClick={() => setDueDay((day) => Math.max(1, day - 1))}
-                >
-                  ‹
-                </button>
-                <p className="font-display text-[17px] font-semibold tabular-nums">
-                  {dueDay}
-                </p>
-                <button
-                  type="button"
-                  className="icon-hit size-11"
-                  aria-label="Next day"
-                  onClick={() => setDueDay((day) => Math.min(28, day + 1))}
-                >
-                  ›
-                </button>
-              </div>
+              <Label htmlFor="house-recurring-due-day">Due day</Label>
+              <DueDayPicker
+                value={dueDay}
+                onChange={setDueDay}
+                inputId="house-recurring-due-day"
+              />
             </div>
 
             <div className="grid gap-2">
-              <Label>Starts</Label>
+              <Label htmlFor="house-recurring-starts">Starts</Label>
               <MonthStepper
                 value={startMonth}
                 onChange={setStartMonth}
                 label="Starts"
+                inputId="house-recurring-starts"
               />
             </div>
 

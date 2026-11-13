@@ -227,9 +227,6 @@ function CreateHouseFields({
                       onChange={(next) => {
                         if (!next) return
                         field.onChange(next)
-                        if (next === today || next === yesterday) {
-                          setEditMovedIn(false)
-                        }
                       }}
                     />
                   </>

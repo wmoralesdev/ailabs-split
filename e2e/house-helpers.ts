@@ -76,6 +76,7 @@ export async function setHouseMovedIn(
       page.getByText(`Moved in ${formatDay(isoDate)}`, { exact: true })
     ).toBeVisible()
     await page.keyboard.press("Escape")
+    await page.keyboard.press("Escape")
     await expect(
       page.getByRole("heading", { name: "In this house" })
     ).toHaveCount(0)

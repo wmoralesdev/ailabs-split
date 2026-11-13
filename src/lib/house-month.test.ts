@@ -4,11 +4,15 @@ import {
   addMonths,
   formatDay,
   formatMonth,
+  formatTypedDate,
   isActiveOn,
   isMovedOutOn,
   monthEnd,
   monthKey,
   monthStart,
+  parseDueDay,
+  parseTypedDate,
+  parseTypedMonth,
   stayOverlapsMonth,
 } from "./house-month"
 
@@ -44,6 +48,31 @@ describe("formatMonth", () => {
 describe("formatDay", () => {
   it("prints a short month and day", () => {
     expect(formatDay("2026-11-04")).toBe("Nov 4")
+  })
+})
+
+describe("typed dates", () => {
+  it("formats and parses MM/DD/YYYY and ISO", () => {
+    expect(formatTypedDate("2026-11-13")).toBe("11/13/2026")
+    expect(parseTypedDate("11/13/2026")).toBe("2026-11-13")
+    expect(parseTypedDate("2026-11-13")).toBe("2026-11-13")
+    expect(parseTypedDate("Nov 13, 2026")).toBe("2026-11-13")
+    expect(parseTypedDate("not a date")).toBeNull()
+  })
+
+  it("parses a typed month", () => {
+    expect(parseTypedMonth("Nov 2026")).toBe("2026-11")
+    expect(parseTypedMonth("11/2026")).toBe("2026-11")
+    expect(parseTypedMonth("2026-11")).toBe("2026-11")
+    expect(parseTypedMonth("13/2026")).toBeNull()
+  })
+
+  it("parses a due day from 1 to 28", () => {
+    expect(parseDueDay("15")).toBe(15)
+    expect(parseDueDay("1")).toBe(1)
+    expect(parseDueDay("28")).toBe(28)
+    expect(parseDueDay("29")).toBeNull()
+    expect(parseDueDay("0")).toBeNull()
   })
 })
 
