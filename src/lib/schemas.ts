@@ -252,6 +252,40 @@ export const claimHouseGuestSchema = z.object({
   memberId: z.string().min(1, "Missing person"),
 })
 
+const houseActorSchema = z.object({
+  code: roomCodeSchema,
+  viewerMemberId: z.string().min(1).optional(),
+})
+
+export const addHousePeopleSchema = houseActorSchema.extend({
+  names: z.array(memberNameSchema).min(1, "Add a name").max(20),
+  isGuest: z.boolean(),
+})
+
+export const renameHouseMemberSchema = houseActorSchema.extend({
+  memberId: z.string().min(1, "Missing person"),
+  name: memberNameSchema,
+})
+
+export const setHouseMemberStaySchema = houseActorSchema.extend({
+  memberId: z.string().min(1, "Missing person"),
+  joinedOn: isoDateSchema.nullable().optional(),
+  leftOn: isoDateSchema.nullable().optional(),
+})
+
+export const setHouseMemberKindSchema = houseActorSchema.extend({
+  memberId: z.string().min(1, "Missing person"),
+  isGuest: z.boolean(),
+})
+
+export const removeHouseMemberSchema = houseActorSchema.extend({
+  memberId: z.string().min(1, "Missing person"),
+})
+
+export const transferHouseSchema = houseActorSchema.extend({
+  toMemberId: z.string().min(1, "Pick who takes the house"),
+})
+
 export const expenseSplitSchema = z.object({
   memberId: z.string().min(1),
   weight: z.number().int().min(0).optional(),
@@ -418,6 +452,12 @@ export type JoinHouseAsHousemateInput = z.input<
 >
 export type JoinHouseAsGuestInput = z.input<typeof joinHouseAsGuestSchema>
 export type ClaimHouseGuestInput = z.input<typeof claimHouseGuestSchema>
+export type AddHousePeopleInput = z.input<typeof addHousePeopleSchema>
+export type RenameHouseMemberInput = z.input<typeof renameHouseMemberSchema>
+export type SetHouseMemberStayInput = z.input<typeof setHouseMemberStaySchema>
+export type SetHouseMemberKindInput = z.input<typeof setHouseMemberKindSchema>
+export type RemoveHouseMemberInput = z.input<typeof removeHouseMemberSchema>
+export type TransferHouseInput = z.input<typeof transferHouseSchema>
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
 export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>

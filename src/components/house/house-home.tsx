@@ -1,3 +1,7 @@
+import { Link } from "@tanstack/react-router"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
+
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { useOnlineStatus } from "@/lib/online-status"
@@ -40,6 +44,25 @@ export function HouseHome({
             Add the rent, a grocery run, or anything you share.
           </p>
         </div>
+
+        <section className="mt-8">
+          <ul className="group-list">
+            <li>
+              <Link
+                to="/r/$code/people"
+                params={{ code: room.code }}
+                className="group-row-hit w-full"
+              >
+                <span className="min-w-0 flex-1 font-medium">People</span>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  size={16}
+                  strokeWidth={2}
+                />
+              </Link>
+            </li>
+          </ul>
+        </section>
 
         <div className="mt-8">
           <RoomExitControl
