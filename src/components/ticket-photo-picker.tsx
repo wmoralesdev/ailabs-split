@@ -18,7 +18,7 @@ type TicketPhotoPickerProps = {
   actionLabel?: string
   dropHint?: string
   dropOverlay?: string
-  /** Card with a title and hint; omit both for bare stacked buttons. */
+  /** Field label above one inline button row; omit for bare stacked buttons. */
   title?: string
   hint?: string
   /** Runs before a picker opens or a drop is accepted; return false to keep it closed. */
@@ -93,16 +93,13 @@ export function TicketPhotoPicker({
     accept(imageFromTransfer(event.dataTransfer))
   }
 
+  const inlineButton = "min-w-0 flex-1 gap-1.5 px-3 whitespace-nowrap"
+
   const buttons = (
-    <div
-      className={cn("grid gap-2", framed ? "mt-3 grid-cols-2" : "grid-cols-1")}
-    >
+    <div className={framed ? "flex gap-2" : "grid grid-cols-1 gap-2"}>
       <button
         type="button"
-        className={cn(
-          "split-cta",
-          framed && "gap-1.5 px-3 whitespace-nowrap [&_svg]:shrink-0"
-        )}
+        className={cn("split-cta", framed && inlineButton)}
         disabled={pending}
         aria-busy={pending}
         onClick={() => open(cameraRef.current)}
@@ -110,25 +107,30 @@ export function TicketPhotoPicker({
         {pending ? (
           <Spinner />
         ) : (
-          <HugeiconsIcon icon={Camera01Icon} size={18} strokeWidth={2} />
+          <HugeiconsIcon
+            icon={Camera01Icon}
+            size={18}
+            strokeWidth={2}
+            className="shrink-0"
+          />
         )}
-        {pending && !framed ? pendingLabel : actionLabel}
+        <span className="truncate">
+          {pending && !framed ? pendingLabel : actionLabel}
+        </span>
       </button>
       <button
         type="button"
-        className={cn(
-          "split-cta-tinted",
-          framed && "gap-1.5 px-3 whitespace-nowrap [&_svg]:shrink-0"
-        )}
+        className={cn("split-cta-tinted", framed && inlineButton)}
         disabled={pending}
         onClick={() => open(galleryRef.current)}
       >
-        {pending && framed ? (
-          <Spinner />
-        ) : (
-          <HugeiconsIcon icon={ImageAdd01Icon} size={18} strokeWidth={2} />
-        )}
-        From gallery
+        <HugeiconsIcon
+          icon={ImageAdd01Icon}
+          size={18}
+          strokeWidth={2}
+          className="shrink-0"
+        />
+        <span className="truncate">From gallery</span>
       </button>
       <input
         ref={cameraRef}
@@ -156,7 +158,7 @@ export function TicketPhotoPicker({
     </div>
   )
 
-  const zone = (
+  return (
     <div
       data-testid="ticket-drop-zone"
       data-dropping={dropping ? "true" : undefined}
@@ -166,26 +168,37 @@ export function TicketPhotoPicker({
       onDrop={onDrop}
       className={cn(
         "relative rounded-2xl transition-[border-color,background-color,box-shadow] duration-200",
-        "[@media(hover:hover)_and_(pointer:fine)]:border [@media(hover:hover)_and_(pointer:fine)]:border-dashed [@media(hover:hover)_and_(pointer:fine)]:border-border [@media(hover:hover)_and_(pointer:fine)]:p-3",
+        framed
+          ? "flex flex-col gap-2"
+          : "[@media(hover:hover)_and_(pointer:fine)]:border [@media(hover:hover)_and_(pointer:fine)]:border-dashed [@media(hover:hover)_and_(pointer:fine)]:border-border [@media(hover:hover)_and_(pointer:fine)]:p-3",
         dropping &&
           "border border-dashed border-primary bg-accent/70 shadow-[inset_0_0_0_1px] shadow-primary/30",
-        !framed && className
+        className
       )}
     >
       {framed ? (
-        <>
-          <p className="flex items-center gap-2 text-[15px] font-semibold">
-            {pending ? <Spinner /> : null}
-            {pending ? pendingLabel : title}
-          </p>
-          {hint ? (
-            <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p>
-          ) : null}
-        </>
+        <p className="flex min-h-4 items-center gap-2 text-[13px] leading-none font-medium text-muted-foreground">
+          {pending ? <Spinner className="size-3.5" /> : null}
+          {pending ? pendingLabel : title}
+        </p>
       ) : null}
       {buttons}
+      {framed && hint ? (
+        <p
+          className={
+            "text-[13px] text-muted-foreground [@media(hover:hover)_and_(pointer:fine)]:hidden"
+          }
+        >
+          {hint}
+        </p>
+      ) : null}
       {dropping ? null : (
-        <p className="mt-2 hidden text-center text-[13px] text-muted-foreground [@media(hover:hover)_and_(pointer:fine)]:block">
+        <p
+          className={cn(
+            "hidden text-[13px] text-muted-foreground [@media(hover:hover)_and_(pointer:fine)]:block",
+            !framed && "mt-2 text-center"
+          )}
+        >
           {dropHint}
         </p>
       )}
@@ -199,8 +212,4 @@ export function TicketPhotoPicker({
       ) : null}
     </div>
   )
-
-  if (!framed) return zone
-
-  return <div className={cn("surface p-3.5", className)}>{zone}</div>
 }
