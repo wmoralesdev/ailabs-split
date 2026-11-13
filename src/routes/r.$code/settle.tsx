@@ -2,12 +2,7 @@ import { useMemo, useState } from "react"
 import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  CheckmarkCircle02Icon,
-  Share01Icon,
-  Tick02Icon,
-  UndoIcon,
-} from "@hugeicons/core-free-icons"
+import { Share01Icon, Tick02Icon, UndoIcon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import {
@@ -21,7 +16,11 @@ import {
   PaymentProofDialog,
 } from "@/components/payment-proof-dialog"
 import { PaymentProofSheet } from "@/components/payment-proof-sheet"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  SettleEmptyState,
+  TransferCard,
+  transferKey,
+} from "@/components/transfer-card"
 import { Button } from "@/components/ui/button"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { parseRoomKind } from "@/lib/room-kind"
@@ -87,15 +86,6 @@ export const Route = createFileRoute("/r/$code/settle")({
     </main>
   ),
 })
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("")
-}
 
 function SettlePage() {
   const { code } = roomRoute.useParams()
@@ -346,25 +336,16 @@ function SettlePage() {
       ) : null}
 
       {transfers.length === 0 ? (
-        <div className="surface mt-5 flex flex-col items-center gap-3 px-4 py-8 text-center">
-          <span className="flex size-11 items-center justify-center rounded-full bg-foreground text-background">
-            <HugeiconsIcon
-              icon={CheckmarkCircle02Icon}
-              size={22}
-              strokeWidth={2}
-            />
-          </span>
-          <div>
-            <p className="font-display text-lg font-semibold">
-              {room.expenses.length === 0 ? "Nothing to settle" : "All settled"}
-            </p>
-            <p className="mt-0.5 text-[15px] text-muted-foreground">
-              {room.expenses.length === 0
-                ? emptySettleHint(parseRoomKind(room.kind))
-                : "Everyone is square."}
-            </p>
-          </div>
-        </div>
+        <SettleEmptyState
+          title={
+            room.expenses.length === 0 ? "Nothing to settle" : "All settled"
+          }
+          hint={
+            room.expenses.length === 0
+              ? emptySettleHint(parseRoomKind(room.kind))
+              : "Everyone is square."
+          }
+        />
       ) : null}
 
       {mine.length > 0 ? (
@@ -509,127 +490,5 @@ function SettlePage() {
         }
       />
     </main>
-  )
-}
-
-function transferKey(transfer: Transfer): string {
-  return `${transfer.fromId}-${transfer.toId}`
-}
-
-function TransferCard({
-  transfer,
-  currency,
-  memberId,
-  emphasis = false,
-  pending,
-  disabled,
-  onMarkPaid,
-  onRemind,
-}: {
-  transfer: Transfer
-  currency: string
-  memberId: string
-  emphasis?: boolean
-  pending: boolean
-  disabled: boolean
-  onMarkPaid: () => void
-  onRemind: () => void
-}) {
-  const iPay = transfer.fromId === memberId
-  const iGet = transfer.toId === memberId
-  const sentence = iPay
-    ? `You pay ${transfer.toName}`
-    : iGet
-      ? `${transfer.fromName} pays you`
-      : `${transfer.fromName} pays ${transfer.toName}`
-  const markLabel = iPay
-    ? `I paid ${transfer.toName}`
-    : iGet
-      ? `${transfer.fromName} paid me`
-      : "Mark paid"
-
-  if (!emphasis) {
-    return (
-      <li className="group-row min-h-14">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px]">{sentence}</p>
-          <p className="text-[15px] font-semibold tabular-nums">
-            {formatMoney(transfer.amountCents, currency)}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground"
-          onClick={onRemind}
-          aria-label={`Remind ${transfer.fromName}`}
-        >
-          <HugeiconsIcon icon={Share01Icon} size={16} strokeWidth={2} />
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="bg-muted font-semibold text-primary"
-          onClick={onMarkPaid}
-          disabled={disabled}
-        >
-          {pending ? "Saving…" : markLabel}
-        </Button>
-      </li>
-    )
-  }
-
-  return (
-    <li className="surface p-4">
-      <div className="flex items-center gap-2.5">
-        <div className="flex -space-x-1.5">
-          <Avatar className="size-7 ring-2 ring-card">
-            <AvatarFallback className="bg-muted text-[11px] font-semibold text-foreground">
-              {initials(transfer.fromName)}
-            </AvatarFallback>
-          </Avatar>
-          <Avatar className="size-7 ring-2 ring-card">
-            <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
-              {initials(transfer.toName)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-        <p className="min-w-0 truncate text-[15px] font-medium">{sentence}</p>
-      </div>
-      <p className="mt-2 font-display text-[26px] leading-none font-bold tracking-tight tabular-nums">
-        {formatMoney(transfer.amountCents, currency)}
-      </p>
-      <div className="mt-4 flex gap-2">
-        <Button
-          type="button"
-          className="flex-1 font-semibold"
-          onClick={onMarkPaid}
-          disabled={disabled}
-        >
-          <HugeiconsIcon
-            icon={CheckmarkCircle02Icon}
-            size={18}
-            strokeWidth={2}
-          />
-          {pending ? "Saving…" : markLabel}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon-lg"
-          className="bg-muted text-primary"
-          onClick={onRemind}
-          aria-label={
-            iPay
-              ? `Share payment to ${transfer.toName}`
-              : `Remind ${transfer.fromName}`
-          }
-        >
-          <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
-        </Button>
-      </div>
-    </li>
   )
 }
