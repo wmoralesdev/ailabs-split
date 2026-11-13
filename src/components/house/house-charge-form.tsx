@@ -26,7 +26,7 @@ import {
 import { isHouseCategory } from "@/lib/house-categories"
 import type { HouseCategory } from "@/lib/house-categories"
 import { defaultParticipants } from "@/lib/house-ledger"
-import { isMovedOutOn, localIsoDate } from "@/lib/house-month"
+import { formatMonth, isMovedOutOn, localIsoDate } from "@/lib/house-month"
 import {
   canAddCharge,
   canEditCharge,
@@ -36,7 +36,11 @@ import {
 import { roomKeys } from "@/lib/room-query"
 import type { SplitMode } from "@/lib/schemas"
 import { equalSplitCents, formatMoney, partsSplitCents } from "@/lib/settle"
-import { addHouseCharge, updateHouseCharge } from "@/server/houses"
+import {
+  addHouseCharge,
+  confirmDueCharge,
+  updateHouseCharge,
+} from "@/server/houses"
 import type { ExpenseDto, RoomDto } from "@/server/rooms"
 
 function monthFromPaidOn(paidOn: string): string {
@@ -46,9 +50,11 @@ function monthFromPaidOn(paidOn: string): string {
 export function HouseChargeForm({
   room,
   expense,
+  due,
 }: {
   room: RoomDto
   expense?: ExpenseDto | null
+  due?: { templateId: string; periodMonth: string } | null
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -57,6 +63,9 @@ export function HouseChargeForm({
   const houseMembers = room.house?.members ?? []
   const today = localIsoDate()
   const editing = expense ?? null
+  const dueTemplate = due
+    ? (room.house?.templates.find((row) => row.id === due.templateId) ?? null)
+    : null
   const isAuthor = Boolean(
     editing && actorId && editing.createdByMemberId === actorId
   )
@@ -67,29 +76,44 @@ export function HouseChargeForm({
       ? actorId
       : (houseMembers[0]?.id ?? "")
   const initialPaidOn = editing?.paidOn ?? today
-  const initialPeriod = editing?.periodMonth ?? monthFromPaidOn(initialPaidOn)
+  const initialPeriod =
+    editing?.periodMonth ?? due?.periodMonth ?? monthFromPaidOn(initialPaidOn)
   const initialCategory: HouseCategory =
     editing?.category && isHouseCategory(editing.category)
       ? editing.category
-      : "GROCERIES"
+      : dueTemplate?.category && isHouseCategory(dueTemplate.category)
+        ? dueTemplate.category
+        : "GROCERIES"
   const fractionDigits = currencyFractionDigits(room.currency)
+  const sourceSplit = editing ?? dueTemplate
 
-  const [title, setTitle] = useState(editing?.title ?? "")
+  const [title, setTitle] = useState(editing?.title ?? dueTemplate?.title ?? "")
   const [amountDigits, setAmountDigits] = useState(
-    editing ? centsToAtmDigits(editing.amountCents, fractionDigits) : ""
+    editing
+      ? centsToAtmDigits(editing.amountCents, fractionDigits)
+      : dueTemplate?.amountCents
+        ? centsToAtmDigits(dueTemplate.amountCents, fractionDigits)
+        : ""
   )
   const [category, setCategory] = useState<HouseCategory>(initialCategory)
-  const [paidById, setPaidById] = useState(editing?.paidById ?? defaultPaidBy)
+  const [paidById, setPaidById] = useState(
+    editing?.paidById ?? dueTemplate?.paidById ?? defaultPaidBy
+  )
   const [paidOn, setPaidOn] = useState(initialPaidOn)
   const [periodMonth, setPeriodMonth] = useState(initialPeriod)
-  const [periodTouched, setPeriodTouched] = useState(Boolean(editing))
+  const [periodTouched, setPeriodTouched] = useState(
+    Boolean(editing || dueTemplate)
+  )
   const [splitMode, setSplitMode] = useState<SplitMode>(
-    editing?.splitMode === "PARTS" || editing?.splitMode === "AMOUNT"
-      ? editing.splitMode
+    sourceSplit?.splitMode === "PARTS" || sourceSplit?.splitMode === "AMOUNT"
+      ? sourceSplit.splitMode
       : "EQUAL"
   )
   const [included, setIncluded] = useState<Set<string>>(() => {
     if (editing) return new Set(editing.shares.map((share) => share.memberId))
+    if (dueTemplate) {
+      return new Set(dueTemplate.shares.map((share) => share.memberId))
+    }
     return new Set(
       defaultParticipants(houseMembers, initialPeriod).map(
         (member) => member.id
@@ -97,12 +121,12 @@ export function HouseChargeForm({
     )
   })
   const [weights, setWeights] = useState<Record<string, number>>(() => {
-    if (editing?.splitMode === "PARTS") {
+    if (sourceSplit?.splitMode === "PARTS") {
+      const shares = editing?.shares ?? dueTemplate?.shares ?? []
       return Object.fromEntries(
         houseMembers.map((member) => [
           member.id,
-          editing.shares.find((share) => share.memberId === member.id)
-            ?.weight ?? 0,
+          shares.find((share) => share.memberId === member.id)?.weight ?? 0,
         ])
       )
     }
@@ -111,11 +135,14 @@ export function HouseChargeForm({
     )
   })
   const [amounts, setAmounts] = useState<Record<string, string>>(() => {
-    if (editing?.splitMode === "AMOUNT") {
+    if (sourceSplit?.splitMode === "AMOUNT") {
+      const shares = editing?.shares ?? dueTemplate?.shares ?? []
       return Object.fromEntries(
-        editing.shares.map((share) => [
+        shares.map((share) => [
           share.memberId,
-          centsToAtmDigits(share.amountCents, fractionDigits),
+          share.amountCents != null
+            ? centsToAtmDigits(share.amountCents, fractionDigits)
+            : "",
         ])
       )
     }
@@ -229,13 +256,27 @@ export function HouseChargeForm({
           data: { ...payload, expenseId: editing.id },
         })
       }
+      if (due) {
+        return confirmDueCharge({
+          data: {
+            ...payload,
+            templateId: due.templateId,
+          },
+        })
+      }
       return addHouseCharge({ data: payload })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: roomKeys.room(room.code),
       })
-      toast.success(editing ? "Charge saved" : "Charge added")
+      toast.success(
+        editing
+          ? "Charge saved"
+          : due
+            ? `${title.trim()} added for ${formatMonth(periodMonth)}`
+            : "Charge added"
+      )
       await navigate({ to: "/r/$code", params: { code: room.code } })
     },
     onError: (error) => {

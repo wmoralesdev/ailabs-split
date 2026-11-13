@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 
+import { DueThisMonth } from "@/components/house/due-this-month"
 import { HouseChargeSheet } from "@/components/house/house-charge-sheet"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { RoomExitControl } from "@/components/room-exit-control"
@@ -93,6 +94,8 @@ export function HouseHome({
           ) : null}
         </div>
 
+        <DueThisMonth room={room} />
+
         {months.length === 0 ? (
           <div className="mt-8">
             <p className="font-medium text-foreground">No charges yet</p>
@@ -176,6 +179,20 @@ export function HouseHome({
                 className="group-row-hit w-full"
               >
                 <span className="min-w-0 flex-1 font-medium">People</span>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  size={16}
+                  strokeWidth={2}
+                />
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/r/$code/recurring"
+                params={{ code: room.code }}
+                className="group-row-hit w-full"
+              >
+                <span className="min-w-0 flex-1 font-medium">Recurring</span>
                 <HugeiconsIcon
                   icon={ArrowRight01Icon}
                   size={16}

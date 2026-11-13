@@ -18,6 +18,7 @@ import { Route as RCodeIndexRouteImport } from './routes/r.$code/index'
 import { Route as RCodeCheckRouteImport } from './routes/r.$code/check'
 import { Route as RCodeNewRouteImport } from './routes/r.$code/new'
 import { Route as RCodePeopleRouteImport } from './routes/r.$code/people'
+import { Route as RCodeRecurringRouteImport } from './routes/r.$code/recurring'
 import { Route as RCodeSettleRouteImport } from './routes/r.$code/settle'
 import { Route as RCodeCheckIndexRouteImport } from './routes/r.$code/check.index'
 import { Route as RCodeCheckCheckIdRouteImport } from './routes/r.$code/check.$checkId'
@@ -67,6 +68,11 @@ const RCodePeopleRoute = RCodePeopleRouteImport.update({
   path: '/people',
   getParentRoute: () => RCodeRoute,
 } as any)
+const RCodeRecurringRoute = RCodeRecurringRouteImport.update({
+  id: '/recurring',
+  path: '/recurring',
+  getParentRoute: () => RCodeRoute,
+} as any)
 const RCodeSettleRoute = RCodeSettleRouteImport.update({
   id: '/settle',
   path: '/settle',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/people': typeof RCodePeopleRoute
+  '/r/$code/recurring': typeof RCodeRecurringRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code/': typeof RCodeIndexRoute
   '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/sign-in/sso-callback': typeof SignInSsoCallbackRoute
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/people': typeof RCodePeopleRoute
+  '/r/$code/recurring': typeof RCodeRecurringRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code': typeof RCodeIndexRoute
   '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/r/$code/check': typeof RCodeCheckRouteWithChildren
   '/r/$code/new': typeof RCodeNewRoute
   '/r/$code/people': typeof RCodePeopleRoute
+  '/r/$code/recurring': typeof RCodeRecurringRoute
   '/r/$code/settle': typeof RCodeSettleRoute
   '/r/$code/': typeof RCodeIndexRoute
   '/r/$code/check/$checkId': typeof RCodeCheckCheckIdRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/r/$code/check'
     | '/r/$code/new'
     | '/r/$code/people'
+    | '/r/$code/recurring'
     | '/r/$code/settle'
     | '/r/$code/'
     | '/r/$code/check/$checkId'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/sign-in/sso-callback'
     | '/r/$code/new'
     | '/r/$code/people'
+    | '/r/$code/recurring'
     | '/r/$code/settle'
     | '/r/$code'
     | '/r/$code/check/$checkId'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/r/$code/check'
     | '/r/$code/new'
     | '/r/$code/people'
+    | '/r/$code/recurring'
     | '/r/$code/settle'
     | '/r/$code/'
     | '/r/$code/check/$checkId'
@@ -240,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RCodePeopleRouteImport
       parentRoute: typeof RCodeRoute
     }
+    '/r/$code/recurring': {
+      id: '/r/$code/recurring'
+      path: '/recurring'
+      fullPath: '/r/$code/recurring'
+      preLoaderRoute: typeof RCodeRecurringRouteImport
+      parentRoute: typeof RCodeRoute
+    }
     '/r/$code/settle': {
       id: '/r/$code/settle'
       path: '/settle'
@@ -282,6 +301,7 @@ interface RCodeRouteChildren {
   RCodeCheckRoute: typeof RCodeCheckRouteWithChildren
   RCodeNewRoute: typeof RCodeNewRoute
   RCodePeopleRoute: typeof RCodePeopleRoute
+  RCodeRecurringRoute: typeof RCodeRecurringRoute
   RCodeSettleRoute: typeof RCodeSettleRoute
   RCodeIndexRoute: typeof RCodeIndexRoute
 }
@@ -290,6 +310,7 @@ const RCodeRouteChildren: RCodeRouteChildren = {
   RCodeCheckRoute: RCodeCheckRouteWithChildren,
   RCodeNewRoute: RCodeNewRoute,
   RCodePeopleRoute: RCodePeopleRoute,
+  RCodeRecurringRoute: RCodeRecurringRoute,
   RCodeSettleRoute: RCodeSettleRoute,
   RCodeIndexRoute: RCodeIndexRoute,
 }

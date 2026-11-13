@@ -11,24 +11,30 @@ import {
 import { buildExpenseShares } from "@/lib/expense-shares"
 import { memberHasHouseLedger } from "@/lib/house-ledger"
 import {
+  addMonths,
   formatMonth,
   isMovedOutOn,
   isoDateFromUtc,
   isoDateToUtc,
   localIsoDate,
   monthEnd,
+  monthKey,
   monthStart,
   stayOverlapsMonth,
 } from "@/lib/house-month"
 import { paymentProofBytesFromPayload } from "@/lib/payment-proof"
 import {
   canAddCharge,
+  canConfirmDue,
+  canCreateTemplate,
   canDeletePayment,
   canEditCharge,
+  canEditTemplate,
   canManagePeople,
   canRecordPayment,
   canSetMemberDates,
   canTransferHouse,
+  canUndoSkip,
   guestsCantAddChargesMessage,
   hasChargesMoveOutMessage,
   onlyAuthorOrOwnerCanEditMessage,
@@ -41,14 +47,19 @@ import { parseRoomKind } from "@/lib/room-kind"
 import {
   addHouseChargeSchema,
   addHousePeopleSchema,
+  archiveRecurringTemplateSchema,
   claimHouseGuestSchema,
   claimHousemateSchema,
+  confirmDueChargeSchema,
   createHouseSchema,
   deleteHouseChargeSchema,
   deleteHousePaymentSchema,
   joinHouseAsGuestSchema,
   joinHouseAsHousemateSchema,
   recordHousePaymentSchema,
+  saveRecurringTemplateSchema,
+  skipDueChargeSchema,
+  undoSkipDueSchema,
   removeHouseMemberSchema,
   renameHouseMemberSchema,
   setHouseMemberKindSchema,
@@ -102,7 +113,7 @@ async function loadHouseRow(code: string) {
       settlements: {
         select: { fromMemberId: true, toMemberId: true },
       },
-      templates: { include: { shares: { select: { memberId: true } } } },
+      templates: { include: { shares: true } },
     },
   })
   if (!room || parseRoomKind(room.kind) !== "HOUSEHOLD") {
@@ -791,5 +802,273 @@ export const deleteHousePayment = createServerFn({ method: "POST" })
       throw new Error("You can't undo this payment")
     }
     await prisma.settlement.delete({ where: { id: existing.id } })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+function isUniqueConstraint(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: string }).code === "P2002"
+  )
+}
+
+function assertPeriodAllowed(startMonth: string, periodMonth: string) {
+  const latest = addMonths(monthKey(), 1)
+  if (periodMonth < startMonth || periodMonth > latest) {
+    throw new Error(`That month isn't due yet`)
+  }
+}
+
+export const saveRecurringTemplate = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(saveRecurringTemplateSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("save-recurring-template")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    const existing = data.templateId
+      ? house.templates.find((row) => row.id === data.templateId)
+      : null
+    if (data.templateId && !existing) throw new Error("Template not found")
+    const isAuthor = Boolean(
+      actor && existing && existing.createdByMemberId === actor.id
+    )
+    if (!actor) {
+      throw new Error(guestsCantAddChargesMessage())
+    }
+    if (existing) {
+      if (!canEditTemplate(viewer.role, isAuthor)) {
+        throw new Error("Only the author or the owner can edit this")
+      }
+    } else if (!canCreateTemplate(viewer.role)) {
+      throw new Error(guestsCantAddChargesMessage())
+    }
+    assertChargeStay(house.members, data.paidById, data.splits, data.startMonth)
+    const amountCents = data.kind === "VARIABLE" ? null : data.amountCents
+    const shareData = data.splits.map((split) => ({
+      memberId: split.memberId,
+      weight: data.splitMode === "PARTS" ? (split.weight ?? 0) : null,
+      amountCents:
+        data.splitMode === "AMOUNT" ? (split.amountCents ?? 0) : null,
+    }))
+    if (existing) {
+      await prisma.$transaction(async (tx) => {
+        await tx.recurringShare.deleteMany({
+          where: { templateId: existing.id },
+        })
+        await tx.recurringTemplate.update({
+          where: { id: existing.id },
+          data: {
+            title: data.title,
+            category: data.category,
+            kind: data.kind,
+            amountCents,
+            dueDay: data.dueDay,
+            paidById: data.paidById,
+            splitMode: data.splitMode,
+            startMonth: data.startMonth,
+            shares: { create: shareData },
+          },
+        })
+      })
+    } else {
+      await prisma.recurringTemplate.create({
+        data: {
+          roomId: house.id,
+          title: data.title,
+          category: data.category,
+          kind: data.kind,
+          amountCents,
+          dueDay: data.dueDay,
+          paidById: data.paidById,
+          splitMode: data.splitMode,
+          startMonth: data.startMonth,
+          createdByMemberId: actor.id,
+          shares: { create: shareData },
+        },
+      })
+    }
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const archiveRecurringTemplate = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    parseOrThrow(archiveRecurringTemplateSchema, data)
+  )
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("archive-recurring-template")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    const existing = house.templates.find((row) => row.id === data.templateId)
+    if (!existing) throw new Error("Template not found")
+    const isAuthor = Boolean(actor && existing.createdByMemberId === actor.id)
+    if (!actor || !canEditTemplate(viewer.role, isAuthor)) {
+      throw new Error("Only the author or the owner can edit this")
+    }
+    await prisma.recurringTemplate.update({
+      where: { id: existing.id },
+      data: { archivedAt: new Date() },
+    })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const confirmDueCharge = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(confirmDueChargeSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("confirm-due-charge")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!actor || !canConfirmDue(viewer.role)) {
+      throw new Error(guestsCantAddChargesMessage())
+    }
+    const template = house.templates.find((row) => row.id === data.templateId)
+    if (!template || template.archivedAt) {
+      throw new Error("Template not found")
+    }
+    assertPeriodAllowed(template.startMonth, data.periodMonth)
+    const title = data.title?.trim() || template.title
+    const category = data.category ?? template.category
+    const paidById = data.paidById ?? template.paidById
+    const paidOn = data.paidOn ?? localIsoDate()
+    const splitMode = data.splitMode ?? template.splitMode
+    const amountCents =
+      data.amountCents ??
+      (template.kind === "VARIABLE" ? null : template.amountCents)
+    if (amountCents == null || amountCents <= 0) {
+      throw new Error("Enter a valid amount")
+    }
+    const splits =
+      data.splits ??
+      template.shares
+        .filter((share) => {
+          const member = house.members.find((row) => row.id === share.memberId)
+          if (!member) return false
+          const joinedOn = member.joinedOn
+            ? isoDateFromUtc(member.joinedOn)
+            : null
+          const leftOn = member.leftOn ? isoDateFromUtc(member.leftOn) : null
+          return stayOverlapsMonth({ joinedOn, leftOn }, data.periodMonth)
+        })
+        .map((share) => ({
+          memberId: share.memberId,
+          weight: share.weight ?? undefined,
+          amountCents: share.amountCents ?? undefined,
+        }))
+    if (splits.length === 0) {
+      throw new Error("Pick at least one person")
+    }
+    assertChargeStay(house.members, paidById, splits, data.periodMonth)
+    const built = buildExpenseShares({
+      paidById,
+      amountCents,
+      splitMode:
+        splitMode === "PARTS" || splitMode === "AMOUNT" ? splitMode : "EQUAL",
+      isPersonal: false,
+      splits,
+    })
+    const minSort = await prisma.expense.aggregate({
+      where: { roomId: house.id },
+      _min: { sortIndex: true },
+    })
+    const sortIndex =
+      minSort._min.sortIndex == null ? 0 : minSort._min.sortIndex - 1
+    try {
+      await prisma.$transaction(async (tx) => {
+        const expense = await tx.expense.create({
+          data: {
+            roomId: house.id,
+            title,
+            amountCents,
+            category,
+            currency: house.currency,
+            splitMode: built.splitMode,
+            isPersonal: false,
+            paidById,
+            sortIndex,
+            periodMonth: data.periodMonth,
+            paidOn: isoDateToUtc(paidOn),
+            createdByMemberId: actor.id,
+            shares: {
+              create: built.shares.map((share) => ({
+                memberId: share.memberId,
+                amountCents: share.amountCents,
+                weight: share.weight,
+              })),
+            },
+          },
+        })
+        await tx.recurringOccurrence.create({
+          data: {
+            templateId: template.id,
+            periodMonth: data.periodMonth,
+            status: "CONFIRMED",
+            expenseId: expense.id,
+            createdByMemberId: actor.id,
+          },
+        })
+      })
+    } catch (error) {
+      if (!isUniqueConstraint(error)) throw error
+    }
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const skipDueCharge = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(skipDueChargeSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("skip-due-charge")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!actor || !canConfirmDue(viewer.role)) {
+      throw new Error(guestsCantAddChargesMessage())
+    }
+    const template = house.templates.find((row) => row.id === data.templateId)
+    if (!template || template.archivedAt) {
+      throw new Error("Template not found")
+    }
+    assertPeriodAllowed(template.startMonth, data.periodMonth)
+    try {
+      await prisma.recurringOccurrence.create({
+        data: {
+          templateId: template.id,
+          periodMonth: data.periodMonth,
+          status: "SKIPPED",
+          createdByMemberId: actor.id,
+        },
+      })
+    } catch (error) {
+      if (!isUniqueConstraint(error)) throw error
+    }
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const undoSkipDue = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(undoSkipDueSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("undo-skip-due")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (!actor || !canUndoSkip(viewer.role)) {
+      throw new Error(guestsCantAddChargesMessage())
+    }
+    await prisma.recurringOccurrence.deleteMany({
+      where: {
+        templateId: data.templateId,
+        periodMonth: data.periodMonth,
+        status: "SKIPPED",
+        template: { roomId: house.id },
+      },
+    })
     return reloadHouse(house.code, data.viewerMemberId)
   })
