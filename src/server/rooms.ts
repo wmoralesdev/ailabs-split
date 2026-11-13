@@ -43,6 +43,13 @@ import {
   updateExpenseSchema,
 } from "@/lib/schemas"
 import type { CheckPayloadInput } from "@/lib/schemas"
+import {
+  buildHouseState,
+  mapRecurringOccurrence,
+  mapRecurringTemplate,
+} from "@/lib/house-actor"
+import { isoDateFromUtc } from "@/lib/house-month"
+import type { HouseStateDto } from "@/lib/house-types"
 import { computeFxAdjustmentBps } from "@/lib/settle"
 import type { FxCalibrationSample } from "@/lib/settle"
 
@@ -71,6 +78,9 @@ export type ExpenseDto = {
   paidById: string
   paidByName: string
   createdAt: string
+  periodMonth: string | null
+  paidOn: string | null
+  createdByMemberId: string | null
   shares: ExpenseShareDto[]
 }
 
@@ -84,6 +94,7 @@ export type SettlementDto = {
   currency: string
   createdAt: string
   hasProof: boolean
+  createdByMemberId: string | null
 }
 
 export type RecordedSettlementDto = SettlementDto & { code: string }
@@ -141,6 +152,7 @@ export type RoomDto = {
   expenses: ExpenseDto[]
   settlements: SettlementDto[]
   checks: CheckDto[]
+  house?: HouseStateDto
 }
 
 /** Parse with Zod but surface the first friendly message instead of a ZodError blob. */
@@ -279,6 +291,9 @@ function expenseToDto(
     paidById: string
     paidBy: { name: string }
     createdAt: Date
+    periodMonth?: string | null
+    paidOn?: Date | null
+    createdByMemberId?: string | null
     shares: Array<{
       memberId: string
       amountCents: number
@@ -305,6 +320,9 @@ function expenseToDto(
     paidById: expense.paidById,
     paidByName: expense.paidBy.name,
     createdAt: expense.createdAt.toISOString(),
+    periodMonth: expense.periodMonth ?? null,
+    paidOn: expense.paidOn ? isoDateFromUtc(expense.paidOn) : null,
+    createdByMemberId: expense.createdByMemberId ?? null,
     shares: redacted
       ? [
           {
@@ -362,6 +380,7 @@ function settlementToDto(settlement: {
   currency: string
   createdAt: Date
   proofMimeType?: string | null
+  createdByMemberId?: string | null
 }): SettlementDto {
   return {
     id: settlement.id,
@@ -373,6 +392,7 @@ function settlementToDto(settlement: {
     currency: settlement.currency,
     createdAt: settlement.createdAt.toISOString(),
     hasProof: Boolean(settlement.proofMimeType),
+    createdByMemberId: settlement.createdByMemberId ?? null,
   }
 }
 
@@ -401,6 +421,7 @@ async function loadRoomByCode(
           currency: true,
           createdAt: true,
           proofMimeType: true,
+          createdByMemberId: true,
           fromMember: { select: { name: true } },
           toMember: { select: { name: true } },
         },
@@ -408,6 +429,12 @@ async function loadRoomByCode(
       checks: {
         orderBy: { createdAt: "desc" },
         include: { paidBy: true },
+      },
+      templates: {
+        include: {
+          shares: true,
+          occurrences: true,
+        },
       },
     },
   })
@@ -420,12 +447,26 @@ async function loadRoomByCode(
     room.currencies.length > 0
       ? Array.from(new Set([room.currency, ...room.currencies]))
       : [room.currency]
+  const kind = parseRoomKind(room.kind)
+  const house =
+    kind === "HOUSEHOLD"
+      ? buildHouseState({
+          ownerUserId: room.ownerUserId,
+          members: room.members,
+          templates: room.templates.map(mapRecurringTemplate),
+          occurrences: room.templates.flatMap((template) =>
+            template.occurrences.map(mapRecurringOccurrence)
+          ),
+          authUserId: viewerUserId,
+          viewerMemberId,
+        })
+      : undefined
 
   return {
     id: room.id,
     code: room.code,
     name: room.name,
-    kind: parseRoomKind(room.kind),
+    kind,
     owned: access.owned,
     canEdit: access.canEdit,
     currency: room.currency,
@@ -445,6 +486,7 @@ async function loadRoomByCode(
     ),
     settlements: room.settlements.map(settlementToDto),
     checks: room.checks.map(checkToDto),
+    ...(house ? { house } : {}),
   }
 }
 
@@ -1173,9 +1215,22 @@ export const listMyRooms = createServerFn({ method: "GET" }).handler(
     const userId = await getAuthUserId()
     if (!userId) return []
     const rooms = await prisma.room.findMany({
-      where: { ownerUserId: userId },
+      where: {
+        AND: [
+          {
+            OR: [
+              { ownerUserId: userId },
+              {
+                kind: "HOUSEHOLD",
+                members: { some: { userId } },
+              },
+            ],
+          },
+          { hides: { none: { userId } } },
+        ],
+      },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 40,
       select: { code: true, name: true, kind: true, createdAt: true },
     })
     return rooms.map((room) => ({

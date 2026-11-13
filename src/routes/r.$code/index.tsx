@@ -39,6 +39,7 @@ import { toast } from "sonner"
 
 import { BankFxCalibrationSheet } from "@/components/bank-fx-calibration-sheet"
 import { DinnerHome } from "@/components/dinner/dinner-home"
+import { HouseHome } from "@/components/house/house-home"
 import { CategoryChips } from "@/components/category-chips"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -379,12 +380,7 @@ function RoomHomePage() {
         />
       )
     case "HOUSEHOLD":
-      return (
-        <main className="page-gutter mx-auto w-full max-w-content pt-6">
-          <h1 className="font-display text-3xl font-semibold">{room.name}</h1>
-          <p className="mt-1 text-[15px] text-muted-foreground">House</p>
-        </main>
-      )
+      return <HouseHome room={room} refetch={refetch} />
     case "TRIP":
       break
     default: {

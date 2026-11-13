@@ -14,7 +14,9 @@ import { RoomTabBar } from "@/components/room-tab-bar"
 import { ShareTripButton } from "@/components/share-trip-button"
 import { SyncStatus } from "@/components/sync-status"
 import { Skeleton } from "@/components/ui/skeleton"
+import { HouseRoomLayout } from "@/components/house/house-room-layout"
 import { WhoAreYouGate } from "@/components/who-are-you-gate"
+import { parseRoomKind } from "@/lib/room-kind"
 import {
   forgetMember,
   rememberMember,
@@ -29,6 +31,7 @@ import { claimMemberById, joinRoom } from "@/server/rooms"
 type RoomSearch = {
   as?: string
   created?: boolean
+  claim?: string
 }
 
 export const Route = createFileRoute("/r/$code")({
@@ -41,6 +44,10 @@ export const Route = createFileRoute("/r/$code")({
       search.created === "1" ||
       search.created === true ||
       search.created === "true",
+    claim:
+      typeof search.claim === "string" && search.claim.trim()
+        ? search.claim.trim()
+        : undefined,
   }),
   loader: async ({ params, context }) => {
     const room = await context.queryClient.ensureQueryData(
@@ -104,7 +111,7 @@ function RoomLoadingShell() {
 
 function RoomLayout() {
   const { code } = Route.useParams()
-  const { as: asName, created } = Route.useSearch()
+  const { as: asName, created, claim } = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [memberId, setMemberId] = useState<string | null>(null)
@@ -156,6 +163,7 @@ function RoomLayout() {
   useEffect(() => {
     if (!members) return
     setHydrated(true)
+    if (parseRoomKind(room.kind) === "HOUSEHOLD") return
     const memberIds = members.map((member) => member.id)
     const remembered = resolveRememberedMember(code, memberIds)
     if (remembered) {
@@ -272,6 +280,17 @@ function RoomLayout() {
         <RoomLoadingShell />
         {createdSheet}
       </>
+    )
+  }
+
+  if (parseRoomKind(room.kind) === "HOUSEHOLD") {
+    return (
+      <HouseRoomLayout
+        code={code}
+        claimMemberId={claim}
+        suggestedName={asName}
+        createdSheet={createdSheet}
+      />
     )
   }
 

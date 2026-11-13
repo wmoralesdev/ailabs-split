@@ -48,12 +48,23 @@ export function RoomTabBar({
       )
       break
     case "TRIP":
-    case "HOUSEHOLD":
       addControl = (
         <Link
           to="/r/$code/new"
           params={{ code }}
           aria-label="Add expense"
+          className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
+        >
+          <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
+        </Link>
+      )
+      break
+    case "HOUSEHOLD":
+      addControl = (
+        <Link
+          to="/r/$code/new"
+          params={{ code }}
+          aria-label="Add charge"
           className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
         >
           <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />

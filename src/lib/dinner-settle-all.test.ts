@@ -73,6 +73,9 @@ function expense(input: {
     paidById: input.paidById,
     paidByName: "Walter",
     createdAt: "2026-01-01T00:00:00.000Z",
+    periodMonth: null,
+    paidOn: null,
+    createdByMemberId: null,
     shares: input.shares.map((share) => ({
       memberId: share.memberId,
       memberName: share.memberId === "ana" ? "Ana" : "Walter",
@@ -296,6 +299,7 @@ describe("dinnerSettleLine + card", () => {
           currency: "USD",
           createdAt: "2026-01-02T00:00:00.000Z",
           hasProof: false,
+          createdByMemberId: null,
         },
       ],
     }
