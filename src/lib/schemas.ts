@@ -463,6 +463,17 @@ export const paymentProofSchema = z.object({
   mimeType: z.enum(PAYMENT_PROOF_MIME_TYPES),
 })
 
+export const recordHousePaymentSchema = houseActorSchema.extend({
+  fromMemberId: z.string().min(1, "Pick who paid"),
+  toMemberId: z.string().min(1, "Pick who received"),
+  amountCents: z.number().int().positive("Enter a valid amount"),
+  proof: paymentProofSchema.optional(),
+})
+
+export const deleteHousePaymentSchema = houseActorSchema.extend({
+  settlementId: z.string().min(1, "Missing payment"),
+})
+
 export const recordSettlementSchema = z.object({
   code: roomCodeSchema,
   fromMemberId: z.string().min(1, "Pick who paid"),
@@ -531,6 +542,8 @@ export type TransferHouseInput = z.input<typeof transferHouseSchema>
 export type AddHouseChargeInput = z.input<typeof addHouseChargeSchema>
 export type UpdateHouseChargeInput = z.input<typeof updateHouseChargeSchema>
 export type DeleteHouseChargeInput = z.input<typeof deleteHouseChargeSchema>
+export type RecordHousePaymentInput = z.input<typeof recordHousePaymentSchema>
+export type DeleteHousePaymentInput = z.input<typeof deleteHousePaymentSchema>
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
 export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>

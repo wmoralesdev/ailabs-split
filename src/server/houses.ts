@@ -20,10 +20,13 @@ import {
   monthStart,
   stayOverlapsMonth,
 } from "@/lib/house-month"
+import { paymentProofBytesFromPayload } from "@/lib/payment-proof"
 import {
   canAddCharge,
+  canDeletePayment,
   canEditCharge,
   canManagePeople,
+  canRecordPayment,
   canSetMemberDates,
   canTransferHouse,
   guestsCantAddChargesMessage,
@@ -42,8 +45,10 @@ import {
   claimHousemateSchema,
   createHouseSchema,
   deleteHouseChargeSchema,
+  deleteHousePaymentSchema,
   joinHouseAsGuestSchema,
   joinHouseAsHousemateSchema,
+  recordHousePaymentSchema,
   removeHouseMemberSchema,
   renameHouseMemberSchema,
   setHouseMemberKindSchema,
@@ -705,5 +710,86 @@ export const deleteHouseCharge = createServerFn({ method: "POST" })
       throw new Error(onlyAuthorOrOwnerCanEditMessage(author))
     }
     await prisma.expense.delete({ where: { id: existing.id } })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const recordHousePayment = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(recordHousePaymentSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("record-house-payment")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    if (
+      !actor ||
+      !canRecordPayment(
+        viewer.role,
+        actor.id,
+        data.fromMemberId,
+        data.toMemberId
+      )
+    ) {
+      throw new Error("You can only record a payment you're part of")
+    }
+    if (data.fromMemberId === data.toMemberId) {
+      throw new Error("Pick two different people")
+    }
+    const memberIds = new Set(house.members.map((member) => member.id))
+    if (!memberIds.has(data.fromMemberId) || !memberIds.has(data.toMemberId)) {
+      throw new Error("Person not found")
+    }
+    let proof:
+      { proofBytes: Uint8Array<ArrayBuffer>; proofMimeType: string } | undefined
+    if (data.proof) {
+      const stored = paymentProofBytesFromPayload(data.proof)
+      proof = {
+        proofBytes: new Uint8Array(stored.bytes),
+        proofMimeType: stored.mimeType,
+      }
+    }
+    await prisma.settlement.create({
+      data: {
+        roomId: house.id,
+        fromMemberId: data.fromMemberId,
+        toMemberId: data.toMemberId,
+        amountCents: data.amountCents,
+        currency: house.currency,
+        createdByMemberId: actor.id,
+        ...proof,
+      },
+    })
+    return reloadHouse(house.code, data.viewerMemberId)
+  })
+
+export const deleteHousePayment = createServerFn({ method: "POST" })
+  .validator((data: unknown) => parseOrThrow(deleteHousePaymentSchema, data))
+  .handler(async ({ data }): Promise<RoomDto> => {
+    limitWrites("delete-house-payment")
+    const { house, viewer, actor } = await resolveHouseContext(
+      data.code,
+      data.viewerMemberId
+    )
+    const existing = await prisma.settlement.findFirst({
+      where: { id: data.settlementId, roomId: house.id },
+      select: {
+        id: true,
+        createdByMemberId: true,
+        toMemberId: true,
+      },
+    })
+    if (!existing) throw new Error("Payment not found")
+    if (
+      !actor ||
+      !canDeletePayment(
+        viewer.role,
+        actor.id,
+        existing.createdByMemberId,
+        existing.toMemberId
+      )
+    ) {
+      throw new Error("You can't undo this payment")
+    }
+    await prisma.settlement.delete({ where: { id: existing.id } })
     return reloadHouse(house.code, data.viewerMemberId)
   })
