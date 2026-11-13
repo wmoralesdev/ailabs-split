@@ -17,9 +17,11 @@ import { cn } from "@/lib/utils"
 export function RoomTabBar({
   code,
   kind = "TRIP",
+  canAdd = true,
 }: {
   code: string
   kind?: RoomKind
+  canAdd?: boolean
 }) {
   const matchRoute = useMatchRoute()
   const onHome = !!matchRoute({ to: "/r/$code", params: { code } })
@@ -52,6 +54,7 @@ export function RoomTabBar({
         <Link
           to="/r/$code/new"
           params={{ code }}
+          search={{}}
           aria-label="Add expense"
           className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
         >
@@ -60,15 +63,18 @@ export function RoomTabBar({
       )
       break
     case "HOUSEHOLD":
-      addControl = (
+      addControl = canAdd ? (
         <Link
           to="/r/$code/new"
           params={{ code }}
+          search={{}}
           aria-label="Add charge"
           className="fill-fab -mt-4 inline-flex size-12 items-center justify-center rounded-full"
         >
           <HugeiconsIcon icon={Add01Icon} size={22} strokeWidth={2.2} />
         </Link>
+      ) : (
+        <span className="size-12" aria-hidden />
       )
       break
     default: {

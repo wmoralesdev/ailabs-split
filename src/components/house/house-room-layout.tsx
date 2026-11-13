@@ -16,6 +16,7 @@ import {
 import { markInstallEligible } from "@/lib/pwa-install"
 import { RoomIdentityContext } from "@/lib/room-identity"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
+import { canAddCharge } from "@/lib/house-permissions"
 import {
   claimHouseGuest,
   claimHousemate,
@@ -186,7 +187,13 @@ export function HouseRoomLayout({
             />
           </>
         }
-        footer={<RoomTabBar code={code} kind={room.kind} />}
+        footer={
+          <RoomTabBar
+            code={code}
+            kind={room.kind}
+            canAdd={canAddCharge(room.house?.viewer.role ?? "VISITOR")}
+          />
+        }
       >
         <Outlet />
       </RoomShell>

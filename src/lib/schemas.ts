@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { HOUSE_CATEGORIES } from "./house-categories"
 import {
   PAYMENT_PROOF_MAX_BASE64_CHARS,
   PAYMENT_PROOF_MIME_TYPES,
@@ -286,10 +287,79 @@ export const transferHouseSchema = houseActorSchema.extend({
   toMemberId: z.string().min(1, "Pick who takes the house"),
 })
 
+export const houseCategorySchema = z.enum(HOUSE_CATEGORIES)
+
+export const monthKeySchema = z.string().regex(/^\d{4}-\d{2}$/, "Pick a month")
+
 export const expenseSplitSchema = z.object({
   memberId: z.string().min(1),
   weight: z.number().int().min(0).optional(),
   amountCents: z.number().int().min(0).optional(),
+})
+
+const houseChargeWriteBaseSchema = houseActorSchema.extend({
+  title: z.string().trim().min(1, "What was it?").max(80, "Title is too long"),
+  amountCents: z.number().int().positive("Enter a valid amount"),
+  category: houseCategorySchema,
+  paidById: z.string().min(1, "Pick who paid"),
+  periodMonth: monthKeySchema,
+  paidOn: isoDateSchema,
+  splitMode: splitModeSchema.default("EQUAL"),
+  splits: z.array(expenseSplitSchema).min(1, "Pick at least one person"),
+})
+
+function validateHouseChargeWrite(
+  value: z.infer<typeof houseChargeWriteBaseSchema>,
+  ctx: z.RefinementCtx
+) {
+  if (value.splitMode === "AMOUNT") {
+    let sum = 0
+    for (const split of value.splits) {
+      if (typeof split.amountCents !== "number") {
+        ctx.addIssue({
+          code: "custom",
+          message: "Every person needs an amount",
+          path: ["splits"],
+        })
+        return
+      }
+      sum += split.amountCents
+    }
+    if (sum !== value.amountCents) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Custom amounts must sum to the total",
+        path: ["splits"],
+      })
+    }
+  }
+  if (value.splitMode === "PARTS") {
+    const totalWeight = value.splits.reduce(
+      (total, split) => total + (split.weight ?? 0),
+      0
+    )
+    if (totalWeight <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Give at least one person some parts",
+        path: ["splits"],
+      })
+    }
+  }
+}
+
+export const addHouseChargeSchema = houseChargeWriteBaseSchema.superRefine(
+  validateHouseChargeWrite
+)
+
+export const updateHouseChargeSchema = houseChargeWriteBaseSchema
+  .extend({
+    expenseId: z.string().min(1, "Missing charge"),
+  })
+  .superRefine(validateHouseChargeWrite)
+
+export const deleteHouseChargeSchema = houseActorSchema.extend({
+  expenseId: z.string().min(1, "Missing charge"),
 })
 
 const expenseWriteBaseSchema = z.object({
@@ -458,6 +528,9 @@ export type SetHouseMemberStayInput = z.input<typeof setHouseMemberStaySchema>
 export type SetHouseMemberKindInput = z.input<typeof setHouseMemberKindSchema>
 export type RemoveHouseMemberInput = z.input<typeof removeHouseMemberSchema>
 export type TransferHouseInput = z.input<typeof transferHouseSchema>
+export type AddHouseChargeInput = z.input<typeof addHouseChargeSchema>
+export type UpdateHouseChargeInput = z.input<typeof updateHouseChargeSchema>
+export type DeleteHouseChargeInput = z.input<typeof deleteHouseChargeSchema>
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
 export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>
