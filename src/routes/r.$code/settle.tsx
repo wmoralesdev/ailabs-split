@@ -23,6 +23,8 @@ import { PaymentProofSheet } from "@/components/payment-proof-sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { formatRelativeTime } from "@/lib/format-relative-time"
+import { parseRoomKind } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 import { copyText } from "@/lib/invite-link"
 import { useRoomIdentity } from "@/lib/room-identity"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
@@ -43,6 +45,21 @@ import { deleteSettlement, recordSettlement } from "@/server/rooms"
 import type { SettlementDto } from "@/server/rooms"
 
 const roomRoute = getRouteApi("/r/$code")
+
+function emptySettleHint(kind: RoomKind): string {
+  switch (kind) {
+    case "DINNER":
+      return "Confirm the bill to see who owes what."
+    case "HOUSEHOLD":
+      return "Add a charge to get started."
+    case "TRIP":
+      return "Add an expense to get started."
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
+  }
+}
 
 export const Route = createFileRoute("/r/$code/settle")({
   loader: async ({ params, context }) => {
@@ -295,7 +312,7 @@ function SettlePage() {
         </div>
       ) : null}
 
-      {room.kind !== "DINNER" && hasForeignExpenses ? (
+      {parseRoomKind(room.kind) === "TRIP" && hasForeignExpenses ? (
         <p className="mt-3 text-sm text-muted-foreground">
           {hasBankMatch ? (
             <>
@@ -338,9 +355,7 @@ function SettlePage() {
             </p>
             <p className="mt-0.5 text-[15px] text-muted-foreground">
               {room.expenses.length === 0
-                ? room.kind === "DINNER"
-                  ? "Confirm the bill to see who owes what."
-                  : "Add an expense to get started."
+                ? emptySettleHint(parseRoomKind(room.kind))
                 : "Everyone is square."}
             </p>
           </div>
@@ -392,7 +407,7 @@ function SettlePage() {
         </section>
       ) : null}
 
-      {room.kind !== "DINNER" ? (
+      {parseRoomKind(room.kind) === "TRIP" ? (
         <BankFxCalibrationSheet
           room={room}
           open={calibrationOpen}

@@ -5,6 +5,8 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { shareOrCopyInvite } from "@/lib/invite-link"
+import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 
 /** Header control: share the trip invite link (OS share sheet or clipboard). */
 export function ShareTripButton({
@@ -14,22 +16,22 @@ export function ShareTripButton({
 }: {
   code: string
   name: string
-  kind?: "TRIP" | "DINNER"
+  kind?: RoomKind
 }) {
   const [busy, setBusy] = useState(false)
+  const parsed = parseRoomKind(kind)
+  const noun = roomKindNoun(parsed)
 
   async function onShare() {
     if (busy) return
     setBusy(true)
     try {
-      const result = await shareOrCopyInvite({ code, name, kind })
+      const result = await shareOrCopyInvite({ code, name, kind: parsed })
       if (result === "copied") {
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error(
-        kind === "DINNER" ? "Could not share bill" : "Could not share trip"
-      )
+      toast.error(`Could not share ${noun}`)
     } finally {
       setBusy(false)
     }
@@ -42,7 +44,7 @@ export function ShareTripButton({
       size="icon-lg"
       onClick={() => void onShare()}
       disabled={busy}
-      aria-label={kind === "DINNER" ? "Share bill" : "Share trip"}
+      aria-label={`Share ${noun}`}
     >
       <HugeiconsIcon icon={Share01Icon} size={18} strokeWidth={2} />
     </Button>

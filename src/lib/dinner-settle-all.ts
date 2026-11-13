@@ -1,4 +1,5 @@
 import { dinnerBill } from "@/lib/dinner-bill"
+import { parseRoomKind } from "@/lib/room-kind"
 import {
   computeNetsWithSettlements,
   formatMoney,
@@ -96,7 +97,7 @@ export function candidateDinnerCodes(input: {
   const out: string[] = []
   const seen = new Set<string>()
   for (const row of [...input.recent, ...input.yours]) {
-    if (row.kind !== "DINNER") continue
+    if (parseRoomKind(row.kind ?? "") !== "DINNER") continue
     const code = normalizeCode(row.code)
     if (!code || seen.has(code) || hidden.has(code)) continue
     seen.add(code)
@@ -132,7 +133,7 @@ export function dinnerSettleLine(
   room: RoomDto,
   memberId: string
 ): DinnerSettleLine | null {
-  if (room.kind !== "DINNER") return null
+  if (parseRoomKind(room.kind) !== "DINNER") return null
   if (!room.members.some((member) => member.id === memberId)) return null
   const bill = dinnerBill(room.checks)
   if (!bill || bill.status !== "CONFIRMED") return null

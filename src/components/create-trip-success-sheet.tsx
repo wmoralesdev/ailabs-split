@@ -17,14 +17,60 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { copyText, shareOrCopyInvite } from "@/lib/invite-link"
+import { parseRoomKind } from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 
 type CreateTripSuccessSheetProps = {
   open: boolean
   code: string
   name: string
-  kind?: "TRIP" | "DINNER"
+  kind?: RoomKind
   onContinue: () => void
   onAddBill?: () => void
+}
+
+function successCopy(kind: RoomKind): {
+  title: string
+  description: string
+  copied: string
+  shareError: string
+  continueLabel: string
+  showAddBill: boolean
+} {
+  switch (kind) {
+    case "DINNER":
+      return {
+        title: "Bill ready",
+        description:
+          "Add the bill now. Send the code whenever, people join from the link.",
+        copied: "Bill code copied",
+        shareError: "Could not share bill",
+        continueLabel: "Continue to bill",
+        showAddBill: true,
+      }
+    case "HOUSEHOLD":
+      return {
+        title: "House ready",
+        description: "Send the code so everyone can join.",
+        copied: "House code copied",
+        shareError: "Could not share house",
+        continueLabel: "Continue to house",
+        showAddBill: false,
+      }
+    case "TRIP":
+      return {
+        title: "Trip ready",
+        description: "Send the code so everyone can join.",
+        copied: "Trip code copied",
+        shareError: "Could not share trip",
+        continueLabel: "Continue to trip",
+        showAddBill: false,
+      }
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
+  }
 }
 
 export function CreateTripSuccessSheet({
@@ -35,14 +81,15 @@ export function CreateTripSuccessSheet({
   onContinue,
   onAddBill,
 }: CreateTripSuccessSheetProps) {
-  const isDinner = kind === "DINNER"
+  const parsed = parseRoomKind(kind)
+  const copy = successCopy(parsed)
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
 
   async function onCopyCode() {
     await copyText(code)
     setCopied(true)
-    toast.success(isDinner ? "Bill code copied" : "Trip code copied")
+    toast.success(copy.copied)
     window.setTimeout(() => setCopied(false), 1500)
   }
 
@@ -50,12 +97,12 @@ export function CreateTripSuccessSheet({
     if (busy) return
     setBusy(true)
     try {
-      const result = await shareOrCopyInvite({ code, name, kind })
+      const result = await shareOrCopyInvite({ code, name, kind: parsed })
       if (result === "copied") {
         toast.success("Invite link copied")
       }
     } catch {
-      toast.error(isDinner ? "Could not share bill" : "Could not share trip")
+      toast.error(copy.shareError)
     } finally {
       setBusy(false)
     }
@@ -74,19 +121,17 @@ export function CreateTripSuccessSheet({
       >
         <SheetHeader className="gap-1 p-0 text-left">
           <SheetTitle className="font-display text-[22px] font-bold tracking-tight">
-            {isDinner ? "Bill ready" : "Trip ready"}
+            {copy.title}
           </SheetTitle>
           <SheetDescription className="text-[15px] leading-snug text-muted-foreground">
-            {isDinner
-              ? "Add the bill now. Send the code whenever, people join from the link."
-              : "Send the code so everyone can join."}
+            {copy.description}
           </SheetDescription>
         </SheetHeader>
 
         <button
           type="button"
           onClick={() => void onCopyCode()}
-          className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left outline-none transition-colors hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring"
+          className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3 text-left transition-colors outline-none hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={`Copy code ${code}`}
         >
           <span className="min-w-0">
@@ -105,7 +150,7 @@ export function CreateTripSuccessSheet({
         </button>
 
         <SheetFooter className="mt-4 flex-col gap-2 p-0 sm:flex-col">
-          {isDinner && onAddBill ? (
+          {copy.showAddBill && onAddBill ? (
             <Button type="button" className="cta-lg" onClick={onAddBill}>
               <HugeiconsIcon
                 icon={ReceiptDollarIcon}
@@ -117,9 +162,11 @@ export function CreateTripSuccessSheet({
           ) : null}
           <Button
             type="button"
-            variant={isDinner ? "secondary" : "default"}
+            variant={copy.showAddBill ? "secondary" : "default"}
             className={
-              isDinner ? "w-full bg-muted font-semibold text-primary" : "cta-lg"
+              copy.showAddBill
+                ? "w-full bg-muted font-semibold text-primary"
+                : "cta-lg"
             }
             onClick={() => void onShare()}
             disabled={busy}
@@ -133,7 +180,7 @@ export function CreateTripSuccessSheet({
             className="w-full"
             onClick={onContinue}
           >
-            {isDinner ? "Continue to bill" : "Continue to trip"}
+            {copy.continueLabel}
           </Button>
         </SheetFooter>
       </SheetContent>

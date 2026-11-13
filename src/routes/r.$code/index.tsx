@@ -70,6 +70,7 @@ import {
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { copyText } from "@/lib/invite-link"
 import { memberLink } from "@/lib/member-storage"
+import { parseRoomKind } from "@/lib/room-kind"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import { useRoomIdentity } from "@/lib/room-identity"
 import {
@@ -366,15 +367,30 @@ function RoomHomePage() {
     return isPending ? <RoomHomeSkeleton /> : null
   }
 
-  if (room.kind === "DINNER") {
-    return (
-      <DinnerHome
-        room={room}
-        memberId={memberId}
-        switchIdentity={switchIdentity}
-        refetch={refetch}
-      />
-    )
+  const kind = parseRoomKind(room.kind)
+  switch (kind) {
+    case "DINNER":
+      return (
+        <DinnerHome
+          room={room}
+          memberId={memberId}
+          switchIdentity={switchIdentity}
+          refetch={refetch}
+        />
+      )
+    case "HOUSEHOLD":
+      return (
+        <main className="page-gutter mx-auto w-full max-w-content pt-6">
+          <h1 className="font-display text-3xl font-semibold">{room.name}</h1>
+          <p className="mt-1 text-[15px] text-muted-foreground">House</p>
+        </main>
+      )
+    case "TRIP":
+      break
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
   }
 
   const selectedExpense =

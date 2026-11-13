@@ -26,6 +26,7 @@ describe("dinnerCanEdit", () => {
   it("keeps unsigned dinners and trips editable", () => {
     expect(dinnerCanEdit({ kind: "DINNER" })).toBe(true)
     expect(dinnerCanEdit({ kind: "TRIP", canEdit: false })).toBe(true)
+    expect(dinnerCanEdit({ kind: "HOUSEHOLD", canEdit: false })).toBe(true)
   })
 })
 
@@ -45,6 +46,9 @@ describe("assertHostDinnerEdit", () => {
     ).not.toThrow()
     expect(() =>
       assertHostDinnerEdit({ kind: "TRIP", ownerUserId: "host" }, "guest")
+    ).not.toThrow()
+    expect(() =>
+      assertHostDinnerEdit({ kind: "HOUSEHOLD", ownerUserId: "host" }, "guest")
     ).not.toThrow()
   })
 })

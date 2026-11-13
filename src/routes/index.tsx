@@ -45,7 +45,8 @@ import {
   rememberKind,
   rememberName,
 } from "@/lib/landing-prefs"
-import type { RoomKind } from "@/lib/landing-prefs"
+import type { LandingKind } from "@/lib/landing-prefs"
+import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
 import { rememberMember } from "@/lib/member-storage"
 import { isStandaloneDisplay, markInstallEligible } from "@/lib/pwa-install"
 import {
@@ -136,7 +137,7 @@ function LandingPage() {
   const [listsRevision, setListsRevision] = useState(0)
   const { stay, tab, code: joinCode } = Route.useSearch()
   const defaultTab = tab === "join" ? "join" : "create"
-  const [kind, setKind] = useState<RoomKind>("TRIP")
+  const [kind, setKind] = useState<LandingKind>("TRIP")
   useEffect(() => {
     const last = getLastKind()
     if (last) setKind(last)
@@ -186,7 +187,7 @@ function LandingPage() {
     )
   }
 
-  function pickKind(next: RoomKind) {
+  function pickKind(next: LandingKind) {
     setKind(next)
     rememberKind(next)
   }
@@ -776,7 +777,7 @@ function JoinForm({
       <div className="flex flex-col gap-5">
         <div className="surface p-4">
           <p className="eyebrow">
-            Joining {room.kind === "DINNER" ? "bill" : "trip"}
+            Joining {roomKindNoun(parseRoomKind(room.kind))}
           </p>
           <p className="mt-0.5 font-display text-xl font-semibold tracking-tight text-foreground">
             {room.name}
@@ -839,8 +840,7 @@ function JoinForm({
                 />
               </FormControl>
               <FormDescription>
-                From whoever started the trip or bill. You pick your name
-                next.
+                From whoever started the trip or bill. You pick your name next.
               </FormDescription>
               <FormMessage />
             </FormItem>

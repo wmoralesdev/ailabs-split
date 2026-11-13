@@ -5,6 +5,7 @@ import type { ZodType } from "zod"
 import { getAuthUserId } from "@/server/auth-user.server"
 import { assertHostDinnerEdit } from "@/lib/dinner-bill"
 import { emptyCheckPayload, unassignMemberFromItems } from "@/lib/dinner-split"
+import { buildExpenseShares } from "@/lib/expense-shares"
 import {
   encodePaymentProof,
   paymentProofBytesFromPayload,
@@ -12,6 +13,12 @@ import {
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
 import { generateRoomCode } from "@/lib/room-code"
+import {
+  HOUSE_SCREENS_MESSAGE,
+  assertNotHousehold,
+  parseRoomKind,
+} from "@/lib/room-kind"
+import type { RoomKind } from "@/lib/room-kind"
 import {
   addExpenseSchema,
   addRoomMembersSchema,
@@ -36,11 +43,7 @@ import {
   updateExpenseSchema,
 } from "@/lib/schemas"
 import type { CheckPayloadInput } from "@/lib/schemas"
-import {
-  computeFxAdjustmentBps,
-  equalSplitCents,
-  partsSplitCents,
-} from "@/lib/settle"
+import { computeFxAdjustmentBps } from "@/lib/settle"
 import type { FxCalibrationSample } from "@/lib/settle"
 
 export type RoomMemberDto = {
@@ -107,7 +110,7 @@ export type CheckDto = {
 export type OwnedRoomDto = {
   code: string
   name: string
-  kind: "TRIP" | "DINNER"
+  kind: RoomKind
   createdAt: string
 }
 
@@ -115,7 +118,7 @@ export type RoomDto = {
   id: string
   code: string
   name: string
-  kind: "TRIP" | "DINNER"
+  kind: RoomKind
   /** True when the signed-in viewer created this room. */
   owned: boolean
   /**
@@ -194,8 +197,57 @@ function viewerAccess(
   const owned = Boolean(
     room.ownerUserId && viewerUserId && room.ownerUserId === viewerUserId
   )
-  const canEdit = room.kind !== "DINNER" || !room.ownerUserId || owned
-  return { owned, canEdit }
+  const kind = parseRoomKind(room.kind)
+  switch (kind) {
+    case "DINNER":
+      return { owned, canEdit: !room.ownerUserId || owned }
+    case "TRIP":
+    case "HOUSEHOLD":
+      return { owned, canEdit: true }
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
+  }
+}
+
+function refuseHouseholdThenDinner(kind: string, dinnerMessage: string): void {
+  const parsed = parseRoomKind(kind)
+  switch (parsed) {
+    case "HOUSEHOLD":
+      throw new Error(HOUSE_SCREENS_MESSAGE)
+    case "DINNER":
+      throw new Error(dinnerMessage)
+    case "TRIP":
+      return
+    default: {
+      const _never: never = parsed
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
+  }
+}
+
+async function assertCanRenameRoom(
+  room: { kind: string; ownerUserId: string | null },
+  userId: string | null
+): Promise<void> {
+  const kind = parseRoomKind(room.kind)
+  switch (kind) {
+    case "DINNER":
+      assertHostDinnerEdit(room, userId)
+      return
+    case "HOUSEHOLD":
+      if (!room.ownerUserId || userId !== room.ownerUserId) {
+        throw new Error("Only the person who started this can edit it")
+      }
+      return
+    case "TRIP":
+      return
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
+  }
 }
 
 function clientIp(): string {
@@ -324,81 +376,6 @@ function settlementToDto(settlement: {
   }
 }
 
-function buildExpenseShares(data: {
-  paidById: string
-  amountCents: number
-  splitMode: "EQUAL" | "PARTS" | "AMOUNT"
-  isPersonal: boolean
-  splits: Array<{ memberId: string; weight?: number; amountCents?: number }>
-}): {
-  splitMode: "EQUAL" | "PARTS" | "AMOUNT"
-  shares: Array<{
-    memberId: string
-    amountCents: number
-    weight: number | null
-  }>
-} {
-  const isPersonal = data.isPersonal
-  const splitMode = isPersonal ? "EQUAL" : data.splitMode
-
-  if (isPersonal) {
-    return {
-      splitMode,
-      shares: [
-        {
-          memberId: data.paidById,
-          amountCents: data.amountCents,
-          weight: null,
-        },
-      ],
-    }
-  }
-
-  if (splitMode === "PARTS") {
-    const parts = partsSplitCents(
-      data.amountCents,
-      data.splits.map((split) => ({
-        memberId: split.memberId,
-        weight: split.weight ?? 0,
-      }))
-    )
-    return {
-      splitMode,
-      shares: parts.map((part) => ({
-        memberId: part.memberId,
-        amountCents: part.amountCents,
-        weight: part.weight,
-      })),
-    }
-  }
-
-  if (splitMode === "AMOUNT") {
-    const sum = data.splits.reduce(
-      (total, split) => total + (split.amountCents ?? 0),
-      0
-    )
-    if (sum !== data.amountCents) {
-      throw new Error("Custom amounts must sum to the expense total")
-    }
-    return {
-      splitMode,
-      shares: data.splits.map((split) => ({
-        memberId: split.memberId,
-        amountCents: split.amountCents ?? 0,
-        weight: null,
-      })),
-    }
-  }
-
-  return {
-    splitMode,
-    shares: equalSplitCents(
-      data.amountCents,
-      data.splits.map((split) => split.memberId)
-    ).map((share) => ({ ...share, weight: null })),
-  }
-}
-
 async function loadRoomByCode(
   code: string,
   viewerMemberId?: string | null
@@ -448,7 +425,7 @@ async function loadRoomByCode(
     id: room.id,
     code: room.code,
     name: room.name,
-    kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+    kind: parseRoomKind(room.kind),
     owned: access.owned,
     canEdit: access.canEdit,
     currency: room.currency,
@@ -475,12 +452,25 @@ export const createRoom = createServerFn({ method: "POST" })
   .validator((data: unknown) => parseOrThrow(createRoomSchema, data))
   .handler(async ({ data }): Promise<RoomDto> => {
     limitWrites("create-room")
-    const kind = data.kind === "DINNER" ? "DINNER" : "TRIP"
-    const currencies =
-      kind === "DINNER"
-        ? [data.currency]
-        : Array.from(new Set([data.currency, ...data.currencies]))
-    const fxRates = kind === "DINNER" ? {} : (data.fxRates ?? {})
+    const kind = parseRoomKind(data.kind)
+    let currencies: string[]
+    let fxRates: Record<string, number>
+    switch (kind) {
+      case "HOUSEHOLD":
+        throw new Error(HOUSE_SCREENS_MESSAGE)
+      case "DINNER":
+        currencies = [data.currency]
+        fxRates = {}
+        break
+      case "TRIP":
+        currencies = Array.from(new Set([data.currency, ...data.currencies]))
+        fxRates = data.fxRates ?? {}
+        break
+      default: {
+        const _never: never = kind
+        throw new Error(`Unknown room kind: ${String(_never)}`)
+      }
+    }
     const ownerUserId = await getAuthUserId()
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -531,6 +521,7 @@ export const joinRoom = createServerFn({ method: "POST" })
     if (!existing) {
       throw new Error("Trip not found")
     }
+    assertNotHousehold(existing.kind)
 
     const match = existing.members.find(
       (member) => member.name.toLowerCase() === data.memberName.toLowerCase()
@@ -569,6 +560,7 @@ export const addRoomMembers = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Room not found")
+    assertNotHousehold(room.kind)
     assertHostDinnerEdit(room, await getAuthUserId())
 
     const existing = new Set(
@@ -602,6 +594,7 @@ export const renameRoomMember = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Room not found")
+    assertNotHousehold(room.kind)
     assertHostDinnerEdit(room, await getAuthUserId())
     const member = room.members.find((entry) => entry.id === data.memberId)
     if (!member) throw new Error("Person not found")
@@ -640,6 +633,7 @@ export const removeRoomMember = createServerFn({ method: "POST" })
       },
     })
     if (!room) throw new Error("Room not found")
+    assertNotHousehold(room.kind)
     assertHostDinnerEdit(room, await getAuthUserId())
     if (room.members.length <= 1) {
       throw new Error("Keep at least one person")
@@ -703,12 +697,12 @@ export const renameRoom = createServerFn({ method: "POST" })
       select: { id: true, kind: true, ownerUserId: true },
     })
     if (!room) throw new Error("Room not found")
-    assertHostDinnerEdit(room, await getAuthUserId())
+    await assertCanRenameRoom(room, await getAuthUserId())
     await prisma.room.update({
       where: { code: data.code },
       data: { name: data.name },
     })
-    if (room.kind === "DINNER") {
+    if (parseRoomKind(room.kind) === "DINNER") {
       await prisma.check.updateMany({
         where: { roomId: room.id },
         data: { merchant: data.name },
@@ -727,6 +721,7 @@ export const claimMemberById = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
+    assertNotHousehold(room.kind)
     const member = room.members.find((entry) => entry.id === data.memberId)
     if (!member) throw new Error("Member not found in this trip")
     return { memberId: member.id, name: member.name }
@@ -741,9 +736,7 @@ export const addExpense = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Charges are added from the bill")
-    }
+    refuseHouseholdThenDinner(room.kind, "Charges are added from the bill")
 
     const memberIds = new Set(room.members.map((member) => member.id))
     if (!memberIds.has(data.paidById)) {
@@ -811,9 +804,7 @@ export const updateExpense = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Charges are edited from the bill")
-    }
+    refuseHouseholdThenDinner(room.kind, "Charges are edited from the bill")
 
     const existing = await prisma.expense.findFirst({
       where: { id: data.expenseId, roomId: room.id },
@@ -882,9 +873,7 @@ export const deleteExpense = createServerFn({ method: "POST" })
       select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Charges are deleted from the bill")
-    }
+    refuseHouseholdThenDinner(room.kind, "Charges are deleted from the bill")
 
     const existing = await prisma.expense.findFirst({
       where: { id: data.expenseId, roomId: room.id },
@@ -906,9 +895,7 @@ export const reorderExpenses = createServerFn({ method: "POST" })
       select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
-    if (room.kind === "DINNER") {
-      throw new Error("Bills do not reorder trip expenses")
-    }
+    refuseHouseholdThenDinner(room.kind, "Bills do not reorder trip expenses")
 
     const roomExpenses = await prisma.expense.findMany({
       where: { roomId: room.id },
@@ -956,6 +943,7 @@ export const recordSettlement = createServerFn({ method: "POST" })
       include: { members: true },
     })
     if (!room) throw new Error("Trip not found")
+    assertNotHousehold(room.kind)
     if (data.fromMemberId === data.toMemberId) {
       throw new Error("Settlement needs two different members")
     }
@@ -1027,6 +1015,7 @@ export const recordSettlements = createServerFn({ method: "POST" })
           include: { members: true },
         })
         if (!room) throw new Error("Trip not found")
+        assertNotHousehold(room.kind)
         const memberIds = new Set(room.members.map((member) => member.id))
         if (
           !memberIds.has(item.fromMemberId) ||
@@ -1103,9 +1092,10 @@ export const deleteSettlement = createServerFn({ method: "POST" })
     limitWrites("delete-settlement")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
-      select: { id: true },
+      select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
+    assertNotHousehold(room.kind)
 
     const existing = await prisma.settlement.findFirst({
       where: { id: data.settlementId, roomId: room.id },
@@ -1128,9 +1118,10 @@ export const deleteSettlements = createServerFn({ method: "POST" })
         for (const item of data.items) {
           const room = await tx.room.findUnique({
             where: { code: item.code },
-            select: { id: true },
+            select: { id: true, kind: true },
           })
           if (!room) throw new Error("Trip not found")
+          assertNotHousehold(room.kind)
           const existing = await tx.settlement.findFirst({
             where: { id: item.settlementId, roomId: room.id },
             select: { id: true },
@@ -1149,9 +1140,10 @@ export const calibrateRoomFx = createServerFn({ method: "POST" })
     limitWrites("calibrate-room-fx")
     const room = await prisma.room.findUnique({
       where: { code: data.code },
-      select: { id: true },
+      select: { id: true, kind: true },
     })
     if (!room) throw new Error("Trip not found")
+    assertNotHousehold(room.kind)
 
     const samples: FxCalibrationSample[] = data.samples.map((sample) => {
       const next: FxCalibrationSample = {
@@ -1189,7 +1181,7 @@ export const listMyRooms = createServerFn({ method: "GET" }).handler(
     return rooms.map((room) => ({
       code: room.code,
       name: room.name,
-      kind: room.kind === "DINNER" ? "DINNER" : "TRIP",
+      kind: parseRoomKind(room.kind),
       createdAt: room.createdAt.toISOString(),
     }))
   }
@@ -1246,6 +1238,7 @@ export const deleteRoom = createServerFn({ method: "POST" })
       await tx.check.deleteMany({ where: { roomId: room.id } })
       await tx.expense.deleteMany({ where: { roomId: room.id } })
       await tx.settlement.deleteMany({ where: { roomId: room.id } })
+      await tx.recurringTemplate.deleteMany({ where: { roomId: room.id } })
       await tx.member.deleteMany({ where: { roomId: room.id } })
       await tx.room.delete({ where: { id: room.id } })
     })

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { forgetRoomCache, readRoomCache, writeRoomCache } from "@/lib/room-cache"
+import {
+  forgetRoomCache,
+  readRoomCache,
+  writeRoomCache,
+} from "@/lib/room-cache"
 import type { RoomDto } from "@/server/rooms"
 
 function stubLocalStorage() {
@@ -75,5 +79,12 @@ describe("room-cache", () => {
     const store = stubLocalStorage()
     store.set("split:room-cache:ABC123:m1", "{not-json")
     expect(readRoomCache("ABC123", "m1")).toBeUndefined()
+  })
+
+  it("does not coerce a cached house to a trip", () => {
+    stubLocalStorage()
+    const house: RoomDto = { ...sampleRoom, kind: "HOUSEHOLD", name: "Casa" }
+    writeRoomCache("abc123", "m1", house)
+    expect(readRoomCache("ABC123", "m1")?.kind).toBe("HOUSEHOLD")
   })
 })

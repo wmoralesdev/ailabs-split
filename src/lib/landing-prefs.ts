@@ -1,4 +1,7 @@
-export type RoomKind = "TRIP" | "DINNER"
+import type { RoomKind } from "@/lib/room-kind"
+
+export type { RoomKind }
+export type LandingKind = Extract<RoomKind, "TRIP" | "DINNER">
 
 const KIND_KEY = "split:last-kind"
 const NAME_KEY = "split:last-name"
@@ -22,12 +25,12 @@ function write(key: string, value: string) {
   }
 }
 
-export function getLastKind(): RoomKind | null {
+export function getLastKind(): LandingKind | null {
   const raw = read(KIND_KEY)
   return raw === "TRIP" || raw === "DINNER" ? raw : null
 }
 
-export function rememberKind(kind: RoomKind) {
+export function rememberKind(kind: LandingKind) {
   write(KIND_KEY, kind)
 }
 

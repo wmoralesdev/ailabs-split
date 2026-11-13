@@ -3,6 +3,7 @@ import { getRequestHeader } from "@tanstack/react-start/server"
 import type { ZodType } from "zod"
 
 import { assertHostDinnerEdit } from "@/lib/dinner-bill"
+import { HOUSE_SCREENS_MESSAGE, parseRoomKind } from "@/lib/room-kind"
 import { computeDinnerSplit, expenseSharesFromDinner } from "@/lib/dinner-split"
 import { prisma } from "@/lib/prisma"
 import { assertRateLimit } from "@/lib/rate-limit"
@@ -48,8 +49,18 @@ async function requireDinnerRoom(code: string) {
     include: { members: true },
   })
   if (!room) throw new Error("Room not found")
-  if (room.kind !== "DINNER") {
-    throw new Error("This is only for bills")
+  const kind = parseRoomKind(room.kind)
+  switch (kind) {
+    case "DINNER":
+      break
+    case "HOUSEHOLD":
+      throw new Error(HOUSE_SCREENS_MESSAGE)
+    case "TRIP":
+      throw new Error("This is only for bills")
+    default: {
+      const _never: never = kind
+      throw new Error(`Unknown room kind: ${String(_never)}`)
+    }
   }
   assertHostDinnerEdit(room, await getAuthUserId())
   return room
