@@ -29,7 +29,9 @@ type OptimisticContext = {
 }
 
 function memberName(room: RoomDto, memberId: string): string {
-  return room.members.find((member) => member.id === memberId)?.name ?? "Unknown"
+  return (
+    room.members.find((member) => member.id === memberId)?.name ?? "Unknown"
+  )
 }
 
 function buildOptimisticShares(
@@ -99,6 +101,9 @@ export function buildOptimisticExpense(
     paidById: vars.paidById,
     paidByName: memberName(room, vars.paidById),
     createdAt: new Date().toISOString(),
+    periodMonth: null,
+    paidOn: null,
+    createdByMemberId: null,
     shares: buildOptimisticShares(room, vars),
   }
 }
@@ -190,7 +195,9 @@ export function registerAddExpenseMutationDefaults(
           ...current,
           expenses: [
             optimistic,
-            ...current.expenses.filter((expense) => expense.id !== vars.clientId),
+            ...current.expenses.filter(
+              (expense) => expense.id !== vars.clientId
+            ),
           ],
         })
       )
@@ -208,7 +215,9 @@ export function registerAddExpenseMutationDefaults(
           ),
         ],
       }))
-      await queryClient.invalidateQueries({ queryKey: roomKeys.room(vars.code) })
+      await queryClient.invalidateQueries({
+        queryKey: roomKeys.room(vars.code),
+      })
     },
     onError: (_error, vars, onMutateResult) => {
       const previousByKey = onMutateResult?.previousByKey

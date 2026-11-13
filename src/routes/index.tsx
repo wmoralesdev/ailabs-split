@@ -7,10 +7,18 @@ import { toast } from "sonner"
 import { z } from "zod"
 import { HugeiconsIcon } from "@hugeicons/react"
 import type { IconSvgElement } from "@hugeicons/react"
-import { Airplane01Icon, Restaurant01Icon } from "@hugeicons/core-free-icons"
+import {
+  Airplane01Icon,
+  Home01Icon,
+  Restaurant01Icon,
+} from "@hugeicons/core-free-icons"
 
 import { AuthControls } from "@/components/auth-controls"
 import { CreateDinnerForm } from "@/components/dinner/create-dinner-form"
+import {
+  CreateHouseForm,
+  SignInToStartHouse,
+} from "@/components/house/create-house-form"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { NameListInput } from "@/components/name-list-input"
 import { RecentTripsList } from "@/components/recent-trips-list"
@@ -48,6 +56,7 @@ import {
 import type { LandingKind } from "@/lib/landing-prefs"
 import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
 import { rememberMember } from "@/lib/member-storage"
+import { useSignedInUserId } from "@/lib/use-auth-user"
 import { isStandaloneDisplay, markInstallEligible } from "@/lib/pwa-install"
 import {
   resolveMostRecentTripCode,
@@ -71,6 +80,7 @@ type LandingSearch = {
   stay?: boolean
   tab?: "create" | "join"
   code?: string
+  kind?: "house"
 }
 
 export const Route = createFileRoute("/")({
@@ -96,6 +106,8 @@ export const Route = createFileRoute("/")({
       typeof search.tab === "string" ? search.tab.toLowerCase() : ""
     const codeRaw =
       typeof search.code === "string" ? search.code.trim().toUpperCase() : ""
+    const kindRaw =
+      typeof search.kind === "string" ? search.kind.toLowerCase() : ""
     return {
       stay:
         search.stay === "1" || search.stay === true || search.stay === "true",
@@ -106,6 +118,7 @@ export const Route = createFileRoute("/")({
             ? "create"
             : undefined,
       code: codeRaw || undefined,
+      kind: kindRaw === "house" ? "house" : undefined,
     }
   },
   component: LandingPage,
@@ -135,13 +148,19 @@ function LandingPage() {
   const navigate = useNavigate()
   const { yours, hiddenCodes, displayName } = Route.useLoaderData()
   const [listsRevision, setListsRevision] = useState(0)
-  const { stay, tab, code: joinCode } = Route.useSearch()
+  const { stay, tab, code: joinCode, kind: kindSearch } = Route.useSearch()
+  const userId = useSignedInUserId()
   const defaultTab = tab === "join" ? "join" : "create"
   const [kind, setKind] = useState<LandingKind>("TRIP")
   useEffect(() => {
+    if (kindSearch === "house") {
+      setKind("HOUSEHOLD")
+      rememberKind("HOUSEHOLD")
+      return
+    }
     const last = getLastKind()
     if (last) setKind(last)
-  }, [])
+  }, [kindSearch])
   const [resuming, setResuming] = useState(() => {
     if (typeof window === "undefined") return false
     if (stay || tab === "join" || joinCode) return false
@@ -210,9 +229,7 @@ function LandingPage() {
           Split
         </h1>
         <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
-          {kind === "DINNER"
-            ? "Scan the ticket, tap who had what. Everyone sees what they owe."
-            : "One code for the whole trip. Settle up at the end."}
+          {landingTagline(kind)}
         </p>
       </div>
 
@@ -233,30 +250,37 @@ function LandingPage() {
           className="tab-panel mt-4 flex flex-col text-base"
         >
           <div
-            className="mb-5 grid grid-cols-2 gap-2.5"
+            className="mb-5 grid grid-cols-3 gap-2"
             role="group"
             aria-label="Mode"
           >
             <ModeButton
               label="Bill"
-              detail="One bill, tonight"
+              detail="Tonight"
               icon={Restaurant01Icon}
               active={kind === "DINNER"}
               onClick={() => pickKind("DINNER")}
             />
             <ModeButton
               label="Trip"
-              detail="Many costs, days"
+              detail="Days"
               icon={Airplane01Icon}
               active={kind === "TRIP"}
               onClick={() => pickKind("TRIP")}
             />
+            <ModeButton
+              label="House"
+              detail="Months"
+              icon={Home01Icon}
+              active={kind === "HOUSEHOLD"}
+              onClick={() => pickKind("HOUSEHOLD")}
+            />
           </div>
-          {kind === "DINNER" ? (
-            <CreateDinnerForm navigate={navigate} displayName={displayName} />
-          ) : (
-            <CreateForm navigate={navigate} displayName={displayName} />
-          )}
+          {landingCreateForm(kind, {
+            navigate,
+            displayName,
+            signedIn: Boolean(userId),
+          })}
         </TabsContent>
         <TabsContent value="join" className="tab-panel mt-6 text-base">
           <JoinForm navigate={navigate} initialCode={joinCode} />
@@ -282,6 +306,67 @@ function LandingPage() {
   )
 }
 
+function landingTagline(kind: LandingKind): string {
+  switch (kind) {
+    case "DINNER":
+      return "Scan the ticket, tap who had what. Everyone sees what they owe."
+    case "TRIP":
+      return "One code for the whole trip. Settle up at the end."
+    case "HOUSEHOLD":
+      return "Rent, groceries, and the rest. A running balance."
+    default: {
+      const _never: never = kind
+      return _never
+    }
+  }
+}
+
+function landingCreateForm(
+  kind: LandingKind,
+  input: {
+    navigate: ReturnType<typeof useNavigate>
+    displayName: string
+    signedIn: boolean
+  }
+) {
+  switch (kind) {
+    case "DINNER":
+      return (
+        <CreateDinnerForm
+          navigate={input.navigate}
+          displayName={input.displayName}
+        />
+      )
+    case "TRIP":
+      return (
+        <CreateForm navigate={input.navigate} displayName={input.displayName} />
+      )
+    case "HOUSEHOLD":
+      if (!input.signedIn) {
+        return (
+          <SignInToStartHouse
+            onSignIn={() => {
+              void input.navigate({
+                to: "/sign-in",
+                search: { redirect: "/?stay=true&kind=house" },
+              })
+            }}
+          />
+        )
+      }
+      return (
+        <CreateHouseForm
+          navigate={input.navigate}
+          displayName={input.displayName}
+        />
+      )
+    default: {
+      const _never: never = kind
+      return _never
+    }
+  }
+}
+
 function ModeButton({
   label,
   detail,
@@ -301,7 +386,7 @@ function ModeButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex flex-col items-start gap-3 rounded-2xl border px-4 pt-4 pb-3.5 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
+        "flex flex-col items-start gap-2 rounded-2xl border px-3 pt-3 pb-3 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
         active
           ? "border-foreground bg-foreground text-background hover:bg-foreground/90"
           : "border-transparent bg-card text-foreground hover:bg-muted"
@@ -706,6 +791,10 @@ function JoinForm({
     onSuccess: (found) => {
       if (!found) {
         toast.error("Room not found")
+        return
+      }
+      if (parseRoomKind(found.kind) === "HOUSEHOLD") {
+        void navigate({ to: "/r/$code", params: { code: found.code } })
         return
       }
       setError(null)

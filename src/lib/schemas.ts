@@ -220,6 +220,38 @@ export const getRoomByCodeSchema = z.object({
   viewerMemberId: z.string().min(1).optional(),
 })
 
+export const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date")
+
+export const createHouseSchema = z.object({
+  name: z.string().trim().min(1, "Name your house").max(60, "Name is too long"),
+  currency: currencyCodeSchema,
+  creatorName: memberNameSchema,
+  joinedOn: isoDateSchema.optional(),
+  housemateNames: z.array(memberNameSchema).max(20).optional().default([]),
+})
+
+export const claimHousemateSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
+})
+
+export const joinHouseAsHousemateSchema = z.object({
+  code: roomCodeSchema,
+  name: memberNameSchema,
+})
+
+export const joinHouseAsGuestSchema = z.object({
+  code: roomCodeSchema,
+  name: memberNameSchema,
+})
+
+export const claimHouseGuestSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
+})
+
 export const expenseSplitSchema = z.object({
   memberId: z.string().min(1),
   weight: z.number().int().min(0).optional(),
@@ -379,6 +411,13 @@ export const calibrateRoomFxSchema = z.object({
     .max(5, "Use up to 5 charges"),
 })
 
+export type CreateHouseInput = z.input<typeof createHouseSchema>
+export type ClaimHousemateInput = z.input<typeof claimHousemateSchema>
+export type JoinHouseAsHousemateInput = z.input<
+  typeof joinHouseAsHousemateSchema
+>
+export type JoinHouseAsGuestInput = z.input<typeof joinHouseAsGuestSchema>
+export type ClaimHouseGuestInput = z.input<typeof claimHouseGuestSchema>
 export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
 export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>
