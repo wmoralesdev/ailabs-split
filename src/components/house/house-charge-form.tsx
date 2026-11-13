@@ -633,13 +633,14 @@ export function HouseChargeForm({
         </div>
 
         <div className="grid gap-2">
-          <Label>For</Label>
+          <Label htmlFor="house-charge-period">For</Label>
           <MonthStepper
             value={periodMonth}
             onChange={(next) => {
               setPeriodTouched(true)
               setPeriodMonth(next)
             }}
+            inputId="house-charge-period"
           />
         </div>
 

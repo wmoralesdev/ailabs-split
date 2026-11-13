@@ -1,13 +1,33 @@
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
+import { isTastePickerTarget } from "@/lib/taste-picker"
+import { cn } from "@/lib/utils"
 
-function Sheet({ ...props }: SheetPrimitive.Root.Props) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function shouldKeepSheetOpen(details: SheetPrimitive.Root.ChangeEventDetails) {
+  if (details.reason !== "outside-press" && details.reason !== "focus-out") {
+    return false
+  }
+  return isTastePickerTarget(details.event.target)
+}
+
+function Sheet({ onOpenChange, ...props }: SheetPrimitive.Root.Props) {
+  return (
+    <SheetPrimitive.Root
+      {...props}
+      data-slot="sheet"
+      onOpenChange={(open, eventDetails) => {
+        if (!open && shouldKeepSheetOpen(eventDetails)) {
+          eventDetails.cancel()
+          return
+        }
+        onOpenChange?.(open, eventDetails)
+      }}
+    />
+  )
 }
 
 function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {

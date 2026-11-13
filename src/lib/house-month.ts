@@ -107,6 +107,101 @@ export function monthEnd(key: string): string {
   return isoDateFromUtc(last)
 }
 
+const MONTH_SHORT = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
+] as const
+
+function monthNameToNumber(name: string): number | null {
+  const key = name.slice(0, 3).toLowerCase()
+  const index = MONTH_SHORT.indexOf(key as (typeof MONTH_SHORT)[number])
+  return index === -1 ? null : index + 1
+}
+
+/** Local calendar Date from YYYY-MM-DD, no UTC shift. */
+export function isoToLocalDate(iso: string): Date {
+  const { year, month, day } = parseIsoDate(iso)
+  return new Date(year, month - 1, day)
+}
+
+/** MM/DD/YYYY, matching the typed date field. */
+export function formatTypedDate(iso: string): string {
+  const { year, month, day } = parseIsoDate(iso)
+  return `${pad2(month)}/${pad2(day)}/${year}`
+}
+
+/** Parse a typed date: ISO, MM/DD/YYYY, or "Nov 13, 2026". */
+export function parseTypedDate(raw: string, now = new Date()): string | null {
+  const text = raw.trim()
+  if (!text) return null
+  if (isIsoDate(text)) return text
+
+  const slash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text)
+  if (slash) {
+    const iso = `${slash[3]}-${pad2(Number(slash[1]))}-${pad2(Number(slash[2]))}`
+    return isIsoDate(iso) ? iso : null
+  }
+
+  const named =
+    /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})?$/i.exec(
+      text
+    )
+  if (named) {
+    const month = monthNameToNumber(named[1])
+    if (!month) return null
+    const year = named[3] ? Number(named[3]) : now.getFullYear()
+    const iso = `${year}-${pad2(month)}-${pad2(Number(named[2]))}`
+    return isIsoDate(iso) ? iso : null
+  }
+
+  return null
+}
+
+/** Parse a typed month: YYYY-MM, MM/YYYY, or "Nov 2026". */
+export function parseTypedMonth(raw: string): string | null {
+  const text = raw.trim()
+  if (!text) return null
+  if (isMonthKey(text)) return text
+
+  const slash = /^(\d{1,2})\/(\d{4})$/.exec(text)
+  if (slash) {
+    const key = `${slash[2]}-${pad2(Number(slash[1]))}`
+    return isMonthKey(key) ? key : null
+  }
+
+  const named =
+    /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{4})$/i.exec(
+      text
+    )
+  if (named) {
+    const month = monthNameToNumber(named[1])
+    if (!month) return null
+    const key = `${named[2]}-${pad2(month)}`
+    return isMonthKey(key) ? key : null
+  }
+
+  return null
+}
+
+/** Due day is 1–28 so every month has that day. */
+export function parseDueDay(raw: string): number | null {
+  const text = raw.trim()
+  if (!/^\d{1,2}$/.test(text)) return null
+  const day = Number(text)
+  if (!Number.isInteger(day) || day < 1 || day > 28) return null
+  return day
+}
+
 /** Oct 2026 */
 export function formatMonth(key: string): string {
   const { year, month } = parseMonthKey(key)
