@@ -12,6 +12,7 @@ import {
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
+import { HouseChargeForm } from "@/components/house/house-charge-form"
 import { CategoryChips } from "@/components/category-chips"
 import { MemberPicker } from "@/components/member-picker"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
@@ -60,7 +61,17 @@ import type { SplitMode } from "@/lib/schemas"
 import { scanReceipt } from "@/server/ocr"
 import type { ExpenseDto, RoomDto } from "@/server/rooms"
 
+type NewSearch = {
+  edit?: string
+}
+
 export const Route = createFileRoute("/r/$code/new")({
+  validateSearch: (search: Record<string, unknown>): NewSearch => ({
+    edit:
+      typeof search.edit === "string" && search.edit.trim()
+        ? search.edit.trim()
+        : undefined,
+  }),
   loader: async ({ params, context }) => {
     const room = await context.queryClient.ensureQueryData(
       roomQueryOptions(params.code)
@@ -129,6 +140,7 @@ function AddExpenseSkeleton() {
 
 function AddExpensePage() {
   const { code } = Route.useParams()
+  const { edit } = Route.useSearch()
   const navigate = useNavigate()
   const { memberId } = useRoomIdentity()
   const { data: room, isPending } = useQuery(roomQueryOptions(code, memberId))
@@ -141,7 +153,16 @@ function AddExpensePage() {
     case "DINNER":
       return <Navigate to="/r/$code/check" params={{ code }} />
     case "HOUSEHOLD":
-      return <Navigate to="/r/$code" params={{ code }} />
+      return (
+        <HouseChargeForm
+          room={room}
+          expense={
+            edit
+              ? (room.expenses.find((expense) => expense.id === edit) ?? null)
+              : null
+          }
+        />
+      )
     case "TRIP":
       break
     default: {

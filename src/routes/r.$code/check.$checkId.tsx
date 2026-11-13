@@ -38,7 +38,7 @@ function EditCheckPage() {
     case "HOUSEHOLD":
       return <Navigate to="/r/$code" params={{ code }} />
     case "TRIP":
-      return <Navigate to="/r/$code/new" params={{ code }} />
+      return <Navigate to="/r/$code/new" params={{ code }} search={{}} />
     default: {
       const _never: never = kind
       throw new Error(`Unknown room kind: ${String(_never)}`)

@@ -584,6 +584,7 @@ function RoomHomePage() {
               <Link
                 to="/r/$code/new"
                 params={{ code: room.code }}
+                search={{}}
                 className="split-cta"
               >
                 <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />

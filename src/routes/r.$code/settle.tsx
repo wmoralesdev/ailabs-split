@@ -198,6 +198,7 @@ function SettlePage() {
   const adjustmentBps = room.fxAdjustmentBps
   const sampleCount = room.fxCalibrationSamples.length
   const hasBankMatch = Number.isFinite(adjustmentBps) && adjustmentBps !== 0
+  const household = parseRoomKind(room.kind) === "HOUSEHOLD"
   const mine = transfers.filter(
     (transfer) => transfer.fromId === memberId || transfer.toId === memberId
   )
@@ -376,7 +377,7 @@ function SettlePage() {
                 memberId={memberId}
                 emphasis
                 pending={pendingKey === transferKey(transfer)}
-                disabled={recordMutation.isPending}
+                disabled={recordMutation.isPending || household}
                 onMarkPaid={() => markPaid(transfer)}
                 onRemind={() => void sendReminder(transfer)}
               />
@@ -398,7 +399,7 @@ function SettlePage() {
                 currency={room.currency}
                 memberId={memberId}
                 pending={pendingKey === transferKey(transfer)}
-                disabled={recordMutation.isPending}
+                disabled={recordMutation.isPending || household}
                 onMarkPaid={() => markPaid(transfer)}
                 onRemind={() => void sendReminder(transfer)}
               />
@@ -466,7 +467,7 @@ function SettlePage() {
                       settlementId: settlement.id,
                     })
                   }
-                  disabled={deleteMutation.isPending}
+                  disabled={deleteMutation.isPending || household}
                   aria-label={`Undo payment from ${settlement.fromMemberName} to ${settlement.toMemberName}`}
                 >
                   <HugeiconsIcon icon={UndoIcon} size={14} strokeWidth={2} />
