@@ -26,7 +26,7 @@ import {
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
 import type { CompressedImage } from "@/lib/compress-image"
-import { isHouseCategory } from "@/lib/house-categories"
+import { isHouseCategory, suggestHouseCategory } from "@/lib/house-categories"
 import type { HouseCategory } from "@/lib/house-categories"
 import { defaultParticipants, dueThisMonth } from "@/lib/house-ledger"
 import {
@@ -111,6 +111,9 @@ export function HouseChargeForm({
         : ""
   )
   const [category, setCategory] = useState<HouseCategory>(initialCategory)
+  const [categoryTouched, setCategoryTouched] = useState(
+    Boolean(editing || dueTemplate)
+  )
   const [paidById, setPaidById] = useState(
     editing?.paidById ?? dueTemplate?.paidById ?? defaultPaidBy
   )
@@ -307,13 +310,6 @@ export function HouseChargeForm({
       await queryClient.invalidateQueries({
         queryKey: roomKeys.room(room.code),
       })
-      toast.success(
-        editing
-          ? "Charge saved"
-          : activeDue
-            ? `${title.trim()} added for ${formatMonth(periodMonth)}`
-            : "Charge added"
-      )
       await navigate({ to: "/r/$code", params: { code: room.code } })
     },
     onError: (error) => {
@@ -399,6 +395,7 @@ export function HouseChargeForm({
       setAmountDigits(centsToAtmDigits(draft.amountCents, fractionDigits))
     }
     setCategory(draft.category)
+    setCategoryTouched(true)
     setScanKind(draft.kind)
     setScanNote(extraChargeNote(draft, room.currency))
     setPendingReceipt(
@@ -455,26 +452,6 @@ export function HouseChargeForm({
         return
       }
       applyDraft(draft, compressed)
-      if (!editing) {
-        const match = matchVariableDue(
-          draft.category,
-          draft.periodMonth,
-          dueThisMonth(
-            room.house?.templates ?? [],
-            room.house?.occurrences ?? [],
-            monthKey()
-          )
-        )
-        if (match) {
-          toast.success(
-            `This fills ${match.title} for ${formatMonth(match.periodMonth)}.`
-          )
-        } else {
-          toast.success("Receipt scanned")
-        }
-      } else {
-        toast.success("Receipt scanned")
-      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not read receipt"
@@ -624,7 +601,12 @@ export function HouseChargeForm({
           <Input
             id="house-charge-title"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value
+              setTitle(next)
+              if (categoryTouched) return
+              setCategory(suggestHouseCategory(next) ?? initialCategory)
+            }}
             placeholder="Rent, Super Selectos…"
             autoComplete="off"
           />
@@ -634,7 +616,10 @@ export function HouseChargeForm({
           <Label>Category</Label>
           <HouseCategoryChips
             value={isHouseCategory(category) ? category : "OTHER"}
-            onChange={setCategory}
+            onChange={(next) => {
+              setCategory(next)
+              setCategoryTouched(true)
+            }}
           />
         </div>
 

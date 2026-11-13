@@ -244,7 +244,6 @@ export function RecurringTemplateSheet({
       await queryClient.invalidateQueries({
         queryKey: roomKeys.room(room.code),
       })
-      toast.success(editing ? "Recurring saved" : "Recurring added")
       onOpenChange(false)
     },
     onError: (error) => {
@@ -269,7 +268,6 @@ export function RecurringTemplateSheet({
       await queryClient.invalidateQueries({
         queryKey: roomKeys.room(room.code),
       })
-      toast.success("Archived")
       onOpenChange(false)
     },
     onError: (error) => {

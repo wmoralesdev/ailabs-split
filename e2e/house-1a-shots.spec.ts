@@ -16,8 +16,11 @@ const SHOTS_DIR =
   process.env.SHOTS_DIR ??
   "/cursor/stores/bc-01a1be84-5756-78cf-8cab-8c393ca5e1f5/media/house-1a"
 
-function shot(page: Page, name: string) {
+async function shot(page: Page, name: string) {
   mkdirSync(SHOTS_DIR, { recursive: true })
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, {
+    timeout: 10_000,
+  })
   return page.screenshot({
     path: path.join(SHOTS_DIR, name),
     animations: "disabled",

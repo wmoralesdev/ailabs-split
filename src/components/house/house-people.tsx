@@ -1,13 +1,14 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons"
+import { Add01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { HousePersonSheet } from "@/components/house/house-person-sheet"
-import { NameListInput } from "@/components/name-list-input"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   houseBalanceCopy,
   houseNets,
@@ -21,6 +22,7 @@ import {
   transferBeforeMoveOutMessage,
 } from "@/lib/house-permissions"
 import type { HouseMemberDto } from "@/lib/house-types"
+import { mergeNames } from "@/lib/landing-prefs"
 import { roomKeys } from "@/lib/room-query"
 import { cn } from "@/lib/utils"
 import {
@@ -61,8 +63,8 @@ export function HousePeople({ room }: { room: RoomDto }) {
   const members = house?.members ?? []
   const nets = houseNets(room.members, room.expenses, room.settlements)
   const netById = new Map(nets.map((row) => [row.memberId, row.netCents]))
+  const inputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState("")
-  const [names, setNames] = useState<string[]>([])
   const [asGuest, setAsGuest] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
@@ -86,15 +88,12 @@ export function HousePeople({ room }: { room: RoomDto }) {
   }
 
   const addMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (names: string[]) =>
       addHousePeople({
         data: { ...viewerPayload(room), names, isGuest: asGuest },
       }),
     onSuccess: async () => {
-      setNames([])
-      setDraft("")
       await invalidate()
-      toast.success(asGuest ? "Guests added" : "Housemates added")
     },
     onError: (error) => {
       toast.error(
@@ -167,7 +166,6 @@ export function HousePeople({ room }: { room: RoomDto }) {
     onSuccess: async () => {
       setEditingId(null)
       await invalidate()
-      toast.success("Removed")
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Could not remove")
@@ -196,6 +194,17 @@ export function HousePeople({ room }: { room: RoomDto }) {
     stayMutation.isPending ||
     kindMutation.isPending ||
     removeMutation.isPending
+
+  function submitNames() {
+    const taken = new Set(members.map((member) => member.name.toLowerCase()))
+    const names = mergeNames([], draft).filter(
+      (name) => !taken.has(name.toLowerCase())
+    )
+    setDraft("")
+    inputRef.current?.focus()
+    if (names.length === 0) return
+    addMutation.mutate(names)
+  }
 
   function onLedger(memberId: string) {
     return memberHasHouseLedger(memberId, {
@@ -303,59 +312,48 @@ export function HousePeople({ room }: { room: RoomDto }) {
       <PersonList title="Guests" rows={guests} />
 
       {manage ? (
-        <section className="mt-8">
-          <h2 className="group-label">Add people</h2>
-          <div className="mt-2 flex flex-col gap-3">
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="group"
-              aria-label="Person type"
-            >
-              <button
-                type="button"
-                aria-pressed={!asGuest}
-                onClick={() => setAsGuest(false)}
-                className={cn(
-                  "h-9 rounded-full px-3 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  !asGuest
-                    ? "bg-foreground text-background"
-                    : "bg-card text-foreground hover:bg-muted"
-                )}
-              >
-                Housemate
-              </button>
-              <button
-                type="button"
-                aria-pressed={asGuest}
-                onClick={() => setAsGuest(true)}
-                className={cn(
-                  "h-9 rounded-full px-3 text-[13px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  asGuest
-                    ? "bg-foreground text-background"
-                    : "bg-card text-foreground hover:bg-muted"
-                )}
-              >
-                Guest
-              </button>
-            </div>
-            <NameListInput
-              id="house-add-people"
-              label={asGuest ? "Guests" : "Housemates"}
-              names={names}
-              draft={draft}
-              onNamesChange={setNames}
-              onDraftChange={setDraft}
-              placeholder="Luis"
+        <section className="mt-3">
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              submitNames()
+            }}
+          >
+            <Label htmlFor="house-add-person" className="sr-only">
+              {asGuest ? "Add a guest" : "Add a housemate"}
+            </Label>
+            <Input
+              ref={inputRef}
+              id="house-add-person"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={asGuest ? "Add a guest's name" : "Add a housemate"}
+              autoComplete="off"
+              enterKeyHint="done"
+              className="flex-1"
             />
             <Button
-              type="button"
-              className="cta-lg"
-              disabled={addMutation.isPending || names.length === 0}
-              onClick={() => addMutation.mutate()}
+              type="submit"
+              className="shrink-0 px-4"
+              disabled={!draft.trim() || addMutation.isPending}
             >
-              {addMutation.isPending ? "Adding…" : "Add people"}
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+              Add
             </Button>
-          </div>
+          </form>
+          <p className="group-footer">
+            {asGuest
+              ? "Guests only join the charges you add them to. "
+              : "Housemates join new charges by default. "}
+            <button
+              type="button"
+              className="text-action text-[13px]"
+              onClick={() => setAsGuest((value) => !value)}
+            >
+              {asGuest ? "Add a housemate" : "Add a guest instead"}
+            </button>
+          </p>
         </section>
       ) : null}
 
