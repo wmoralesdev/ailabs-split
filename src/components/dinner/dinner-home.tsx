@@ -12,6 +12,8 @@ import { toast } from "sonner"
 import { RenameDinnerSheet } from "@/components/dinner/dinner-name"
 import { OwingAmount } from "@/components/dinner/owing-amount"
 import { PullToRefresh } from "@/components/pull-to-refresh"
+import { PayAccountButton } from "@/components/pay-account-button"
+import { MyPayLine, PayProfileSheet } from "@/components/pay-profile-sheet"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
@@ -47,6 +49,7 @@ export function DinnerHome({
   const canEdit = dinnerCanEdit(room)
   const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
 
   const nets = useMemo(() => {
     return computeNetsWithSettlements(
@@ -127,6 +130,13 @@ export function DinnerHome({
             name={room.name}
           />
         ) : null}
+        <PayProfileSheet
+          room={room}
+          member={payOpen ? (me ?? null) : null}
+          viewerMemberId={memberId}
+          open={payOpen && me != null}
+          onOpenChange={setPayOpen}
+        />
 
         {bill ? (
           <BillCard
@@ -180,10 +190,18 @@ export function DinnerHome({
             with the code
             {canEdit ? ", or add them on the bill." : "."}
           </p>
-          <div className="mt-3 flex h-11 items-center gap-1 rounded-xl bg-card pr-1.5 pl-3.5">
-            <p className="min-w-0 flex-1 truncate text-[15px]">
-              You · {me?.name ?? "Unknown"}
-            </p>
+          <div className="mt-3 flex min-h-13 items-center gap-1 rounded-xl bg-card pr-1.5 pl-3.5">
+            <button
+              type="button"
+              className="min-w-0 flex-1 rounded-sm py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={!me}
+              onClick={() => setPayOpen(true)}
+            >
+              <span className="block truncate text-[15px]">
+                You · {me?.name ?? "Unknown"}
+              </span>
+              <MyPayLine pay={me?.pay ?? null} />
+            </button>
             <Button
               type="button"
               variant="ghost"
@@ -337,6 +355,10 @@ function BillCard({
   const owedToMe = transfers.filter((transfer) => transfer.toId === memberId)
   const oweCents = iOwe.reduce((sum, t) => sum + t.amountCents, 0)
   const owedCents = owedToMe.reduce((sum, t) => sum + t.amountCents, 0)
+  const payeePay =
+    iOwe.length === 1
+      ? (room.members.find((member) => member.id === iOwe[0].toId)?.pay ?? null)
+      : null
 
   let headline: string
   let detail: string
@@ -389,6 +411,13 @@ function BillCard({
           {headline}
         </p>
         <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
+        {confirmed && iOwe.length === 1 && payeePay ? (
+          <PayAccountButton
+            pay={payeePay}
+            ownerLabel={`${iOwe[0].toName}'s`}
+            className="mt-3"
+          />
+        ) : null}
         {!confirmed ? (
           <Link
             to="/r/$code/check/$checkId"

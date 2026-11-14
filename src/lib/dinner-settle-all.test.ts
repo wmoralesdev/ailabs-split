@@ -110,9 +110,10 @@ function dinner(input: {
     fxAdjustmentBps: 0,
     fxCalibrationSamples: [],
     createdAt: "2026-01-01T00:00:00.000Z",
+    viewerSignedIn: false,
     members: [
-      { id: "ana", name: "Ana" },
-      { id: "walter", name: "Walter" },
+      { id: "ana", name: "Ana", pay: null, payLocked: false },
+      { id: "walter", name: "Walter", pay: null, payLocked: false },
     ],
     expenses:
       status === "CONFIRMED"

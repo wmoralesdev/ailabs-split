@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { HouseDateChips } from "@/components/house/house-date-chips"
+import { PayDetailsRow } from "@/components/pay-profile-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/sheet"
 import { formatDay } from "@/lib/house-month"
 import type { HouseMemberDto } from "@/lib/house-types"
+import type { PayDetailsDto } from "@/lib/pay-details"
 import { cn } from "@/lib/utils"
 
 const removeActionClass =
@@ -28,6 +30,8 @@ export function HousePersonSheet({
   canMoveOut,
   moveOutBlocked,
   balanceLine,
+  pay,
+  onPayDetails,
   onOpenChange,
   onRename,
   onStay,
@@ -43,6 +47,9 @@ export function HousePersonSheet({
   canMoveOut: boolean
   moveOutBlocked: string | null
   balanceLine: string | null
+  pay: PayDetailsDto | null
+  /** Omitted when the viewer can't see or change this number. */
+  onPayDetails?: () => void
   onOpenChange: (open: boolean) => void
   onRename: (name: string) => void
   onStay: (input: { joinedOn?: string | null; leftOn?: string | null }) => void
@@ -124,6 +131,10 @@ export function HousePersonSheet({
                 <p className="text-[15px] font-medium tabular-nums">
                   {balanceLine}
                 </p>
+              ) : null}
+
+              {onPayDetails ? (
+                <PayDetailsRow pay={pay} onClick={onPayDetails} />
               ) : null}
 
               {canEdit ? (

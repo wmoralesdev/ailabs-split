@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
+import { PayDetailsRow } from "@/components/pay-profile-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -25,6 +26,7 @@ type BillPersonSheetProps = {
   onOpenChange: (open: boolean) => void
   onRename: (name: string) => void
   onRemove: () => void
+  onPayDetails: () => void
 }
 
 function assignedContext(count: number, amountCents: number, currency: string) {
@@ -55,6 +57,7 @@ export function BillPersonSheet({
   onOpenChange,
   onRename,
   onRemove,
+  onPayDetails,
 }: BillPersonSheetProps) {
   const nameRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState("")
@@ -130,6 +133,7 @@ export function BillPersonSheet({
                   {blockReason}
                 </p>
               ) : null}
+              <PayDetailsRow pay={member.pay ?? null} onClick={onPayDetails} />
             </div>
 
             <SheetFooter className="pb-safe border-t border-border px-4 pt-3">

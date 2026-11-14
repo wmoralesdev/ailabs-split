@@ -41,6 +41,7 @@ import { BankFxCalibrationSheet } from "@/components/bank-fx-calibration-sheet"
 import { DinnerHome } from "@/components/dinner/dinner-home"
 import { HouseHome } from "@/components/house/house-home"
 import { CategoryChips } from "@/components/category-chips"
+import { MyPayLine, PayProfileSheet } from "@/components/pay-profile-sheet"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -207,6 +208,7 @@ function RoomHomePage() {
     null
   )
   const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
   const [calibrationExpenseId, setCalibrationExpenseId] = useState<
     string | null
   >(null)
@@ -441,9 +443,17 @@ function RoomHomePage() {
                 {me ? initials(me.name) : "?"}
               </AvatarFallback>
             </Avatar>
-            <p className="min-w-0 flex-1 truncate text-[15px]">
-              You · {me?.name ?? "Unknown"}
-            </p>
+            <button
+              type="button"
+              className="min-w-0 flex-1 rounded-sm py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={!me}
+              onClick={() => setPayOpen(true)}
+            >
+              <span className="block truncate text-[15px]">
+                You · {me?.name ?? "Unknown"}
+              </span>
+              <MyPayLine pay={me?.pay ?? null} />
+            </button>
             <button
               type="button"
               onClick={() => void copyMyLink()}
@@ -645,6 +655,13 @@ function RoomHomePage() {
             setCalibrationExpenseId(expenseId)
             setCalibrationOpen(true)
           }}
+        />
+        <PayProfileSheet
+          room={room}
+          member={payOpen ? (me ?? null) : null}
+          viewerMemberId={memberId}
+          open={payOpen && me != null}
+          onOpenChange={setPayOpen}
         />
         <BankFxCalibrationSheet
           room={room}

@@ -51,12 +51,18 @@ import {
 import { houseNetFromRows } from "@/lib/house-ledger"
 import { isoDateFromUtc } from "@/lib/house-month"
 import type { HouseStateDto } from "@/lib/house-types"
+import { resolvePayDetails } from "@/lib/pay-details"
+import type { PayDetailsDto } from "@/lib/pay-details"
 import { computeFxAdjustmentBps } from "@/lib/settle"
 import type { FxCalibrationSample } from "@/lib/settle"
 
 export type RoomMemberDto = {
   id: string
   name: string
+  /** Where to send this person money. Typed by people, never read from receipts. */
+  pay: PayDetailsDto | null
+  /** Claimed by another signed-in person: only they can change their number. */
+  payLocked: boolean
 }
 
 export type ExpenseShareDto = {
@@ -154,6 +160,7 @@ export type RoomDto = {
   /** Calibration samples used to derive fxAdjustmentBps. */
   fxCalibrationSamples: FxCalibrationSample[]
   createdAt: string
+  viewerSignedIn: boolean
   members: RoomMemberDto[]
   expenses: ExpenseDto[]
   settlements: SettlementDto[]
@@ -464,6 +471,24 @@ async function loadRoomByCode(
 
   const viewerUserId = await getAuthUserId()
   const access = viewerAccess(room, viewerUserId)
+  const seatUserIds = room.members.flatMap((member) =>
+    member.userId ? [member.userId] : []
+  )
+  const payProfiles =
+    seatUserIds.length === 0
+      ? []
+      : await prisma.payProfile.findMany({
+          where: { userId: { in: seatUserIds } },
+          select: {
+            userId: true,
+            account: true,
+            label: true,
+            accountType: true,
+          },
+        })
+  const profileByUser = new Map(
+    payProfiles.map((profile) => [profile.userId, profile])
+  )
   const currencies =
     room.currencies.length > 0
       ? Array.from(new Set([room.currency, ...room.currencies]))
@@ -496,9 +521,12 @@ async function loadRoomByCode(
     fxAdjustmentBps: room.fxAdjustmentBps,
     fxCalibrationSamples: toFxCalibrationSamples(room.fxCalibrationSamples),
     createdAt: room.createdAt.toISOString(),
+    viewerSignedIn: viewerUserId != null,
     members: room.members.map((member) => ({
       id: member.id,
       name: member.name,
+      pay: resolvePayDetails(member, profileByUser),
+      payLocked: Boolean(member.userId && member.userId !== viewerUserId),
     })),
     // Include others' personal expenses (redacted) so bank FX calibration can
     // use them; home/settle UIs hide redacted rows from the main lists.
@@ -509,6 +537,21 @@ async function loadRoomByCode(
     checks: room.checks.map(checkToDto),
     ...(house ? { house } : {}),
   }
+}
+
+/** One seat per signed-in person in a room, so their pay profile shows here. */
+async function linkSeatToUser(
+  roomId: string,
+  memberId: string,
+  userId: string | null
+): Promise<void> {
+  if (!userId) return
+  const taken = await prisma.member.count({ where: { roomId, userId } })
+  if (taken > 0) return
+  await prisma.member.updateMany({
+    where: { id: memberId, userId: null },
+    data: { userId },
+  })
 }
 
 export const createRoom = createServerFn({ method: "POST" })
@@ -549,8 +592,10 @@ export const createRoom = createServerFn({ method: "POST" })
             fxRates,
             ...(ownerUserId ? { ownerUserId } : {}),
             members: {
-              create: data.memberNames.map((memberName) => ({
+              create: data.memberNames.map((memberName, index) => ({
                 name: memberName,
+                // The creator's seat carries their pay profile into this room.
+                ...(index === 0 && ownerUserId ? { userId: ownerUserId } : {}),
               })),
             },
           },
@@ -589,16 +634,24 @@ export const joinRoom = createServerFn({ method: "POST" })
     const match = existing.members.find(
       (member) => member.name.toLowerCase() === data.memberName.toLowerCase()
     )
+    const authUserId = await getAuthUserId()
     if (match) {
+      if (!match.pay) await linkSeatToUser(existing.id, match.id, authUserId)
       const room = await loadRoomByCode(data.code, match.id)
       if (!room) throw new Error("Trip not found")
       return { room, memberId: match.id }
     }
 
+    const seatTaken =
+      authUserId != null &&
+      (await prisma.member.count({
+        where: { roomId: existing.id, userId: authUserId },
+      })) > 0
     await prisma.member.create({
       data: {
         roomId: existing.id,
         name: data.memberName,
+        ...(authUserId && !seatTaken ? { userId: authUserId } : {}),
       },
     })
 

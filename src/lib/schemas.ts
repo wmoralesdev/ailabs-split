@@ -2,6 +2,12 @@ import { z } from "zod"
 
 import { HOUSE_CATEGORIES } from "./house-categories"
 import {
+  PAY_ACCOUNT_MAX,
+  PAY_ACCOUNT_TYPES,
+  PAY_LABEL_MAX,
+  normalizePayText,
+} from "./pay-details"
+import {
   PAYMENT_PROOF_MAX_BASE64_CHARS,
   PAYMENT_PROOF_MIME_TYPES,
 } from "./payment-proof"
@@ -162,6 +168,27 @@ export const renameRoomMemberSchema = z.object({
   code: roomCodeSchema,
   memberId: z.string().min(1, "Missing person"),
   name: memberNameSchema,
+})
+
+export const savePayDetailsSchema = z.object({
+  code: roomCodeSchema,
+  memberId: z.string().min(1, "Missing person"),
+  viewerMemberId: z.string().min(1).optional(),
+  account: z
+    .string()
+    .transform(normalizePayText)
+    .pipe(
+      z
+        .string()
+        .max(PAY_ACCOUNT_MAX, "That number is too long")
+        .regex(/^[A-Za-z0-9 .-]*$/, "Use letters, numbers and dashes")
+    ),
+  label: z
+    .string()
+    .transform(normalizePayText)
+    .pipe(z.string().max(PAY_LABEL_MAX, "Keep the bank short"))
+    .optional(),
+  accountType: z.enum(PAY_ACCOUNT_TYPES).nullable().optional(),
 })
 
 export const removeRoomMemberSchema = z.object({
@@ -661,6 +688,7 @@ export type CreateRoomInput = z.input<typeof createRoomSchema>
 export type AddRoomMembersInput = z.input<typeof addRoomMembersSchema>
 export type RenameRoomMemberInput = z.input<typeof renameRoomMemberSchema>
 export type RemoveRoomMemberInput = z.input<typeof removeRoomMemberSchema>
+export type SavePayDetailsInput = z.input<typeof savePayDetailsSchema>
 export type UpsertCheckInput = z.input<typeof upsertCheckSchema>
 export type ConfirmCheckInput = z.input<typeof confirmCheckSchema>
 export type DeleteCheckInput = z.input<typeof deleteCheckSchema>
