@@ -89,13 +89,26 @@ export function RoomTabBar({
       className="pb-safe relative z-30 shrink-0 border-t border-border bg-background"
     >
       <div className="page-gutter mx-auto grid max-w-content grid-cols-3 items-center gap-2 pt-1">
-        <TabLink
-          to="/r/$code"
-          code={code}
-          icon={Home01Icon}
-          label="Home"
-          active={onHome}
-        />
+        {onHome ? (
+          // Already on the room's home: Home leaves the room for the app's main screen.
+          <Link
+            to="/"
+            search={{ stay: true }}
+            aria-label="Go to main screen"
+            className={tabLinkClass(true)}
+          >
+            <HugeiconsIcon icon={Home01Icon} size={20} strokeWidth={2.2} />
+            Home
+          </Link>
+        ) : (
+          <TabLink
+            to="/r/$code"
+            code={code}
+            icon={Home01Icon}
+            label="Home"
+            active={false}
+          />
+        )}
         <div className="flex justify-center">{addControl}</div>
         <TabLink
           to="/r/$code/settle"
@@ -126,15 +139,19 @@ function TabLink({
     <Link
       to={to}
       params={{ code }}
-      className={cn(
-        "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active
-          ? "text-primary"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
+      className={tabLinkClass(active)}
     >
       <HugeiconsIcon icon={icon} size={20} strokeWidth={active ? 2.2 : 2} />
       {label}
     </Link>
+  )
+}
+
+function tabLinkClass(active: boolean) {
+  return cn(
+    "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    active
+      ? "text-primary"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground"
   )
 }
