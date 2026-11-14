@@ -37,6 +37,8 @@ pnpm dev
 
 ## Product
 
+Full map: [docs/feature-map.md](docs/feature-map.md). Three room kinds — **Trip**, **Bill**, **House**.
+
 1. **/** — create a room (name, currency, members) or join by code **and your name**
 2. **/r/$code** — who-are-you gate (pick existing or add name) → balances + expenses
 3. **/r/$code?as=Name** — personal link that claims you on a new device
