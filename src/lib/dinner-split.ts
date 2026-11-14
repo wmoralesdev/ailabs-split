@@ -77,6 +77,17 @@ export type DinnerSplitResult = {
 const RESIDUAL_BUCKET = "__residual__"
 export const PRINTED_TOTAL_ADJUSTMENT_NAME = "Printed total"
 
+/** $0 rows (combo extras, AYCE) are not payable and must not be assigned. */
+export function isPayableBillItem(item: { amountCents: number }): boolean {
+  return item.amountCents > 0
+}
+
+export function payableBillItems<T extends { amountCents: number }>(
+  items: readonly T[]
+): T[] {
+  return items.filter((item) => item.amountCents > 0)
+}
+
 export function emptyTip(): TipConfig {
   return {
     percent: null,
@@ -318,12 +329,13 @@ export function computeDinnerSplit(input: {
   tip: TipConfig
   notedTotalCents?: number | null
 }): DinnerSplitResult {
+  const items = payableBillItems(input.items)
   const itemCents = new Map<string, number>()
   let residualCents = 0
   const unassignedItemIds: string[] = []
   let lineInvalid = false
 
-  for (const item of input.items) {
+  for (const item of items) {
     const split = splitLineItemShares(item)
     residualCents += split.residualCents
     if (split.residualCents > 0 || split.invalid) {
@@ -335,7 +347,7 @@ export function computeDinnerSplit(input: {
     }
   }
 
-  const itemSubtotalCents = input.items.reduce(
+  const itemSubtotalCents = items.reduce(
     (sum, item) => sum + item.amountCents,
     0
   )
@@ -391,7 +403,7 @@ export function computeDinnerSplit(input: {
   })
 
   let confirmBlockReason: string | null = null
-  if (input.items.length === 0) {
+  if (items.length === 0) {
     confirmBlockReason = "Add at least one item"
   } else if (lineInvalid) {
     confirmBlockReason = "Fix item quantities or amounts before confirming"

@@ -15,6 +15,7 @@ import {
   extractCheckDraft,
   extractDraft,
   mergeOcrCheckItems,
+  tidyOcrPayableItems,
 } from "./receipt-ocr"
 
 describe("extractDraft", () => {
@@ -292,6 +293,71 @@ TOTAL $10.00
         ?.amountCents
     ).toBe(100)
     expect(draft.totalCents).toBe(6232)
+  })
+})
+
+describe("tidyOcrPayableItems", () => {
+  it("drops $0 combo rows from the bill payload", () => {
+    const draft = extractCheckDraft(PASTARIA_MESA_M11_MD)
+    expect(draft.items.some((item) => item.amountCents === 0)).toBe(true)
+    const payload = checkPayloadFromOcr(draft)
+    expect(payload.items.every((item) => item.amountCents > 0)).toBe(true)
+    expect(
+      payload.items.find((item) => /insalata caesar/i.test(item.name))
+    ).toBeUndefined()
+    expect(
+      payload.items.find((item) => /pan almuerzo/i.test(item.name))
+    ).toMatchObject({ amountCents: 100 })
+    expect(computeDinnerSplit(payload).totalCents).toBe(6232)
+  })
+
+  it("drops an OCR duplicate when the printed total already matches without it", () => {
+    const burger = {
+      name: "Men camperito S",
+      amountCents: 4725,
+      quantity: 7,
+      modifiers: [] as string[],
+      confidence: 0.75,
+    }
+    const fries = {
+      name: "Papa regular",
+      amountCents: 355,
+      quantity: 1,
+      modifiers: [] as string[],
+      confidence: 0.75,
+    }
+    const items = tidyOcrPayableItems(
+      [burger, { ...burger, name: "Men camperito S (6.75)(G)" }, fries],
+      {
+        subtotalCents: 5080,
+        totalCents: 5080,
+        tax: [],
+        fees: [],
+        discounts: [],
+        tip: undefined,
+      }
+    )
+    expect(items).toHaveLength(2)
+    expect(items.reduce((sum, item) => sum + item.amountCents, 0)).toBe(5080)
+  })
+
+  it("keeps two real identical lines when the printed total includes both", () => {
+    const pollo = {
+      name: "POLLO CHIPOTLE",
+      amountCents: 1290,
+      quantity: 1,
+      modifiers: [] as string[],
+      confidence: 0.85,
+    }
+    const items = tidyOcrPayableItems([pollo, { ...pollo }], {
+      subtotalCents: 2580,
+      totalCents: 2580,
+      tax: [],
+      fees: [],
+      discounts: [],
+      tip: undefined,
+    })
+    expect(items).toHaveLength(2)
   })
 })
 

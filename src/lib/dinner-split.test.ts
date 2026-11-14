@@ -90,6 +90,26 @@ describe("computeDinnerSplit pizzas", () => {
     expect(result.residualCents).toBe(2400)
     expect(result.unassignedItemIds).toContain("pizza-b")
   })
+
+  it("ignores $0 lines instead of asking who had them", () => {
+    const result = computeDinnerSplit({
+      items: [
+        pizzaA,
+        item({
+          id: "ayce",
+          name: "Insalata Caesar AYCE",
+          amountCents: 0,
+          split: { mode: "UNASSIGNED" },
+        }),
+      ],
+      adjustments: [],
+      tip: emptyTip(),
+    })
+    expect(result.canConfirm).toBe(true)
+    expect(result.residualCents).toBe(0)
+    expect(result.unassignedItemIds).toEqual([])
+    expect(result.itemSubtotalCents).toBe(2400)
+  })
 })
 
 describe("BY_ITEMS fees and ticket-only tip", () => {

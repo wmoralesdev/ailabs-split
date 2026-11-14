@@ -6,7 +6,12 @@ import type { LineKind } from "@/components/dinner/line-kind-picker"
 import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { Button } from "@/components/ui/button"
 import type { CheckPayload, LineItem } from "@/lib/dinner-split"
-import { emptyTip, itemToAdjustment, ticketTip } from "@/lib/dinner-split"
+import {
+  emptyTip,
+  itemToAdjustment,
+  payableBillItems,
+  ticketTip,
+} from "@/lib/dinner-split"
 import { formatMoney } from "@/lib/settle"
 
 type Reclass = LineKind
@@ -94,9 +99,15 @@ export function OcrReview({
     }
   }
 
-  const itemSum = payload.items.reduce((sum, item) => sum + item.amountCents, 0)
+  const payableItems = payableBillItems(payload.items)
+  const itemSum = payableItems.reduce((sum, item) => sum + item.amountCents, 0)
   const noted = payload.notedTotalCents
-  const delta = noted == null ? null : noted - itemSum - payload.tip.amountCents
+  const adjSum = payload.adjustments.reduce(
+    (sum, adjustment) => sum + adjustment.amountCents,
+    0
+  )
+  const delta =
+    noted == null ? null : noted - itemSum - adjSum - payload.tip.amountCents
 
   const hasTip = payload.tip.source !== "NONE"
   const hasPrinted = payload.notedSubtotalCents != null || noted != null
@@ -105,29 +116,36 @@ export function OcrReview({
     <div className="flex flex-col gap-5">
       <section aria-label="Lines on the ticket">
         <p className="group-label">
-          {payload.items.length} {payload.items.length === 1 ? "line" : "lines"}{" "}
+          {payableItems.length} {payableItems.length === 1 ? "line" : "lines"}{" "}
           · change any that aren’t food or drink
         </p>
         <ul className="group-list">
-          {payload.items.map((item, index) => (
-            <ReviewRow
-              key={item.id}
-              name={item.name}
-              quantity={item.quantity}
-              detail={
-                item.modifiers.length > 0 ? item.modifiers.join(" · ") : null
-              }
-              lowConfidence={item.confidence != null && item.confidence < 0.7}
-              amount={formatMoney(item.amountCents, currency)}
-              current="item"
-              options={
-                index > 0
-                  ? ITEM_OPTIONS
-                  : ITEM_OPTIONS.filter((option) => option !== "modifier")
-              }
-              onPick={(kind) => reclassItem(index, kind)}
-            />
-          ))}
+          {payableItems.map((item) => {
+            const index = payload.items.findIndex(
+              (entry) => entry.id === item.id
+            )
+            return (
+              <ReviewRow
+                key={item.id}
+                name={item.name}
+                quantity={item.quantity}
+                detail={
+                  item.modifiers.length > 0 ? item.modifiers.join(" · ") : null
+                }
+                lowConfidence={
+                  item.confidence != null && item.confidence < 0.7
+                }
+                amount={formatMoney(item.amountCents, currency)}
+                current="item"
+                options={
+                  index > 0
+                    ? ITEM_OPTIONS
+                    : ITEM_OPTIONS.filter((option) => option !== "modifier")
+                }
+                onPick={(kind) => reclassItem(index, kind)}
+              />
+            )
+          })}
           {payload.adjustments.map((adjustment) => (
             <ReviewRow
               key={adjustment.id}

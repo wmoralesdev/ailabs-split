@@ -41,6 +41,7 @@ import {
   emptyCheckPayload,
   lineAmountCents,
   manualTip,
+  payableBillItems,
   resolveManualFee,
   splitLineItem,
   splitLineItemShares,
@@ -98,9 +99,10 @@ export function CheckEditor({
         ? selfMemberId
         : (room.members[0]?.id ?? ""))
   )
-  const [payload, setPayload] = useState<CheckPayload>(
-    check?.payload ?? emptyCheckPayload()
-  )
+  const [payload, setPayload] = useState<CheckPayload>(() => {
+    const source = check?.payload ?? emptyCheckPayload()
+    return { ...source, items: payableBillItems(source.items) }
+  })
   const [phase, setPhase] = useState<Phase>("assign")
   const itemNameRef = useRef<HTMLInputElement>(null)
   const [ocrPending, setOcrPending] = useState(
@@ -410,7 +412,8 @@ export function CheckEditor({
     }))
   }
 
-  const unassignedCount = payload.items.filter(
+  const payableItems = payableBillItems(payload.items)
+  const unassignedCount = payableItems.filter(
     (item) => item.split.mode === "UNASSIGNED"
   ).length
   const backHome = () =>
@@ -534,20 +537,23 @@ export function CheckEditor({
                 onClick={() =>
                   setPayload((prev) => ({
                     ...prev,
-                    items: assignRestToMember(prev.items, selfMemberId),
+                    items: assignRestToMember(
+                      payableBillItems(prev.items),
+                      selfMemberId
+                    ),
                   }))
                 }
               >
                 Assign rest to me
               </button>
-            ) : payload.items.length > 0 ? (
+            ) : payableItems.length > 0 ? (
               <p className="text-[13px] text-muted-foreground">
-                {payload.items.length}{" "}
-                {payload.items.length === 1 ? "item" : "items"}
+                {payableItems.length}{" "}
+                {payableItems.length === 1 ? "item" : "items"}
               </p>
             ) : null}
           </div>
-          {payload.items.length > 0 ? (
+          {payableItems.length > 0 ? (
             <p className="text-[13px] leading-snug text-muted-foreground">
               {readOnly
                 ? "Who had each item."
@@ -555,9 +561,9 @@ export function CheckEditor({
             </p>
           ) : null}
 
-          {payload.items.length > 0 ? (
+          {payableItems.length > 0 ? (
             <ul className="group-list mt-2.5">
-              {payload.items.map((item) => (
+              {payableItems.map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
@@ -938,7 +944,7 @@ export function CheckEditor({
           }
         />
 
-        {room.members.length > 0 && payload.items.length > 0 ? (
+        {room.members.length > 0 && payableItems.length > 0 ? (
           <section aria-labelledby="by-person-heading">
             <h2
               id="by-person-heading"
@@ -1012,7 +1018,7 @@ export function CheckEditor({
               >
                 {split.confirmBlockReason}
               </p>
-            ) : payload.items.length > 0 ? (
+            ) : payableItems.length > 0 ? (
               <p className="text-[13px] text-muted-foreground">
                 Split between {split.shares.length}{" "}
                 {split.shares.length === 1 ? "person" : "people"}

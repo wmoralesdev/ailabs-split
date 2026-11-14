@@ -457,6 +457,129 @@ export function mergeOcrCheckItems(
   return merged
 }
 
+function sameOcrPayableLine(
+  left: { name: string; amountCents: number },
+  right: { name: string; amountCents: number }
+): boolean {
+  if (left.amountCents !== right.amountCents) return false
+  if (foldItemName(left.name) === foldItemName(right.name)) return true
+  return namesOverlap(left.name, right.name)
+}
+
+function subsetSumIndices(amounts: number[], target: number): number[] | null {
+  if (target <= 0 || amounts.length === 0) return null
+  const n = amounts.length
+  if (n > 20) return null
+  const reach: Array<number | undefined> = Array.from({
+    length: target + 1,
+  })
+  reach[0] = -1
+  for (let i = 0; i < n; i++) {
+    const amount = amounts[i]
+    if (amount <= 0 || amount > target) continue
+    for (let sum = target; sum >= amount; sum--) {
+      if (reach[sum] === undefined && reach[sum - amount] !== undefined) {
+        reach[sum] = i
+      }
+    }
+  }
+  if (reach[target] === undefined) return null
+  const indices: number[] = []
+  const used = new Set<number>()
+  let sum = target
+  while (sum > 0) {
+    const index = reach[sum]
+    if (index == null || index < 0 || used.has(index)) return null
+    used.add(index)
+    indices.push(index)
+    sum -= amounts[index]
+  }
+  return indices
+}
+
+function dropDuplicateCopiesToMatch<
+  T extends { name: string; amountCents: number },
+>(items: T[], expectedCents: number): T[] | null {
+  const sum = items.reduce((total, item) => total + item.amountCents, 0)
+  if (sum === expectedCents) return items
+  const extra = sum - expectedCents
+  if (extra <= 0) return null
+
+  const droppable: number[] = []
+  const seen = new Array<boolean>(items.length).fill(false)
+  for (let i = 0; i < items.length; i++) {
+    if (seen[i]) continue
+    seen[i] = true
+    const group = [i]
+    for (let j = i + 1; j < items.length; j++) {
+      if (seen[j]) continue
+      if (sameOcrPayableLine(items[i], items[j])) {
+        seen[j] = true
+        group.push(j)
+      }
+    }
+    droppable.push(...group.slice(1))
+  }
+  if (droppable.length === 0) return null
+
+  const pick = subsetSumIndices(
+    droppable.map((index) => items[index].amountCents),
+    extra
+  )
+  if (!pick) return null
+  const drop = new Set(pick.map((offset) => droppable[offset]))
+  return items.filter((_, index) => !drop.has(index))
+}
+
+function expectedOcrItemTargets(
+  draft: Pick<
+    OcrCheckDraft,
+    "subtotalCents" | "totalCents" | "tax" | "fees" | "discounts" | "tip"
+  >
+): number[] {
+  const adj =
+    (draft.tax ?? []).reduce((sum, row) => sum + row.amountCents, 0) +
+    draft.fees.reduce((sum, row) => sum + row.amountCents, 0) -
+    (draft.discounts ?? []).reduce((sum, row) => sum + row.amountCents, 0)
+  const tip =
+    draft.tip && draft.tip.amountCents > 0 ? draft.tip.amountCents : 0
+  const targets: number[] = []
+  if (draft.subtotalCents != null && draft.subtotalCents > 0) {
+    targets.push(draft.subtotalCents)
+  }
+  if (draft.totalCents != null && draft.totalCents > 0) {
+    const fromTotal = draft.totalCents - adj - tip
+    if (fromTotal > 0 && !targets.includes(fromTotal)) targets.push(fromTotal)
+  }
+  return targets
+}
+
+/**
+ * Drop $0 combo/AYCE rows and OCR duplicate copies when the printed
+ * subtotal/total already accounts for one of them.
+ */
+export function tidyOcrPayableItems<
+  T extends { name: string; amountCents: number },
+>(
+  items: readonly T[],
+  draft: Pick<
+    OcrCheckDraft,
+    "subtotalCents" | "totalCents" | "tax" | "fees" | "discounts" | "tip"
+  >
+): T[] {
+  const payable = items.filter((item) => item.amountCents > 0)
+  const targets = expectedOcrItemTargets(draft)
+  if (targets.length === 0) return payable
+
+  for (const target of targets) {
+    const sum = payable.reduce((total, item) => total + item.amountCents, 0)
+    if (sum === target) return payable
+    const dropped = dropDuplicateCopiesToMatch(payable, target)
+    if (dropped) return dropped
+  }
+  return payable
+}
+
 /**
  * Structured dinner-ticket parse. Does not invent tip/tax: only footer lines.
  * Nested `** 16 ONZ` and `RES`/`VAS` become modifiers, not items.
@@ -598,17 +721,19 @@ export function checkPayloadFromOcr(
   draft: OcrCheckDraft,
   nextId: () => string = () => crypto.randomUUID()
 ): CheckPayload {
-  const items: LineItem[] = draft.items.map((entry) => ({
-    id: nextId(),
-    name: entry.name,
-    quantity: entry.quantity && entry.quantity > 0 ? entry.quantity : 1,
-    unitPriceCents: entry.unitPriceCents ?? entry.amountCents,
-    amountCents: entry.amountCents,
-    modifiers: entry.modifiers,
-    source: "OCR",
-    confidence: entry.confidence,
-    split: { mode: "UNASSIGNED" },
-  }))
+  const items: LineItem[] = tidyOcrPayableItems(draft.items, draft).map(
+    (entry) => ({
+      id: nextId(),
+      name: entry.name,
+      quantity: entry.quantity && entry.quantity > 0 ? entry.quantity : 1,
+      unitPriceCents: entry.unitPriceCents ?? entry.amountCents,
+      amountCents: entry.amountCents,
+      modifiers: entry.modifiers,
+      source: "OCR",
+      confidence: entry.confidence,
+      split: { mode: "UNASSIGNED" },
+    })
+  )
 
   const adjustments = [
     ...(draft.tax ?? []).map((entry) => ({
