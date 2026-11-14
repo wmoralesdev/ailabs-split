@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { useNavigate } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 
@@ -8,6 +7,7 @@ import { SiteLogo } from "@/components/site-logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { openAuthModal } from "@/lib/auth-modal"
 import type { HouseMemberDto } from "@/lib/house-types"
 import { useSignedInUserId } from "@/lib/use-auth-user"
 import type { RoomDto } from "@/server/rooms"
@@ -139,7 +139,6 @@ function HomeMode({
   onNew: () => void
   onGuest: () => void
 }) {
-  const navigate = useNavigate()
 
   return (
     <>
@@ -157,11 +156,8 @@ function HomeMode({
                       onClaimHousemate(member.id)
                       return
                     }
-                    void navigate({
-                      to: "/sign-in",
-                      search: {
-                        redirect: `/r/${code}?claim=${encodeURIComponent(member.id)}`,
-                      },
+                    openAuthModal({
+                      redirect: `/r/${code}?claim=${encodeURIComponent(member.id)}`,
                     })
                   }}
                   className="group-row-hit w-full text-left disabled:opacity-50"
@@ -265,7 +261,6 @@ function NameForm({
   onBack?: () => void
   guestLink: () => void
 }) {
-  const navigate = useNavigate()
   const [name, setName] = useState(initial)
 
   return (
@@ -276,10 +271,7 @@ function NameForm({
         const trimmed = name.trim()
         if (!trimmed) return
         if (!signedIn) {
-          void navigate({
-            to: "/sign-in",
-            search: { redirect: `/r/${code}` },
-          })
+          openAuthModal({ redirect: `/r/${code}` })
           return
         }
         onSubmit(trimmed)

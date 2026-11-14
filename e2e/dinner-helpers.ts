@@ -5,7 +5,7 @@ import { E2E_NAME_COOKIE, E2E_USER_COOKIE } from "../src/lib/auth-session"
 import {
   COOKIE_CONSENT_KEY,
   COOKIE_CONSENT_VALUE,
-} from "../src/lib/cookie-consent"
+} from "../src/lib/site-notice-ack"
 
 /** React 19 attach lags the `load` event; clicks before this are no-ops on SSR HTML. */
 export async function waitForHydration(page: Page) {

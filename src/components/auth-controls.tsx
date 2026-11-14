@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/tanstack-react-start"
-import { Link, useRouterState } from "@tanstack/react-router"
+import { useRouterState } from "@tanstack/react-router"
 
+import { openAuthModal } from "@/lib/auth-modal"
 import { clerkUiEnabled } from "@/lib/clerk-ui"
 import { useSignedInUserId } from "@/lib/use-auth-user"
 
@@ -30,12 +31,12 @@ export function AuthControls() {
   }
 
   return (
-    <Link
-      to="/sign-in"
-      search={{ redirect: href || "/" }}
+    <button
+      type="button"
+      onClick={() => openAuthModal({ redirect: href || "/" })}
       className="split-cta h-8 px-3 text-[13px]"
     >
       Sign in
-    </Link>
+    </button>
   )
 }

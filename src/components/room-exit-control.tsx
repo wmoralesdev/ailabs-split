@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sheet"
 import { hideRoomLocal } from "@/lib/hidden-rooms"
 import { forgetMember } from "@/lib/member-storage"
+import { forgetInvite } from "@/lib/pending-invite"
 import { forgetRecentTrip } from "@/lib/recent-trips"
 import { forgetRoomCache } from "@/lib/room-cache"
 import { roomKeys } from "@/lib/room-query"
@@ -96,6 +97,7 @@ export function RoomExitControl({
       }
       hideRoomLocal(code)
       forgetRecentTrip(code)
+      forgetInvite(code)
     },
     onSuccess: async () => {
       toast.success("Hidden from your list")
@@ -112,6 +114,7 @@ export function RoomExitControl({
       queryClient.removeQueries({ queryKey: roomKeys.room(code) })
       forgetRoomCache(code)
       forgetRecentTrip(code)
+      forgetInvite(code)
       forgetMember(code)
     },
     onSuccess: async () => {

@@ -1,23 +1,18 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
 
-import { ClerkAuthScreen } from "@/components/clerk-auth-screen"
+import { AUTH_HASH } from "@/components/auth-modal"
 import { safeRedirectPath } from "@/lib/auth-session"
 
-type SignUpSearch = {
-  redirect?: string
-}
-
+/**
+ * Not a page: sign-in is a modal over the app. Old links (and Clerk's
+ * `signInUrl`) land on the target screen with the modal open.
+ */
 export const Route = createFileRoute("/sign-up")({
-  validateSearch: (search: Record<string, unknown>): SignUpSearch => ({
-    redirect: safeRedirectPath(search.redirect),
-  }),
   beforeLoad: ({ context, search }) => {
-    if (!context.userId) return
-    throw redirect({ href: search.redirect ?? "/" })
+    const target = safeRedirectPath(
+      (search as Record<string, unknown>).redirect
+    )
+    const hash = context.userId ? "" : AUTH_HASH
+    throw redirect({ href: `${target ?? "/"}${hash}` })
   },
-  component: SignUpPage,
 })
-
-function SignUpPage() {
-  return <ClerkAuthScreen />
-}

@@ -20,6 +20,7 @@ import { HouseLanding } from "@/components/house/house-landing"
 import { MemberIdentityPicker } from "@/components/member-identity-picker"
 import { NameListInput } from "@/components/name-list-input"
 import { RecentTripsList } from "@/components/recent-trips-list"
+import { OnboardingSplash } from "@/components/onboarding-splash"
 import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -52,6 +53,8 @@ import {
   rememberName,
 } from "@/lib/landing-prefs"
 import type { LandingKind } from "@/lib/landing-prefs"
+import { openAuthModal } from "@/lib/auth-modal"
+import { forgetInvite, getPendingInvite } from "@/lib/pending-invite"
 import { householdRooms } from "@/lib/preferred-house"
 import { parseRoomKind, roomKindNoun } from "@/lib/room-kind"
 import { rememberMember } from "@/lib/member-storage"
@@ -74,6 +77,16 @@ import {
   listMyRooms,
 } from "@/server/rooms"
 import type { OwnedRoomDto, RoomDto } from "@/server/rooms"
+
+/** Pending invite room, if it still exists; a dead one is forgotten. */
+async function resolveInviteCode(code: string): Promise<string | null> {
+  const room = await getRoomByCode({ data: { code } })
+  if (!room) {
+    forgetInvite(code)
+    return null
+  }
+  return room.code
+}
 
 type LandingSearch = {
   stay?: boolean
@@ -163,15 +176,19 @@ function LandingPage() {
   const [resuming, setResuming] = useState(() => {
     if (typeof window === "undefined") return false
     if (stay || tab === "join" || joinCode) return false
+    if (userId && getPendingInvite()) return true
     return isStandaloneDisplay() && Boolean(getMostRecentTripCode())
   })
 
   useEffect(() => {
-    if (stay || tab === "join" || joinCode || !isStandaloneDisplay()) return
+    if (stay || tab === "join" || joinCode) return
+    // Signed in after opening an invite: finish the trip to that room.
+    const invite = userId ? getPendingInvite() : null
+    if (!invite && !isStandaloneDisplay()) return
 
     let cancelled = false
 
-    void resolveMostRecentTripCode()
+    void (invite ? resolveInviteCode(invite.code) : resolveMostRecentTripCode())
       .then((code) => {
         if (cancelled) return
         if (!code) {
@@ -191,7 +208,7 @@ function LandingPage() {
     return () => {
       cancelled = true
     }
-  }, [navigate, stay, tab, joinCode])
+  }, [navigate, stay, tab, joinCode, userId])
 
   if (resuming) {
     return (
@@ -208,6 +225,16 @@ function LandingPage() {
   function pickKind(next: LandingKind) {
     setKind(next)
     rememberKind(next)
+  }
+
+  if (!userId) {
+    return (
+      <OnboardingSplash
+        redirect={
+          joinCode ? `/?tab=join&code=${encodeURIComponent(joinCode)}` : undefined
+        }
+      />
+    )
   }
 
   return (
@@ -345,10 +372,7 @@ function landingCreateForm(
         return (
           <SignInToStartHouse
             onSignIn={() => {
-              void input.navigate({
-                to: "/sign-in",
-                search: { redirect: "/?stay=true&kind=house" },
-              })
+              openAuthModal({ redirect: "/?stay=true&kind=house" })
             }}
           />
         )

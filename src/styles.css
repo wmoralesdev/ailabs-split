@@ -203,6 +203,8 @@
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
+    /* Room for the docked cookie notice while it shows (0 otherwise). */
+    padding-bottom: var(--site-notice-height, 0px);
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -813,5 +815,50 @@ button.person-chip-everyone:not([aria-pressed="true"]):focus-visible,
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Onboarding splash: story-style progress bar. */
+.splash-progress {
+  transform-origin: left center;
+  animation-name: splash-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes splash-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Preview card scales to the height its sized container gives it; the
+   tighter rule comes last so it wins. */
+@container (max-height: 310px) {
+  .splash-preview {
+    scale: 0.9;
+  }
+}
+@container (max-height: 280px) {
+  .splash-preview {
+    scale: 0.8;
+  }
+}
+@container (max-height: 250px) {
+  .splash-preview {
+    scale: 0.72;
+  }
+}
+@container (max-height: 220px) {
+  .splash-preview {
+    scale: 0.64;
+  }
+}
+@container (max-height: 190px) {
+  .splash-preview {
+    scale: 0.56;
   }
 }

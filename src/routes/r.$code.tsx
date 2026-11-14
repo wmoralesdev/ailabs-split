@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Link,
   Outlet,
@@ -8,6 +8,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { CreateTripSuccessSheet } from "@/components/create-trip-success-sheet"
+import { OnboardingSplash } from "@/components/onboarding-splash"
 import { PageShell } from "@/components/page-shell"
 import { RoomShell } from "@/components/room-shell"
 import { RoomTabBar } from "@/components/room-tab-bar"
@@ -22,7 +23,9 @@ import {
   rememberMember,
   resolveRememberedMember,
 } from "@/lib/member-storage"
+import { forgetInvite, rememberInvite } from "@/lib/pending-invite"
 import { markInstallEligible } from "@/lib/pwa-install"
+import { useSignedInUserId } from "@/lib/use-auth-user"
 import { rememberRecentTrip } from "@/lib/recent-trips"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import { RoomIdentityContext } from "@/lib/room-identity"
@@ -114,10 +117,13 @@ function RoomLayout() {
   const { as: asName, created, claim } = Route.useSearch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const userId = useSignedInUserId()
   const [memberId, setMemberId] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hydrated, setHydrated] = useState(false)
+  const [inviteSplash, setInviteSplash] = useState(false)
+  const inviteCheckedFor = useRef<string | null>(null)
   const [showCreatedSheet, setShowCreatedSheet] = useState(Boolean(created))
 
   const { data: room, isFetched } = useQuery(roomQueryOptions(code, memberId))
@@ -163,9 +169,23 @@ function RoomLayout() {
   useEffect(() => {
     if (!members) return
     setHydrated(true)
-    if (parseRoomKind(room.kind) === "HOUSEHOLD") return
     const memberIds = members.map((member) => member.id)
     const remembered = resolveRememberedMember(code, memberIds)
+    if (inviteCheckedFor.current === code) {
+      // Decided once per room; a refetch must not reopen a dismissed splash.
+    } else if (created) {
+      forgetInvite()
+    } else if (userId) {
+      // Signed in and here: the invite has done its job.
+      forgetInvite(room.code)
+    } else if (!remembered) {
+      // A signed-out newcomer from a link: show the splash, and keep the
+      // room so signing in (however the flow ends) lands back here.
+      rememberInvite({ code: room.code, kind: room.kind })
+      setInviteSplash(true)
+    }
+    inviteCheckedFor.current = code
+    if (parseRoomKind(room.kind) === "HOUSEHOLD") return
     if (remembered) {
       setMemberId(remembered)
       return
@@ -205,7 +225,7 @@ function RoomLayout() {
     return () => {
       cancelled = true
     }
-  }, [asName, code, members])
+  }, [asName, code, members, created, userId])
 
   async function pickExisting(id: string) {
     setError(null)
@@ -280,6 +300,14 @@ function RoomLayout() {
         <RoomLoadingShell />
         {createdSheet}
       </>
+    )
+  }
+
+  if (inviteSplash) {
+    return (
+      <OnboardingSplash
+        invite={{ code: room.code, name: room.name, kind: room.kind }}
+      />
     )
   }
 

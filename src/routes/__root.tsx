@@ -10,7 +10,8 @@ import type { QueryClient } from "@tanstack/react-query"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
 
-import { CookieBanner } from "@/components/cookie-banner"
+import { AuthModal } from "@/components/auth-modal"
+import { SiteNotice } from "@/components/site-notice"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 import { PwaUpdatePrompt } from "@/components/pwa-update-prompt"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -137,7 +138,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <AppProviders>
             {children}
             <Toaster />
-            <CookieBanner />
+            <SiteNotice />
+            <AuthModal />
             <PwaInstallPrompt />
             <PwaUpdatePrompt />
           </AppProviders>

@@ -20,7 +20,7 @@ export function RoomShell({ children, headerRight, footer }: RoomShellProps) {
   }, [])
 
   return (
-    <SplitAtmosphere className="flex h-dvh max-h-dvh flex-col overflow-hidden">
+    <SplitAtmosphere className="flex h-[calc(100dvh-var(--site-notice-height,0px))] max-h-[calc(100dvh-var(--site-notice-height,0px))] flex-col overflow-hidden">
       <div data-app-shell className="relative flex min-h-0 flex-1 flex-col">
         <AppHeader right={headerRight} />
         <div

@@ -17,7 +17,12 @@ export function SplitAtmosphere({
   className,
 }: SplitAtmosphereProps) {
   return (
-    <Comp className={cn("relative isolate min-h-dvh bg-background", className)}>
+    <Comp
+      className={cn(
+        "relative isolate min-h-[calc(100dvh-var(--site-notice-height,0px))] bg-background",
+        className
+      )}
+    >
       <HalftoneWash />
       {children}
     </Comp>
