@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { ChipRow } from "@/components/chip-row"
 import { PayAccountButton } from "@/components/pay-account-button"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,11 +19,13 @@ import {
 } from "@/components/ui/sheet"
 import {
   PAY_ACCOUNT_MAX,
+  PAY_ACCOUNT_TYPES,
   PAY_LABEL_MAX,
   normalizePayText,
+  payAccountTypeLabel,
   payDetailsLine,
 } from "@/lib/pay-details"
-import type { PayDetailsDto } from "@/lib/pay-details"
+import type { PayAccountType, PayDetailsDto } from "@/lib/pay-details"
 import { roomKeys } from "@/lib/room-query"
 import type { RoomKind } from "@/lib/room-kind"
 import { savePayDetails } from "@/server/pay-details"
@@ -122,21 +125,35 @@ export function PayProfileSheet({
   const accountRef = useRef<HTMLInputElement>(null)
   const [account, setAccount] = useState("")
   const [label, setLabel] = useState("")
+  const [accountType, setAccountType] = useState<PayAccountType | null>(null)
 
   useEffect(() => {
     if (!open || !member) return
     setAccount(member.pay?.account ?? "")
     setLabel(member.pay?.label ?? "")
-  }, [open, member?.id, member?.pay?.account, member?.pay?.label])
+    setAccountType(member.pay?.accountType ?? null)
+  }, [
+    open,
+    member?.id,
+    member?.pay?.account,
+    member?.pay?.label,
+    member?.pay?.accountType,
+  ])
 
   const saveMutation = useMutation({
-    mutationFn: (input: { memberId: string; account: string; label: string }) =>
+    mutationFn: (input: {
+      memberId: string
+      account: string
+      label: string
+      accountType: PayAccountType | null
+    }) =>
       savePayDetails({
         data: {
           code: room.code,
           memberId: input.memberId,
           account: input.account,
           label: input.label,
+          accountType: input.accountType,
           ...(viewerMemberId ? { viewerMemberId } : {}),
         },
       }),
@@ -161,9 +178,11 @@ export function PayProfileSheet({
   const self = member.id === viewerMemberId
   const nextAccount = normalizePayText(account)
   const nextLabel = nextAccount ? normalizePayText(label) : ""
+  const nextType = nextAccount ? accountType : null
   const dirty =
     nextAccount !== (member.pay?.account ?? "") ||
-    nextLabel !== (member.pay?.label ?? "")
+    nextLabel !== (member.pay?.label ?? "") ||
+    nextType !== (member.pay?.accountType ?? null)
   const saving = saveMutation.isPending
   const owner = self ? "Your" : `${member.name}'s`
   const readOnly = member.payLocked || !canEdit
@@ -211,6 +230,7 @@ export function PayProfileSheet({
                   memberId: member.id,
                   account: nextAccount,
                   label: nextLabel,
+                  accountType: nextType,
                 })
               }}
             >
@@ -249,6 +269,40 @@ export function PayProfileSheet({
                     disabled={!nextAccount}
                     className="h-12 bg-card px-3.5"
                   />
+                </div>
+                <div className="grid gap-2">
+                  <p
+                    id="pay-type-label"
+                    className="flex items-center gap-1 text-[13px] leading-none font-medium text-muted-foreground"
+                  >
+                    Account type{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (optional)
+                    </span>
+                  </p>
+                  <ChipRow
+                    role="group"
+                    aria-label="Account type"
+                    bleed
+                    className="[--chip-bleed:1rem]"
+                  >
+                    {PAY_ACCOUNT_TYPES.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        className="person-chip"
+                        aria-pressed={nextType === type}
+                        disabled={!nextAccount}
+                        onClick={() =>
+                          setAccountType((current) =>
+                            current === type ? null : type
+                          )
+                        }
+                      >
+                        {payAccountTypeLabel(type)}
+                      </button>
+                    ))}
+                  </ChipRow>
                 </div>
                 <p className="text-[13px] leading-snug text-muted-foreground">
                   {scopeCopy(room, self)}

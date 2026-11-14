@@ -60,13 +60,25 @@ async function newPage(browser: Browser, scheme: "light" | "dark") {
 
 async function fillPaySheet(
   page: Page,
-  input: { name: string; account: string; bank?: string }
+  input: {
+    name: string
+    account: string
+    bank?: string
+    type?: "Savings" | "Checking"
+  }
 ) {
   const sheet = page.getByRole("dialog")
   await expect(sheet.getByText("Pay details")).toBeVisible()
   await expect(sheet.getByRole("heading", { name: input.name })).toBeVisible()
   await sheet.getByLabel("Account number").fill(input.account)
   if (input.bank) await sheet.getByLabel(/Bank/).fill(input.bank)
+  if (input.type) {
+    const chip = sheet
+      .getByRole("group", { name: "Account type" })
+      .getByRole("button", { name: input.type, exact: true })
+    await chip.click()
+    await expect(chip).toHaveAttribute("aria-pressed", "true")
+  }
   await expect(sheet).toHaveCSS("opacity", "1")
   return sheet
 }
@@ -103,6 +115,7 @@ for (const scheme of ["light", "dark"] as const) {
         name: "Walter",
         account: WALTER_ACCOUNT,
         bank: "BAC",
+        type: "Savings",
       })
       await expect(page.getByText("Only on this bill.")).toBeVisible()
       await shot(page, `${scheme}-profile-edit.png`)
@@ -121,6 +134,7 @@ for (const scheme of ["light", "dark"] as const) {
         name: `Copy Walter's account number ${WALTER_ACCOUNT}`,
       })
       await expect(homeCopy).toBeVisible()
+      await expect(homeCopy).toContainText("BAC · Savings")
       await shot(page, `${scheme}-bill-home-pay.png`)
 
       await page.getByRole("link", { name: "Pay and mark it done" }).click()
@@ -131,7 +145,9 @@ for (const scheme of ["light", "dark"] as const) {
         name: `Copy Walter's account number ${WALTER_ACCOUNT}`,
       })
       await expect(payCopy).toBeVisible()
-      await expect(page.getByText("BAC", { exact: true })).toBeVisible()
+      await expect(
+        page.getByText("BAC · Savings", { exact: true })
+      ).toBeVisible()
       await shot(page, `${scheme}-pay-with-copy.png`)
 
       await payCopy.click()
@@ -159,15 +175,20 @@ for (const scheme of ["light", "dark"] as const) {
         name: "Ana (you)",
         account: ANA_ACCOUNT,
         bank: "BCR",
+        type: "Checking",
       })
       await expect(page.getByText(/Saved to your account/)).toBeVisible()
       await shot(page, `${scheme}-my-profile-edit.png`)
       await savePaySheet(page)
-      await expect(page.getByText(`BCR · ${ANA_ACCOUNT}`)).toBeVisible()
+      await expect(
+        page.getByText(`BCR · Checking · ${ANA_ACCOUNT}`)
+      ).toBeVisible()
 
       await goHome(page)
       await createDinnerFromHome(page, "Ana")
-      await expect(page.getByText(`BCR · ${ANA_ACCOUNT}`)).toBeVisible()
+      await expect(
+        page.getByText(`BCR · Checking · ${ANA_ACCOUNT}`)
+      ).toBeVisible()
       await page.context().close()
     })
 
@@ -195,12 +216,14 @@ for (const scheme of ["light", "dark"] as const) {
         name: "Walter (you)",
         account: WALTER_ACCOUNT,
         bank: "BAC",
+        type: "Savings",
       })
       await savePaySheet(page)
       const copy = page.getByRole("button", {
         name: `Copy your account number ${WALTER_ACCOUNT}`,
       })
       await expect(copy).toBeVisible()
+      await expect(copy).toContainText("BAC · Savings")
       await shot(page, `${scheme}-house-settle-pay.png`)
       await copy.click()
       expect(await clipboard(page)).toBe(WALTER_ACCOUNT)

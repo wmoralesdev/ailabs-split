@@ -1,7 +1,12 @@
 import { z } from "zod"
 
 import { HOUSE_CATEGORIES } from "./house-categories"
-import { PAY_ACCOUNT_MAX, PAY_LABEL_MAX, normalizePayText } from "./pay-details"
+import {
+  PAY_ACCOUNT_MAX,
+  PAY_ACCOUNT_TYPES,
+  PAY_LABEL_MAX,
+  normalizePayText,
+} from "./pay-details"
 import {
   PAYMENT_PROOF_MAX_BASE64_CHARS,
   PAYMENT_PROOF_MIME_TYPES,
@@ -183,6 +188,7 @@ export const savePayDetailsSchema = z.object({
     .transform(normalizePayText)
     .pipe(z.string().max(PAY_LABEL_MAX, "Keep the bank short"))
     .optional(),
+  accountType: z.enum(PAY_ACCOUNT_TYPES).nullable().optional(),
 })
 
 export const removeRoomMemberSchema = z.object({

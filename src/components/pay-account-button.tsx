@@ -4,7 +4,7 @@ import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { copyText } from "@/lib/invite-link"
-import { payDetailsLine } from "@/lib/pay-details"
+import { payBankLine, payDetailsLine } from "@/lib/pay-details"
 import type { PayDetailsDto } from "@/lib/pay-details"
 import { cn } from "@/lib/utils"
 
@@ -84,7 +84,7 @@ export function PayAccountButton({
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] text-muted-foreground">
-          {pay.label ?? `${ownerLabel} account`}
+          {payBankLine(pay) ?? `${ownerLabel} account`}
         </span>
         <span className="block text-[15px] font-semibold [overflow-wrap:anywhere] tabular-nums">
           {pay.account}

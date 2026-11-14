@@ -479,7 +479,12 @@ async function loadRoomByCode(
       ? []
       : await prisma.payProfile.findMany({
           where: { userId: { in: seatUserIds } },
-          select: { userId: true, account: true, label: true },
+          select: {
+            userId: true,
+            account: true,
+            label: true,
+            accountType: true,
+          },
         })
   const profileByUser = new Map(
     payProfiles.map((profile) => [profile.userId, profile])
