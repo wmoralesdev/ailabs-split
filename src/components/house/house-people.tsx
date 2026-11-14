@@ -308,11 +308,16 @@ export function HousePeople({ room }: { room: RoomDto }) {
       </div>
 
       <PersonList title="Housemates" rows={housemates} />
+      {housemates.some((member) => !member.claimed) ? (
+        <p className="group-footer">
+          Share the house from the header so they can claim their names.
+        </p>
+      ) : null}
       <PersonList title="Moved out" rows={movedOut} />
       <PersonList title="Guests" rows={guests} />
 
       {manage ? (
-        <section className="mt-3">
+        <section className="mt-5">
           <form
             className="flex gap-2"
             onSubmit={(event) => {
@@ -435,10 +440,6 @@ export function HousePeople({ room }: { room: RoomDto }) {
         onKind={(isGuest) => kindMutation.mutate(isGuest)}
         onRemove={() => removeMutation.mutate()}
       />
-
-      <p className="mt-8 text-[13px] text-muted-foreground">
-        Share the house from the header so housemates can claim their names.
-      </p>
     </main>
   )
 }

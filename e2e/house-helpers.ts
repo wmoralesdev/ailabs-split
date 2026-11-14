@@ -4,6 +4,17 @@ import type { Page } from "@playwright/test"
 import { signInE2e, skipCookieBanner, waitForHydration } from "./dinner-helpers"
 import { formatDay } from "../src/lib/house-month"
 
+export async function revealCreateHouseForm(page: Page) {
+  const startAnother = page.getByRole("button", { name: "Start another house" })
+  await expect(
+    page.getByLabel("Name your house").or(startAnother)
+  ).toBeVisible()
+  if (await startAnother.isVisible()) {
+    await startAnother.click()
+  }
+  await expect(page.getByLabel("Name your house")).toBeVisible()
+}
+
 export async function pickHouseMode(page: Page) {
   const houseChip = page
     .getByRole("group", { name: "Mode" })
@@ -34,6 +45,7 @@ export async function createHouse(
   await expect(page.getByRole("heading", { name: "Split" })).toBeVisible()
   await waitForHydration(page)
   await pickHouseMode(page)
+  await revealCreateHouseForm(page)
   await page.getByLabel("Name your house").fill(input.houseName)
   await page.getByLabel("Your name").fill(input.creator)
   for (const name of input.housemates ?? []) {

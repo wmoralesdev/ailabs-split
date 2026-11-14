@@ -98,7 +98,7 @@ export function HouseHome({
             </Link>
           ) : null}
         </div>
-        {canAdd ? (
+        {canAdd && months.length > 0 ? (
           <p className="mt-2">
             <Link
               to="/r/$code/new"
@@ -114,11 +114,23 @@ export function HouseHome({
         <DueThisMonth room={room} />
 
         {months.length === 0 ? (
-          <div className="surface mt-8 px-4 py-4">
+          <div
+            className={`surface mt-6 flex flex-col items-start px-4 pt-4 ${canAdd ? "pb-1" : "pb-4"}`}
+          >
             <p className="font-medium text-foreground">No charges yet</p>
             <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
               Add the rent, a grocery run, or anything you share.
             </p>
+            {canAdd ? (
+              <Link
+                to="/r/$code/new"
+                params={{ code: room.code }}
+                search={{}}
+                className="text-action mt-1 text-[15px]"
+              >
+                Scan a receipt
+              </Link>
+            ) : null}
           </div>
         ) : (
           months.map(([month, expenses]) => {
