@@ -89,17 +89,5 @@
     "vite": "^8",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4"
-  },
-  "pnpm": {
-    "overrides": {
-      "@tanstack/router-core": "1.171.39",
-      "@tanstack/start-server-core": "1.169.45"
-    },
-    "onlyBuiltDependencies": [
-      "prisma",
-      "@prisma/engines",
-      "esbuild",
-      "sharp"
-    ]
   }
 }

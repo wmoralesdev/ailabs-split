@@ -1,9 +1,15 @@
 packages: []
 
+overrides:
+  '@tanstack/router-core': 1.171.39
+  '@tanstack/start-server-core': 1.169.45
+
 allowBuilds:
   esbuild: true
   lightningcss: true
   unrs-resolver: true
   msw: false
+  core-js: false
   '@prisma/engines': true
   prisma: true
+  sharp: true
