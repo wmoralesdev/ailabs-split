@@ -1,8 +1,10 @@
 import { HugeiconsIcon } from "@hugeicons/react"
 import { CheckmarkCircle02Icon, Share01Icon } from "@hugeicons/core-free-icons"
 
+import { PayAccountButton } from "@/components/pay-account-button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import type { PayDetailsDto } from "@/lib/pay-details"
 import { formatMoney } from "@/lib/settle"
 import type { Transfer } from "@/lib/settle"
 import { cn } from "@/lib/utils"
@@ -28,6 +30,8 @@ export function TransferCard({
   pending,
   disabled,
   canMark = true,
+  payee = null,
+  onPayeeDetails,
   onMarkPaid,
   onRemind,
 }: {
@@ -39,6 +43,10 @@ export function TransferCard({
   disabled: boolean
   /** False hides the mark-paid control for viewers who can't record it. */
   canMark?: boolean
+  /** Where the money goes; shown with a copy action. */
+  payee?: PayDetailsDto | null
+  /** Opens the payee's pay details when there is no number yet. */
+  onPayeeDetails?: () => void
   onMarkPaid: () => void
   onRemind: () => void
 }) {
@@ -54,6 +62,10 @@ export function TransferCard({
     : iGet
       ? `${transfer.fromName} paid me`
       : "Mark paid"
+  const payeeOwner = iGet ? "Your" : `${transfer.toName}'s`
+  const addPayeeLabel = iGet
+    ? "Add your account number"
+    : `Add ${transfer.toName}'s account`
 
   if (!emphasis) {
     return (
@@ -63,6 +75,14 @@ export function TransferCard({
           <p className="text-[15px] font-semibold tabular-nums">
             {formatMoney(transfer.amountCents, currency)}
           </p>
+          {payee ? (
+            <PayAccountButton
+              pay={payee}
+              ownerLabel={payeeOwner}
+              variant="inline"
+              className="-my-1.5"
+            />
+          ) : null}
         </div>
         <Button
           type="button"
@@ -110,6 +130,21 @@ export function TransferCard({
       <p className="mt-2 font-display text-[26px] leading-none font-bold tracking-tight tabular-nums">
         {formatMoney(transfer.amountCents, currency)}
       </p>
+      {payee ? (
+        <PayAccountButton
+          pay={payee}
+          ownerLabel={payeeOwner}
+          className="mt-3"
+        />
+      ) : onPayeeDetails ? (
+        <button
+          type="button"
+          className="text-action -mb-2 text-[15px]"
+          onClick={onPayeeDetails}
+        >
+          {addPayeeLabel}
+        </button>
+      ) : null}
       <div className="mt-4 flex gap-2">
         {canMark ? (
           <Button

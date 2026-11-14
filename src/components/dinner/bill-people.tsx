@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { BillPersonSheet } from "@/components/dinner/bill-person-sheet"
 import { MemberPicker } from "@/components/member-picker"
+import { PayProfileSheet } from "@/components/pay-profile-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -84,7 +85,9 @@ export function BillPeople({
   const inputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [payMemberId, setPayMemberId] = useState<string | null>(null)
   const members = room.members
+  const payMember = members.find((member) => member.id === payMemberId) ?? null
   const editing = members.find((member) => member.id === editingId) ?? null
 
   const addMutation = useMutation({
@@ -309,6 +312,11 @@ export function BillPeople({
             if (!open && !saving) setEditingId(null)
           }}
           onRename={(name) => renameMutation.mutate(name)}
+          onPayDetails={() => {
+            if (!editing) return
+            setEditingId(null)
+            setPayMemberId(editing.id)
+          }}
           onRemove={() => {
             if (!editing) return
             removeMutation.mutate({
@@ -319,6 +327,15 @@ export function BillPeople({
           }}
         />
       )}
+      <PayProfileSheet
+        room={room}
+        member={payMember}
+        viewerMemberId={selfMemberId}
+        open={payMember !== null}
+        onOpenChange={(open) => {
+          if (!open) setPayMemberId(null)
+        }}
+      />
     </section>
   )
 }

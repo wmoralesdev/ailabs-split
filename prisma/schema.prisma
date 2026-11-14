@@ -39,6 +39,14 @@ model Room {
   @@index([ownerUserId])
 }
 
+// A signed-in person's own account number, shown wherever they get paid.
+model PayProfile {
+  userId    String   @id
+  account   String
+  label     String?
+  updatedAt DateTime @updatedAt
+}
+
 model RoomHide {
   id        String   @id @default(cuid())
   userId    String
@@ -62,6 +70,10 @@ model Member {
   // HOUSEHOLD: move-in / move-out dates (day, no time).
   joinedOn                   DateTime?           @db.Date
   leftOn                     DateTime?           @db.Date
+  // Typed by people in the room for someone added by name. A seat with a userId
+  // reads PayProfile instead. Never filled from receipt OCR.
+  payAccount                 String?
+  payLabel                   String?
   createdAt                  DateTime            @default(now())
   room                       Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
   paidExpenses               Expense[]           @relation("ExpensePaidBy")

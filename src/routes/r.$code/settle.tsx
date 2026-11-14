@@ -16,6 +16,7 @@ import {
   PaymentProofDialog,
 } from "@/components/payment-proof-dialog"
 import { PaymentProofSheet } from "@/components/payment-proof-sheet"
+import { PayProfileSheet } from "@/components/pay-profile-sheet"
 import {
   SettleEmptyState,
   TransferCard,
@@ -96,6 +97,7 @@ function SettlePage() {
   const [pendingKey, setPendingKey] = useState<string | null>(null)
   const [pendingTransfer, setPendingTransfer] = useState<Transfer | null>(null)
   const [viewing, setViewing] = useState<SettlementDto | null>(null)
+  const [payMemberId, setPayMemberId] = useState<string | null>(null)
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
@@ -201,6 +203,17 @@ function SettlePage() {
   )
   const paidCount = room.settlements.length
   const stepCount = paidCount + transfers.length
+  const payMember =
+    room.members.find((member) => member.id === payMemberId) ?? null
+
+  function payeeProps(transfer: Transfer) {
+    const payee = room?.members.find((member) => member.id === transfer.toId)
+    return {
+      payee: payee?.pay ?? null,
+      onPayeeDetails:
+        payee && !payee.payLocked ? () => setPayMemberId(payee.id) : undefined,
+    }
+  }
 
   async function shareSummary() {
     if (!room) return
@@ -361,6 +374,7 @@ function SettlePage() {
                 currency={room.currency}
                 memberId={memberId}
                 emphasis
+                {...payeeProps(transfer)}
                 pending={pendingKey === transferKey(transfer)}
                 disabled={recordMutation.isPending || household}
                 onMarkPaid={() => markPaid(transfer)}
@@ -383,6 +397,7 @@ function SettlePage() {
                 transfer={transfer}
                 currency={room.currency}
                 memberId={memberId}
+                {...payeeProps(transfer)}
                 pending={pendingKey === transferKey(transfer)}
                 disabled={recordMutation.isPending || household}
                 onMarkPaid={() => markPaid(transfer)}
@@ -475,6 +490,15 @@ function SettlePage() {
           if (!next) setPendingTransfer(null)
         }}
         onConfirm={confirmPaid}
+      />
+      <PayProfileSheet
+        room={room}
+        member={payMember}
+        viewerMemberId={memberId || null}
+        open={payMember !== null}
+        onOpenChange={(next) => {
+          if (!next) setPayMemberId(null)
+        }}
       />
       <PaymentProofDialog
         open={viewing !== null}

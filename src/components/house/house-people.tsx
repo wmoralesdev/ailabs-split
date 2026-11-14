@@ -6,6 +6,7 @@ import { Add01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { HousePersonSheet } from "@/components/house/house-person-sheet"
+import { PayProfileSheet } from "@/components/pay-profile-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -68,6 +69,7 @@ export function HousePeople({ room }: { room: RoomDto }) {
   const [asGuest, setAsGuest] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [transferOpen, setTransferOpen] = useState(false)
+  const [payMemberId, setPayMemberId] = useState<string | null>(null)
 
   const editing = members.find((member) => member.id === editingId) ?? null
   const manage = canManagePeople(role)
@@ -285,6 +287,14 @@ export function HousePeople({ room }: { room: RoomDto }) {
   const canMoveOutEditing = Boolean(
     editing && canSetMemberDates(role, actorId, editing.id)
   )
+  const editingRoomMember = editing
+    ? (room.members.find((member) => member.id === editing.id) ?? null)
+    : null
+  const payMember =
+    room.members.find((member) => member.id === payMemberId) ?? null
+  const canEditPay = (memberId: string) =>
+    memberId === actorId ||
+    (manage && !members.find((m) => m.id === memberId)?.claimed)
   const moveOutBlocked = editing?.isOwner
     ? transferBeforeMoveOutMessage()
     : null
@@ -429,6 +439,15 @@ export function HousePeople({ room }: { room: RoomDto }) {
               )
             : null
         }
+        pay={editingRoomMember?.pay ?? null}
+        onPayDetails={
+          editing && (editingRoomMember?.pay || canEditPay(editing.id))
+            ? () => {
+                setEditingId(null)
+                setPayMemberId(editing.id)
+              }
+            : undefined
+        }
         onOpenChange={(open) => {
           if (!open) setEditingId(null)
         }}
@@ -439,6 +458,16 @@ export function HousePeople({ room }: { room: RoomDto }) {
         }}
         onKind={(isGuest) => kindMutation.mutate(isGuest)}
         onRemove={() => removeMutation.mutate()}
+      />
+      <PayProfileSheet
+        room={room}
+        member={payMember}
+        viewerMemberId={actorId}
+        canEdit={payMember ? canEditPay(payMember.id) : false}
+        open={payMember !== null}
+        onOpenChange={(open) => {
+          if (!open) setPayMemberId(null)
+        }}
       />
     </main>
   )

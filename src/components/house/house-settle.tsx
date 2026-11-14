@@ -10,6 +10,7 @@ import {
   PaymentProofDialog,
 } from "@/components/payment-proof-dialog"
 import { PaymentProofSheet } from "@/components/payment-proof-sheet"
+import { PayProfileSheet } from "@/components/pay-profile-sheet"
 import {
   SettleEmptyState,
   TransferCard,
@@ -59,6 +60,9 @@ export function HouseSettle({ room }: { room: RoomDto }) {
   const [viewing, setViewing] = useState<SettlementDto | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(actorId)
   const [openMonth, setOpenMonth] = useState<string | null>(null)
+  const [payMemberId, setPayMemberId] = useState<string | null>(null)
+  const payMember =
+    room.members.find((member) => member.id === payMemberId) ?? null
 
   const nets = useMemo(
     () => houseNets(room.members, room.expenses, room.settlements),
@@ -209,6 +213,7 @@ export function HouseSettle({ room }: { room: RoomDto }) {
   )
 
   function renderTransfer(transfer: Transfer, emphasis: boolean) {
+    const payee = room.members.find((member) => member.id === transfer.toId)
     return (
       <TransferCard
         key={transferKey(transfer)}
@@ -222,6 +227,10 @@ export function HouseSettle({ room }: { room: RoomDto }) {
           draft.toId === transfer.toId
         }
         disabled={recordMutation.isPending}
+        payee={payee?.pay ?? null}
+        onPayeeDetails={
+          payee && !payee.payLocked ? () => setPayMemberId(payee.id) : undefined
+        }
         canMark={canRecordPayment(
           role,
           actorId,
@@ -513,6 +522,16 @@ export function HouseSettle({ room }: { room: RoomDto }) {
             amountCents: draftAmountCents,
             ...(proof ? { proof } : {}),
           })
+        }}
+      />
+
+      <PayProfileSheet
+        room={room}
+        member={payMember}
+        viewerMemberId={actorId}
+        open={payMember !== null}
+        onOpenChange={(open) => {
+          if (!open) setPayMemberId(null)
         }}
       />
 
