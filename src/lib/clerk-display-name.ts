@@ -12,21 +12,25 @@ function nonempty(value: string | null | undefined): string | undefined {
   return trimmed ? trimmed : undefined
 }
 
+function firstGivenName(value: string | null | undefined): string | undefined {
+  const trimmed = nonempty(value)
+  if (!trimmed) return undefined
+  return trimmed.split(/\s+/)[0]
+}
+
 /**
- * Clerk display name for "Your name": fullName, else firstName, else username.
- * Backend User has no fullName; first+last is Clerk's frontend fullName.
+ * Clerk given name for "Your name": firstName, else first word of fullName,
+ * else username. Last names stay out of the split nickname.
  */
 export function clerkDisplayName(
   user: ClerkNameFields | null | undefined
 ): string {
   if (!user) return ""
-  const joined = [user.firstName, user.lastName]
-    .map((part) => nonempty(part))
-    .filter((part): part is string => Boolean(part))
-    .join(" ")
-  const fullName = nonempty(user.fullName) ?? nonempty(joined)
   const name =
-    fullName ?? nonempty(user.firstName) ?? nonempty(user.username) ?? ""
+    nonempty(user.firstName) ??
+    firstGivenName(user.fullName) ??
+    nonempty(user.username) ??
+    ""
   return name.slice(0, CREATOR_NAME_MAX)
 }
 

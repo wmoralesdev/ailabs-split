@@ -3,14 +3,15 @@ import { describe, expect, it } from "vitest"
 import { clerkDisplayName, nextCreatorName } from "./clerk-display-name"
 
 describe("clerkDisplayName", () => {
-  it("prefers fullName", () => {
+  it("uses firstName even when fullName is set", () => {
     expect(
       clerkDisplayName({
         fullName: "Walter Morales",
         firstName: "Walter",
+        lastName: "Morales",
         username: "wmorales",
       })
-    ).toBe("Walter Morales")
+    ).toBe("Walter")
   })
 
   it("uses firstName when fullName is empty", () => {
@@ -23,14 +24,33 @@ describe("clerkDisplayName", () => {
     ).toBe("Walter")
   })
 
-  it("joins first and last when fullName is missing", () => {
+  it("ignores lastName when firstName is set", () => {
     expect(
       clerkDisplayName({
         firstName: "Walter",
         lastName: "Morales",
         username: "wmorales",
       })
-    ).toBe("Walter Morales")
+    ).toBe("Walter")
+  })
+
+  it("takes the first word of fullName when firstName is missing", () => {
+    expect(
+      clerkDisplayName({
+        fullName: "Walter Morales",
+        username: "wmorales",
+      })
+    ).toBe("Walter")
+  })
+
+  it("keeps a compound firstName", () => {
+    expect(
+      clerkDisplayName({
+        firstName: "Maria Jose",
+        lastName: "Garcia",
+        fullName: "Maria Jose Garcia",
+      })
+    ).toBe("Maria Jose")
   })
 
   it("uses username last", () => {

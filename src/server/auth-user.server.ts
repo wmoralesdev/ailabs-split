@@ -69,7 +69,7 @@ export async function requireSignedInUserId(): Promise<string> {
   return userId
 }
 
-/** Landing-only: e2e cookie, else Clerk Backend User (fullName / firstName / username). */
+/** Landing-only: e2e cookie, else Clerk given name (firstName / fullName / username). */
 export async function getSignedInDisplayName(): Promise<string> {
   if (e2eAuthEnabled()) {
     if (!parseClerkUserId(readCookie(E2E_USER_COOKIE))) return ""
