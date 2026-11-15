@@ -22,8 +22,9 @@ import {
   formatLineAmount,
   formatLinePayHint,
   formatPayAllSummary,
+  amountWithCode,
   formatSettleDetail,
-  formatSettleHeadlines,
+  joinPersonNames,
   outgoingSettleItems,
   readHiddenDinnerCodes,
 } from "@/lib/dinner-settle-all"
@@ -160,8 +161,42 @@ export function ToSettleCard({
   if (waiting && !card) return null
   if (!card) return null
 
-  const headlines = formatSettleHeadlines(card)
   const detail = formatSettleDetail(card)
+  const showCode = card.buckets.length > 1
+  const owe = card.buckets
+    .filter((bucket) => bucket.oweCents > 0)
+    .map((bucket) => amountWithCode(bucket.oweCents, bucket.currency, showCode))
+  const owed = card.buckets
+    .filter((bucket) => bucket.owedCents > 0)
+    .map((bucket) => amountWithCode(bucket.owedCents, bucket.currency, showCode))
+  const sides = [
+    ...(owe.length > 0
+      ? [
+          {
+            label: "You owe",
+            amounts: owe,
+            people:
+              card.payeeNames.length > 0
+                ? `To ${joinPersonNames(card.payeeNames)}`
+                : null,
+          },
+        ]
+      : []),
+    ...(owed.length > 0
+      ? [
+          {
+            label: "You get back",
+            amounts: owed,
+            people:
+              card.payerNames.length > 0
+                ? card.payerNames.length > 3
+                  ? `From ${card.payerNames.length} people`
+                  : `From ${joinPersonNames(card.payerNames)}`
+                : null,
+          },
+        ]
+      : []),
+  ]
 
   function openDinnerSettle(code: string) {
     setListOpen(false)
@@ -180,20 +215,46 @@ export function ToSettleCard({
         data-testid="to-settle-card"
         aria-haspopup="dialog"
         onClick={() => setListOpen(true)}
-        className="surface mt-8 w-full p-4 text-left transition-[transform,background-color] duration-200 outline-none hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px"
+        className="mt-8 w-full overflow-hidden rounded-3xl bg-card text-left transition-[transform,background-color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:hover:-translate-y-px motion-safe:active:translate-y-px"
       >
-        <p className="eyebrow">To settle</p>
-        <div className="mt-1 flex flex-col gap-0.5">
-          {headlines.map((headline) => (
-            <p
-              key={headline}
-              className="font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums"
-            >
-              {headline}
-            </p>
+        <span className="flex items-center justify-between gap-3 px-4 pt-4">
+          <span className="text-[13px] font-medium text-muted-foreground">
+            To settle · {card.dinnerCount}{" "}
+            {card.dinnerCount === 1 ? "bill" : "bills"}
+          </span>
+          <span className="inline-flex items-center gap-0.5 text-[13px] font-medium text-primary">
+            See all
+            <HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
+          </span>
+        </span>
+        <span
+          className={
+            sides.length > 1
+              ? "grid grid-cols-2 divide-x divide-border/70"
+              : "grid grid-cols-1"
+          }
+        >
+          {sides.map((side) => (
+            <span key={side.label} className="min-w-0 px-4 pt-2 pb-4">
+              <span className="block text-[13px] text-muted-foreground">
+                {side.label}
+              </span>
+              {side.amounts.map((amount) => (
+                <span
+                  key={amount}
+                  className="mt-0.5 block truncate font-display text-[28px] leading-tight font-bold tracking-tight tabular-nums"
+                >
+                  {amount}
+                </span>
+              ))}
+              {side.people ? (
+                <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">
+                  {side.people}
+                </span>
+              ) : null}
+            </span>
           ))}
-        </div>
-        <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
+        </span>
       </button>
 
       <Sheet open={listOpen} onOpenChange={setListOpen}>

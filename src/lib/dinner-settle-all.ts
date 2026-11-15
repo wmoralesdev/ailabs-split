@@ -194,7 +194,7 @@ export function buildSettleAllCard(
   }
 }
 
-function amountWithCode(
+export function amountWithCode(
   cents: number,
   currency: string,
   showCode: boolean
