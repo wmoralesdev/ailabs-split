@@ -1,3 +1,5 @@
+import { ocrErrorMessage, ocrLog, ocrMs, ocrNow } from "@/lib/ocr-log"
+
 export type CompressedImage = {
   base64: string
   mimeType: "image/jpeg"
@@ -185,8 +187,33 @@ async function compressImage(
  * Resize + JPEG-compress a phone photo in the browser before OCR upload.
  * Handles typical iPhone sizes (~8–12MB) without shipping a heavy library.
  */
-export function compressImageForOcr(file: File): Promise<CompressedImage> {
-  return compressImage(file, OCR_COMPRESS)
+export async function compressImageForOcr(
+  file: File
+): Promise<CompressedImage> {
+  const startedAt = ocrNow()
+  ocrLog("compress:start", {
+    sourceBytes: file.size,
+    type: file.type,
+  })
+  try {
+    const image = await compressImage(file, OCR_COMPRESS)
+    ocrLog("compress:done", {
+      ms: ocrMs(startedAt),
+      sourceBytes: file.size,
+      outBytes: image.bytesApprox,
+      imageKb: Math.round(image.bytesApprox / 1024),
+      width: image.width,
+      height: image.height,
+    })
+    return image
+  } catch (error) {
+    ocrLog("compress:error", {
+      ms: ocrMs(startedAt),
+      sourceBytes: file.size,
+      message: ocrErrorMessage(error),
+    })
+    throw error
+  }
 }
 
 /** Same pipeline as OCR, slightly sharper so transfer amounts stay readable. */

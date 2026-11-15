@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { computeDinnerSplit } from "./dinner-split"
 import {
   BIBLIOTECA_CAFE_MD,
+  CAMPERO_DTE_MD,
   CELESTE_IMPERIO_MD,
   PASTARIA_MESA_M11_MD,
   PASTARIA_WRAPPED_BEFORE_PRICES_MD,
@@ -376,5 +377,65 @@ describe("mergeOcrCheckItems", () => {
     )
     expect(merged.find((item) => /formaggi/i.test(item.name))).toBeTruthy()
     expect(merged).toHaveLength(parsed.items.length)
+  })
+})
+
+describe("SV DTE unit-price layout", () => {
+  it("strips ( 0.40)(G)$ from names and keeps the unit price", () => {
+    const parsed = extractCheckDraft(CAMPERO_DTE_MD)
+    const pan = parsed.items.find((item) => item.amountCents === 280)
+    expect(pan).toMatchObject({ name: "Pan", quantity: 7, unitPriceCents: 40 })
+    expect(parsed.items.some((item) => /\(G\)/.test(item.name))).toBe(false)
+  })
+
+  it("does not duplicate a short name like Pan when merged with vision", () => {
+    const parsed = extractCheckDraft(CAMPERO_DTE_MD)
+    const vision = [
+      { name: "Men camperito S/", quantity: 7, unitPriceCents: 675, amountCents: 4725 },
+      { name: "Pan", quantity: 7, unitPriceCents: 40, amountCents: 280 },
+      { name: "Aderezo B. Ranch", quantity: 1, unitPriceCents: 75, amountCents: 75 },
+    ].map((item) => ({ ...item, modifiers: [], confidence: 0.95 }))
+    const payable = tidyOcrPayableItems(
+      mergeOcrCheckItems(vision, parsed.items),
+      parsed
+    )
+    expect(payable.map((item) => item.name)).toEqual([
+      "Men camperito S/",
+      "Pan",
+      "Aderezo B. Ranch",
+    ])
+    expect(payable.reduce((sum, item) => sum + item.amountCents, 0)).toBe(5080)
+  })
+
+  it("drops a copy whose name disagrees when the printed total confirms it", () => {
+    const row = (name: string, quantity: number, amountCents: number) => ({
+      name,
+      quantity,
+      amountCents,
+      modifiers: [],
+      confidence: 0.9,
+    })
+    const payable = tidyOcrPayableItems(
+      [
+        row("Men camperito S/", 7, 4725),
+        row("Pan ( 0.40)(G)", 7, 280),
+        row("Aderezo B. Ranch", 1, 75),
+        row("Pan", 7, 280),
+      ],
+      { subtotalCents: 5080, totalCents: 5080, fees: [] }
+    )
+    expect(payable).toHaveLength(3)
+    expect(payable.reduce((sum, item) => sum + item.amountCents, 0)).toBe(5080)
+  })
+
+  it("keeps same-price rows when the total says both are real", () => {
+    const payable = tidyOcrPayableItems(
+      [
+        { name: "Pepsi", quantity: 1, amountCents: 250 },
+        { name: "Te", quantity: 1, amountCents: 250 },
+      ],
+      { subtotalCents: 500, totalCents: 500, fees: [] }
+    )
+    expect(payable).toHaveLength(2)
   })
 })

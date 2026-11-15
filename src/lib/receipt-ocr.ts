@@ -158,6 +158,10 @@ const MONEY_AT_END =
 
 const RAW_TEXT_LIMIT = 20_000
 
+/** `( 0.40)(G)$` — unit price then Gravada/Exenta/No Sujeta flag. */
+const UNIT_PRICE_WITH_TAX_FLAG =
+  /\(\s*(\d+[.,]\d{2})\s*\)\s*\((?:G|E|NS)\)\s*\$?/gi
+
 function normalizeOcrLines(markdown: string): string[] {
   return markdown
     .split(/\r?\n/)
@@ -167,6 +171,8 @@ function normalizeOcrLines(markdown: string): string[] {
         .replace(/\|\s*$/, "")
         .replace(/\|/g, " ")
         .replace(/^[#>*]+\s+/, "")
+        // SV DTE layout: `7 Pan ( 0.40)(G)$ 2.80` → `7 Pan 0.40 2.80`.
+        .replace(UNIT_PRICE_WITH_TAX_FLAG, " $1 ")
         .replace(/\s+/g, " ")
         .trim()
     )
@@ -457,13 +463,18 @@ export function mergeOcrCheckItems(
   return merged
 }
 
-function sameOcrPayableLine(
-  left: { name: string; amountCents: number },
-  right: { name: string; amountCents: number }
-): boolean {
+type PayableLine = { name: string; amountCents: number; quantity?: number }
+
+/**
+ * Candidate OCR copy of the same row. Names can disagree between vision and
+ * the line parser (`Pan` vs `Pan ( 0.40)(G)`), so same amount + same quantity
+ * also counts; callers only drop a copy when the printed total confirms it.
+ */
+function sameOcrPayableLine(left: PayableLine, right: PayableLine): boolean {
   if (left.amountCents !== right.amountCents) return false
   if (foldItemName(left.name) === foldItemName(right.name)) return true
-  return namesOverlap(left.name, right.name)
+  if (namesOverlap(left.name, right.name)) return true
+  return (left.quantity ?? 1) === (right.quantity ?? 1)
 }
 
 function subsetSumIndices(amounts: number[], target: number): number[] | null {
@@ -497,9 +508,7 @@ function subsetSumIndices(amounts: number[], target: number): number[] | null {
   return indices
 }
 
-function dropDuplicateCopiesToMatch<
-  T extends { name: string; amountCents: number },
->(items: T[], expectedCents: number): T[] | null {
+function dropDuplicateCopiesToMatch<T extends PayableLine>(items: T[], expectedCents: number): T[] | null {
   const sum = items.reduce((total, item) => total + item.amountCents, 0)
   if (sum === expectedCents) return items
   const extra = sum - expectedCents
@@ -558,9 +567,7 @@ function expectedOcrItemTargets(
  * Drop $0 combo/AYCE rows and OCR duplicate copies when the printed
  * subtotal/total already accounts for one of them.
  */
-export function tidyOcrPayableItems<
-  T extends { name: string; amountCents: number },
->(
+export function tidyOcrPayableItems<T extends PayableLine>(
   items: readonly T[],
   draft: Pick<
     OcrCheckDraft,

@@ -1,5 +1,6 @@
 import { compressImageForOcr } from "@/lib/compress-image"
 import type { CompressedImage } from "@/lib/compress-image"
+import { runClientTicketOcr } from "@/lib/ocr-log"
 import type { OcrDraft } from "@/lib/receipt-ocr"
 import { scanReceipt } from "@/server/ocr"
 
@@ -20,16 +21,19 @@ export function startPendingDinnerScan(options: {
   image: Promise<CompressedImage>
   nameFromTicket: boolean
 }): Promise<OcrDraft> {
-  const result = options.image.then((compressed) =>
-    scanReceipt({
-      data: {
-        code: options.code,
-        imageBase64: compressed.base64,
-        mimeType: compressed.mimeType,
-        mode: "dinner",
-      },
-    })
-  )
+  const result = runClientTicketOcr({
+    kind: "dinner",
+    image: options.image,
+    scan: (compressed) =>
+      scanReceipt({
+        data: {
+          code: options.code,
+          imageBase64: compressed.base64,
+          mimeType: compressed.mimeType,
+          mode: "dinner",
+        },
+      }),
+  })
   pendingScans.set(options.code.toUpperCase(), {
     nameFromTicket: options.nameFromTicket,
     result,

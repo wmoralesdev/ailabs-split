@@ -24,6 +24,7 @@ import {
   parseHouseReceiptExtract,
 } from "@/lib/house-receipt-ocr"
 import type { HouseScanDraft } from "@/lib/house-receipt-ocr"
+import { ocrLog, ocrMs, ocrNow } from "@/lib/ocr-log"
 import {
   RECEIPT_VISION_INSTRUCTIONS,
   draftFromExtract,
@@ -55,6 +56,12 @@ const MAX_BASE64_CHARS = 1_400_000
 const OCR_TIMEOUT_MS = 45_000
 const OCR_VISION_MODEL = "gpt-5-mini"
 const OCR_MAX_OUTPUT_TOKENS = 16_384
+/**
+ * Vision took ~21 s on `low`; `minimal` cuts hidden reasoning. `OCR_REASONING_EFFORT`
+ * overrides it so `minimal` vs `low` can be compared on the same ticket.
+ */
+const OCR_REASONING_EFFORT: "minimal" | "low" =
+  process.env.OCR_REASONING_EFFORT === "low" ? "low" : "minimal"
 
 async function claimRoomOwnerIfOpen(code: string, userId: string) {
   await prisma.room.updateMany({
@@ -129,6 +136,29 @@ function fixtureDraft(mode: OcrScanMode): OcrDraft {
       const _exhaustive: never = mode
       return _exhaustive
     }
+  }
+}
+
+function imageKb(imageBase64: string): number {
+  return Math.round((imageBase64.length * 3) / 4 / 1024)
+}
+
+function visionUsage(response: {
+  usage?: {
+    input_tokens?: number
+    output_tokens?: number
+    output_tokens_details?: { reasoning_tokens?: number }
+    total_tokens?: number
+  }
+  status?: string
+}): Record<string, unknown> {
+  const usage = response.usage
+  return {
+    status: response.status,
+    inputTokens: usage?.input_tokens,
+    outputTokens: usage?.output_tokens,
+    reasoningTokens: usage?.output_tokens_details?.reasoning_tokens,
+    totalTokens: usage?.total_tokens,
   }
 }
 
@@ -234,46 +264,72 @@ export const scanReceipt = createServerFn({ method: "POST" })
     return { ...parsed, mode }
   })
   .handler(async ({ data }): Promise<OcrDraft> => {
-    const userId = await requireSignedInUserId()
-    assertRateLimit(`ocr:user:${userId}`, {
-      limit: 8,
-      windowMs: 60_000,
-      label: "receipt scans",
+    const startedAt = ocrNow()
+    const kind = data.mode
+    const meta = {
+      kind,
+      mime: data.mimeType,
+      imageKb: imageKb(data.imageBase64),
+    }
+    ocrLog("scan:start", {
+      ...meta,
+      fixture: process.env.OCR_FIXTURE === "1",
+      model: OCR_VISION_MODEL,
     })
+    try {
+      const userId = await requireSignedInUserId()
+      assertRateLimit(`ocr:user:${userId}`, {
+        limit: 8,
+        windowMs: 60_000,
+        label: "receipt scans",
+      })
 
-    if (process.env.OCR_FIXTURE === "1") {
+      if (process.env.OCR_FIXTURE === "1") {
+        await assertCanScanRoom(data.code, userId)
+        await claimRoomOwnerIfOpen(data.code, userId)
+        const draft = fixtureDraft(data.mode)
+        ocrLog("scan:done", {
+          ...meta,
+          fixture: true,
+          totalMs: ocrMs(startedAt),
+        })
+        return draft
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) {
+        throw new Error("OPENAI_API_KEY is not configured")
+      }
+
+      const ip = clientKey()
+      assertRateLimit(`ocr:ip:${ip}`, {
+        limit: 8,
+        windowMs: 60_000,
+        label: "receipt scans",
+      })
+      assertRateLimit(`ocr:room:${data.code}`, {
+        limit: 20,
+        windowMs: 60_000,
+        label: "receipt scans for this trip",
+      })
+
+      // Prove the room exists before spending OpenAI credits.
       await assertCanScanRoom(data.code, userId)
       await claimRoomOwnerIfOpen(data.code, userId)
-      return fixtureDraft(data.mode)
-    }
 
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not configured")
-    }
-
-    const ip = clientKey()
-    assertRateLimit(`ocr:ip:${ip}`, {
-      limit: 8,
-      windowMs: 60_000,
-      label: "receipt scans",
-    })
-    assertRateLimit(`ocr:room:${data.code}`, {
-      limit: 20,
-      windowMs: 60_000,
-      label: "receipt scans for this trip",
-    })
-
-    // Prove the room exists before spending OpenAI credits.
-    await assertCanScanRoom(data.code, userId)
-    await claimRoomOwnerIfOpen(data.code, userId)
-
-    const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })
-    try {
+      const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })
+      const visionStartedAt = ocrNow()
+      ocrLog("scan:vision:start", {
+        ...meta,
+        model: OCR_VISION_MODEL,
+        effort: OCR_REASONING_EFFORT,
+        setupMs: ocrMs(startedAt),
+        timeoutMs: OCR_TIMEOUT_MS,
+      })
       const response = await withTimeout(
         client.responses.parse({
           model: OCR_VISION_MODEL,
-          reasoning: { effort: "low" },
+          reasoning: { effort: OCR_REASONING_EFFORT },
           max_output_tokens: OCR_MAX_OUTPUT_TOKENS,
           instructions: RECEIPT_VISION_INSTRUCTIONS,
           input: [
@@ -302,14 +358,40 @@ export const scanReceipt = createServerFn({ method: "POST" })
         OCR_TIMEOUT_MS,
         "Receipt scan timed out. Try again with a smaller image."
       )
+      const visionMs = ocrMs(visionStartedAt)
 
       const extracted =
         response.output_parsed ?? parseReceiptExtract(response.output_text)
       if (!extracted) {
+        ocrLog("scan:done", {
+          ...meta,
+          totalMs: ocrMs(startedAt),
+          visionMs,
+          empty: true,
+          parsed: Boolean(response.output_parsed),
+          ...visionUsage(response),
+        })
         return { rawText: "" }
       }
-      return draftFromExtract(extracted, data.mode)
+      const draft = draftFromExtract(extracted, data.mode)
+      ocrLog("scan:done", {
+        ...meta,
+        totalMs: ocrMs(startedAt),
+        visionMs,
+        parsed: Boolean(response.output_parsed),
+        items: extracted.items.length,
+        merchant: extracted.merchant,
+        totalCents: extracted.totalCents,
+        rawTextChars: extracted.rawText.length,
+        ...visionUsage(response),
+      })
+      return draft
     } catch (error) {
+      ocrLog("scan:error", {
+        ...meta,
+        totalMs: ocrMs(startedAt),
+        message: error instanceof Error ? error.message : String(error),
+      })
       throw new Error(ocrErrorMessage(error))
     }
   })
@@ -319,43 +401,71 @@ export const scanHouseReceipt = createServerFn({ method: "POST" })
     parseOcrImagePayload(data, "House code is required for OCR")
   )
   .handler(async ({ data }): Promise<HouseScanDraft> => {
-    const userId = await requireSignedInUserId()
-    assertRateLimit(`ocr:user:${userId}`, {
-      limit: 8,
-      windowMs: 60_000,
-      label: "receipt scans",
-    })
-
-    if (process.env.OCR_FIXTURE === "1") {
-      await assertCanScanHouse(data.code, userId)
-      return draftFromHouseExtract(fixtureHouseExtract(houseFixtureKind()))
+    const startedAt = ocrNow()
+    const kind = "house"
+    const meta = {
+      kind,
+      mime: data.mimeType,
+      imageKb: imageKb(data.imageBase64),
     }
-
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not configured")
-    }
-
-    const ip = clientKey()
-    assertRateLimit(`ocr:ip:${ip}`, {
-      limit: 8,
-      windowMs: 60_000,
-      label: "receipt scans",
+    ocrLog("scan:start", {
+      ...meta,
+      fixture: process.env.OCR_FIXTURE === "1",
+      model: OCR_VISION_MODEL,
     })
-    assertRateLimit(`ocr:house:${data.code}`, {
-      limit: 20,
-      windowMs: 60_000,
-      label: "receipt scans for this house",
-    })
-
-    await assertCanScanHouse(data.code, userId)
-
-    const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })
     try {
+      const userId = await requireSignedInUserId()
+      assertRateLimit(`ocr:user:${userId}`, {
+        limit: 8,
+        windowMs: 60_000,
+        label: "receipt scans",
+      })
+
+      if (process.env.OCR_FIXTURE === "1") {
+        await assertCanScanHouse(data.code, userId)
+        const draft = draftFromHouseExtract(
+          fixtureHouseExtract(houseFixtureKind())
+        )
+        ocrLog("scan:done", {
+          ...meta,
+          fixture: true,
+          totalMs: ocrMs(startedAt),
+        })
+        return draft
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) {
+        throw new Error("OPENAI_API_KEY is not configured")
+      }
+
+      const ip = clientKey()
+      assertRateLimit(`ocr:ip:${ip}`, {
+        limit: 8,
+        windowMs: 60_000,
+        label: "receipt scans",
+      })
+      assertRateLimit(`ocr:house:${data.code}`, {
+        limit: 20,
+        windowMs: 60_000,
+        label: "receipt scans for this house",
+      })
+
+      await assertCanScanHouse(data.code, userId)
+
+      const client = new OpenAI({ apiKey, timeout: OCR_TIMEOUT_MS })
+      const visionStartedAt = ocrNow()
+      ocrLog("scan:vision:start", {
+        ...meta,
+        model: OCR_VISION_MODEL,
+        effort: OCR_REASONING_EFFORT,
+        setupMs: ocrMs(startedAt),
+        timeoutMs: OCR_TIMEOUT_MS,
+      })
       const response = await withTimeout(
         client.responses.parse({
           model: OCR_VISION_MODEL,
-          reasoning: { effort: "low" },
+          reasoning: { effort: OCR_REASONING_EFFORT },
           max_output_tokens: OCR_MAX_OUTPUT_TOKENS,
           instructions: HOUSE_RECEIPT_VISION_INSTRUCTIONS,
           input: [
@@ -384,14 +494,31 @@ export const scanHouseReceipt = createServerFn({ method: "POST" })
         OCR_TIMEOUT_MS,
         "Receipt scan timed out. Try again with a smaller image."
       )
+      const visionMs = ocrMs(visionStartedAt)
 
       const extracted =
         response.output_parsed ?? parseHouseReceiptExtract(response.output_text)
       if (!extracted) {
         throw new Error("Could not read that photo. Try a clearer crop.")
       }
-      return draftFromHouseExtract(extracted)
+      const draft = draftFromHouseExtract(extracted)
+      ocrLog("scan:done", {
+        ...meta,
+        totalMs: ocrMs(startedAt),
+        visionMs,
+        parsed: Boolean(response.output_parsed),
+        documentKind: extracted.documentKind,
+        provider: extracted.provider,
+        totalCents: extracted.totalCents,
+        ...visionUsage(response),
+      })
+      return draft
     } catch (error) {
+      ocrLog("scan:error", {
+        ...meta,
+        totalMs: ocrMs(startedAt),
+        message: error instanceof Error ? error.message : String(error),
+      })
       throw new Error(ocrErrorMessage(error, "Could not read receipt"))
     }
   })

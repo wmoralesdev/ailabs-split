@@ -28,6 +28,24 @@ function readCookie(name: string): string | null {
   return null
 }
 
+/**
+ * Dev-only: Clerk test and live instances mint different user ids for the same
+ * person, so local sign-ins never own the rows created in prod. `DEV_USER_ID_MAP`
+ * ("user_dev:user_prod,user_dev2:user_prod2") aliases a dev id to a prod id.
+ * Ignored unless the secret key is a test key, so it can never apply in prod.
+ */
+function mapDevUserId(userId: string): string {
+  const raw = process.env.DEV_USER_ID_MAP
+  if (!raw || !process.env.CLERK_SECRET_KEY?.startsWith("sk_test_")) {
+    return userId
+  }
+  for (const pair of raw.split(",")) {
+    const [from, to] = pair.split(":").map((part) => part.trim())
+    if (from === userId) return parseClerkUserId(to) ?? userId
+  }
+  return userId
+}
+
 export async function getAuthUserId(): Promise<string | null> {
   if (e2eAuthEnabled()) {
     const e2eUserId = parseClerkUserId(readCookie(E2E_USER_COOKIE))
@@ -36,7 +54,8 @@ export async function getAuthUserId(): Promise<string | null> {
   if (!process.env.CLERK_SECRET_KEY) return null
   try {
     const { userId } = await auth()
-    return parseClerkUserId(userId)
+    const id = parseClerkUserId(userId)
+    return id ? mapDevUserId(id) : null
   } catch {
     return null
   }

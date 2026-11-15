@@ -242,3 +242,24 @@ Subtotal: $56.65
 Propina (10%): $5.67
 Total: $62.32
 `
+
+/** SV DTE layout: unit price in parens + (G) tax flag before the line total. */
+export const CAMPERO_DTE_MD = `ORDEN # 423
+FACTURA CONSUMIDOR FINAL
+Productos:
+7 Men camperito S/ ( 6.75)(G)$ 47.25
+7 Papa Mcamper ( 0.00)(G)$ 0.00
+3 Adere Ajo Ci ( 0.00)(G)$ 0.00
+4 Adere Ranch ( 0.00)(G)$ 0.00
+2 TE.LIMON.MD ( 0.00)(G)$ 0.00
+4 PEPSI.MD ( 0.00)(G)$ 0.00
+1 PEPSI.MD ( 0.00)(G)$ 0.00
+5 Tarro Barba ( 0.00)(G)$ 0.00
+2 Tarro Bufalo ( 0.00)(G)$ 0.00
+7 Pan ( 0.40)(G)$ 2.80
+1 Aderezo B. Ranch ( 0.75)(G)$ 0.75
+SUBTOTAL GRAV.: $ 50.80
+SUBTOTAL EXENTO: $ 0.00
+SUBTOTAL NO SUJETAS: $ 0.00
+TOTAL A PAGAR: $ 50.80
+Total Items: 43`
