@@ -45,6 +45,7 @@ export function DinnerNameField({
   onChange,
   id = "dinner-name",
   readOnly = false,
+  variant = "field",
 }: {
   code: string
   value: string
@@ -52,6 +53,8 @@ export function DinnerNameField({
   onChange: (name: string) => void
   id?: string
   readOnly?: boolean
+  /** "title": the page heading itself, edited in place. */
+  variant?: "field" | "title"
 }) {
   const rename = useRenameDinner(code)
 
@@ -63,6 +66,36 @@ export function DinnerNameField({
     }
     if (trimmed === savedName) return
     rename.mutate(trimmed)
+  }
+
+  if (variant === "title") {
+    return (
+      <h1 className="min-w-0">
+        {readOnly ? (
+          <span className="block truncate font-display text-[34px] leading-tight font-bold tracking-tight">
+            {savedName}
+          </span>
+        ) : (
+          <input
+            id={id}
+            aria-label="Ticket name"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={commit}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return
+              event.preventDefault()
+              event.currentTarget.blur()
+            }}
+            placeholder="Name this ticket"
+            maxLength={60}
+            autoComplete="off"
+            enterKeyHint="done"
+            className="-mx-2 w-[calc(100%+1rem)] rounded-xl bg-transparent px-2 font-display text-[34px] leading-tight font-bold tracking-tight transition-colors outline-none placeholder:text-muted-foreground hover:bg-muted/60 focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        )}
+      </h1>
+    )
   }
 
   if (readOnly) {

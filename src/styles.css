@@ -97,7 +97,6 @@
   --space-gutter: 1rem;
   --max-width: 40rem;
   --max-width-narrow: 28rem;
-  --room-tab-bar-clearance: calc(7rem + env(safe-area-inset-bottom, 0px));
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -297,10 +296,6 @@
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
   }
 
-  .pb-room-tab-bar {
-    padding-bottom: var(--room-tab-bar-clearance);
-  }
-
   html.room-lock-scroll,
   html.room-lock-scroll body {
     height: 100%;
@@ -417,6 +412,11 @@
     @apply pointer-events-none absolute top-0 right-0 left-4 h-px bg-border/70;
   }
 
+  /* Rows that lead with a 40px tile: the hairline starts at the text. */
+  .group-list-inset > * + *::before {
+    left: 4.25rem;
+  }
+
   /* Navigable row hit: fill on press, no nested radius. */
   .group-row-hit {
     @apply flex min-h-14 items-center gap-3 px-4 py-2.5 text-[15px] transition-colors outline-none select-none;
@@ -448,7 +448,7 @@
   }
 
   .item-row-main {
-    @apply flex w-full items-start justify-between gap-3 px-4 pt-2.5 pb-1.5 text-left outline-none;
+    @apply flex w-full items-start justify-between gap-3 px-4 pt-4 pb-2 text-left outline-none;
     @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset;
   }
 
@@ -457,7 +457,7 @@
   }
 
   .item-row-chips {
-    @apply flex flex-nowrap gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pt-1.5 pb-2.5;
+    @apply flex flex-nowrap gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 pt-1.5 pb-4;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
@@ -501,6 +501,11 @@
 
   .item-row-chips > * {
     @apply shrink-0;
+  }
+
+  /* Chips as list items inside the scroller div: no browser bullet. */
+  .item-row-chips > li {
+    list-style: none;
   }
 
   /* Page or sheet row: chips scroll to the screen edge, not the card inset. */
@@ -553,7 +558,7 @@
   }
 
   .person-chip[aria-pressed="true"] {
-    @apply bg-foreground text-background;
+    @apply bg-primary text-primary-foreground;
   }
 
   :is(.surface, .group-list) .person-chip:not([aria-pressed="true"]) {
@@ -753,11 +758,7 @@ button.person-chip-everyone:not([aria-pressed="true"]):focus-visible,
   }
 
   button.person-chip[aria-pressed="true"]:hover {
-    background-color: color-mix(
-      in srgb,
-      var(--foreground) 88%,
-      var(--background)
-    );
+    background-color: color-mix(in srgb, var(--primary) 86%, var(--foreground));
   }
 
   .group-list

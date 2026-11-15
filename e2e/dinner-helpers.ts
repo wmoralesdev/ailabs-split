@@ -79,7 +79,7 @@ export async function openLanding(page: Page) {
 export async function openDinnerCreate(page: Page) {
   await openLanding(page)
   const dinnerChip = page
-    .getByRole("group", { name: "Mode" })
+    .getByRole("group", { name: "What are you splitting?" })
     .getByRole("button", {
       name: "Bill",
     })
@@ -124,7 +124,7 @@ export async function createDinnerFromHome(
   creator: string
 ): Promise<{ code: string; name: string }> {
   const dinnerChip = page
-    .getByRole("group", { name: "Mode" })
+    .getByRole("group", { name: "What are you splitting?" })
     .getByRole("button", { name: "Bill" })
   await expect(async () => {
     await dinnerChip.click()
@@ -170,10 +170,6 @@ export async function joinDinner(
   await skipCookieBanner(page)
   await page.goto("/?stay=true&tab=join", { waitUntil: "domcontentloaded" })
   await waitForHydration(page)
-  const joinTab = page.getByRole("tab", { name: "Join" })
-  if (await joinTab.isVisible()) {
-    await joinTab.click()
-  }
   await page.getByLabel("Code", { exact: true }).fill(code)
   await expect(page.getByText(/Joining bill/i)).toBeVisible()
   if (existing) {

@@ -97,7 +97,7 @@ test.describe("House home CTA", () => {
     ).toBeVisible()
     await expect(openHouse).toHaveCount(0)
     await page
-      .getByRole("tabpanel")
+      .getByRole("region", { name: "Start or join" })
       .getByRole("button", { name: `Open ${houseName}` })
       .click()
     await expect(page.getByRole("heading", { name: houseName })).toBeVisible()
@@ -158,7 +158,7 @@ test.describe("House home CTA", () => {
       await expect(page.getByLabel("Name your house")).toBeVisible()
       await expect(
         page
-          .getByRole("tabpanel")
+          .getByRole("region", { name: "Start or join" })
           .getByRole("button", { name: `Open ${houseName}` })
       ).toBeVisible()
       await shot(page, `${scheme}-start-another.png`)

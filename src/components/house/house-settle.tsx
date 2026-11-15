@@ -1,75 +1,38 @@
 import { useMemo, useState } from "react"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Tick02Icon, UndoIcon } from "@hugeicons/core-free-icons"
-import { toast } from "sonner"
 
-import { PartialPaymentSheet } from "@/components/house/partial-payment-sheet"
-import {
-  PaymentProofButton,
-  PaymentProofDialog,
-} from "@/components/payment-proof-dialog"
-import { PaymentProofSheet } from "@/components/payment-proof-sheet"
-import { PayProfileSheet } from "@/components/pay-profile-sheet"
+import { PaymentProofButton } from "@/components/payment-proof-dialog"
 import {
   SettleEmptyState,
   TransferCard,
   transferKey,
 } from "@/components/transfer-card"
 import { Button } from "@/components/ui/button"
-import {
-  atmDigitsToCents,
-  centsToAtmDigits,
-  currencyFractionDigits,
-} from "@/lib/atm-amount"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import {
-  formatHouseTransfer,
   houseBalanceCopy,
   houseNets,
-  houseTransfers,
   monthBreakdown,
   movedOutSubtitle,
 } from "@/lib/house-ledger"
 import { formatMonth, isMovedOutOn, localIsoDate } from "@/lib/house-month"
-import { canDeletePayment, canRecordPayment } from "@/lib/house-permissions"
-import { copyText } from "@/lib/invite-link"
-import { roomKeys } from "@/lib/room-query"
+import { canDeletePayment } from "@/lib/house-permissions"
 import { cn } from "@/lib/utils"
 import { formatMoney } from "@/lib/settle"
 import type { Transfer } from "@/lib/settle"
-import { deleteHousePayment, recordHousePayment } from "@/server/houses"
-import type { RoomDto, SettlementDto } from "@/server/rooms"
-
-type Draft = {
-  fromId: string
-  toId: string
-  amountDigits: string
-  lockPair: boolean
-}
+import { useHouseSettle } from "@/lib/use-house-settle"
+import type { RoomDto } from "@/server/rooms"
 
 export function HouseSettle({ room }: { room: RoomDto }) {
-  const queryClient = useQueryClient()
-  const role = room.house?.viewer.role ?? "VISITOR"
-  const actorId = room.house?.viewer.memberId ?? null
-  const members = room.house?.members ?? []
+  const settle = useHouseSettle(room)
+  const { role, actorId, members, transfers, mine, others } = settle
   const today = localIsoDate()
-  const fractionDigits = currencyFractionDigits(room.currency)
-  const [draft, setDraft] = useState<Draft | null>(null)
-  const [proofOpen, setProofOpen] = useState(false)
-  const [viewing, setViewing] = useState<SettlementDto | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(actorId)
   const [openMonth, setOpenMonth] = useState<string | null>(null)
-  const [payMemberId, setPayMemberId] = useState<string | null>(null)
-  const payMember =
-    room.members.find((member) => member.id === payMemberId) ?? null
 
   const nets = useMemo(
     () => houseNets(room.members, room.expenses, room.settlements),
-    [room]
-  )
-  const transfers = useMemo(
-    () => houseTransfers(room.members, room.expenses, room.settlements),
     [room]
   )
   const selected = selectedId ?? actorId
@@ -79,181 +42,28 @@ export function HouseSettle({ room }: { room: RoomDto }) {
     [selected, room]
   )
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: roomKeys.room(room.code) })
-
-  const deleteMutation = useMutation({
-    mutationFn: (settlementId: string) =>
-      deleteHousePayment({
-        data: {
-          code: room.code,
-          viewerMemberId: actorId ?? undefined,
-          settlementId,
-        },
-      }),
-    onSuccess: async () => {
-      await invalidate()
-      toast.success("Payment undone")
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not undo payment"
-      )
-    },
-  })
-
-  const recordMutation = useMutation({
-    mutationFn: (input: {
-      fromMemberId: string
-      toMemberId: string
-      amountCents: number
-      proof?: { base64: string; mimeType: "image/jpeg" }
-    }) =>
-      recordHousePayment({
-        data: {
-          code: room.code,
-          viewerMemberId: actorId ?? undefined,
-          ...input,
-        },
-      }),
-    onSuccess: async (next, vars) => {
-      setDraft(null)
-      setProofOpen(false)
-      await invalidate()
-      const created = next.settlements.find(
-        (row) =>
-          row.fromMemberId === vars.fromMemberId &&
-          row.toMemberId === vars.toMemberId &&
-          row.amountCents === vars.amountCents
-      )
-      toast.success("Payment recorded", {
-        description: `${vars.fromMemberId === actorId ? "You" : (members.find((member) => member.id === vars.fromMemberId)?.name ?? "They")} paid ${formatMoney(vars.amountCents, room.currency)}`,
-        action: created
-          ? {
-              label: "Undo",
-              onClick: () => deleteMutation.mutate(created.id),
-            }
-          : undefined,
-      })
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not record payment"
-      )
-    },
-  })
-
-  const suggestedCents =
-    draft == null
-      ? 0
-      : (transfers.find(
-          (row) => row.fromId === draft.fromId && row.toId === draft.toId
-        )?.amountCents ?? 0)
-
-  const draftAmountCents = draft
-    ? atmDigitsToCents(draft.amountDigits, fractionDigits)
-    : 0
-  const draftFromName =
-    members.find((member) => member.id === draft?.fromId)?.name ?? ""
-  const draftToName =
-    members.find((member) => member.id === draft?.toId)?.name ?? ""
-  const proofTransfer: Transfer | null =
-    draft && draftAmountCents > 0
-      ? {
-          fromId: draft.fromId,
-          fromName: draftFromName,
-          toId: draft.toId,
-          toName: draftToName,
-          amountCents: draftAmountCents,
-        }
-      : null
-
-  function openFromTransfer(transfer: Transfer) {
-    setDraft({
-      fromId: transfer.fromId,
-      toId: transfer.toId,
-      amountDigits: centsToAtmDigits(transfer.amountCents, fractionDigits),
-      lockPair: true,
-    })
-    setProofOpen(false)
-  }
-
-  function openCustom() {
-    if (!actorId) return
-    const other = members.find((member) => member.id !== actorId)?.id ?? actorId
-    setDraft({
-      fromId: actorId,
-      toId: other,
-      amountDigits: "",
-      lockPair: false,
-    })
-    setProofOpen(false)
-  }
-
-  async function remind(transfer: Transfer) {
-    const text = formatHouseTransfer(transfer, room.currency)
-    const share = "share" in navigator ? navigator.share.bind(navigator) : null
-    if (share) {
-      try {
-        await share({ text })
-      } catch {
-        // Dismissed share sheet.
-      }
-      return
-    }
-    await copyText(text)
-    toast.success("Copied, paste it in the group chat")
-  }
-
-  const mine = transfers.filter(
-    (row) => row.fromId === actorId || row.toId === actorId
-  )
-  const others = transfers.filter(
-    (row) => row.fromId !== actorId && row.toId !== actorId
-  )
-
-  function renderTransfer(transfer: Transfer, emphasis: boolean) {
-    const payee = room.members.find((member) => member.id === transfer.toId)
+  function renderTransfer(transfer: Transfer) {
+    const toMe = transfer.toId === actorId
     return (
       <TransferCard
         key={transferKey(transfer)}
         transfer={transfer}
         currency={room.currency}
         memberId={actorId ?? ""}
-        emphasis={emphasis}
-        pending={
-          recordMutation.isPending &&
-          draft?.fromId === transfer.fromId &&
-          draft.toId === transfer.toId
-        }
-        disabled={recordMutation.isPending}
-        payee={payee?.pay ?? null}
-        onPayeeDetails={
-          payee && !payee.payLocked ? () => setPayMemberId(payee.id) : undefined
-        }
-        canMark={canRecordPayment(
-          role,
-          actorId,
-          transfer.fromId,
-          transfer.toId
-        )}
-        onMarkPaid={() => openFromTransfer(transfer)}
-        onRemind={() => void remind(transfer)}
+        pending={settle.isPending(transfer)}
+        disabled={settle.recording}
+        {...(toMe ? {} : settle.payeeProps(transfer))}
+        canMark={settle.canMark(transfer)}
+        onMarkPaid={() => settle.markPaid(transfer)}
+        onRemind={() => void settle.remind(transfer)}
       />
     )
   }
 
-  const canRecordCustom = Boolean(
-    actorId &&
-    members.some((member) =>
-      canRecordPayment(role, actorId, actorId, member.id)
-    )
-  )
-
   return (
     <main className="page-gutter mx-auto max-w-content pt-2 pb-8">
       <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
-        Settle up
+        All payments
       </h1>
       <p className="mt-0.5 text-[15px] text-muted-foreground">
         Amounts in {room.currency}
@@ -277,8 +87,8 @@ export function HouseSettle({ room }: { room: RoomDto }) {
           <h2 id="house-yours-heading" className="group-label">
             Yours
           </h2>
-          <ul className="flex flex-col gap-2.5">
-            {mine.map((transfer) => renderTransfer(transfer, true))}
+          <ul className="group-list">
+            {mine.map((transfer) => renderTransfer(transfer))}
           </ul>
         </section>
       ) : null}
@@ -289,7 +99,7 @@ export function HouseSettle({ room }: { room: RoomDto }) {
             {mine.length > 0 ? "Between others" : "Who pays whom"}
           </h2>
           <ul className="group-list">
-            {others.map((transfer) => renderTransfer(transfer, false))}
+            {others.map((transfer) => renderTransfer(transfer))}
           </ul>
         </section>
       ) : null}
@@ -418,7 +228,7 @@ export function HouseSettle({ room }: { room: RoomDto }) {
                   {settlement.hasProof ? (
                     <PaymentProofButton
                       fromName={settlement.fromMemberName}
-                      onClick={() => setViewing(settlement)}
+                      onClick={() => settle.viewProof(settlement)}
                     />
                   ) : null}
                   {canUndo ? (
@@ -427,8 +237,8 @@ export function HouseSettle({ room }: { room: RoomDto }) {
                       variant="ghost"
                       size="sm"
                       className="shrink-0 text-primary"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => deleteMutation.mutate(settlement.id)}
+                      disabled={settle.undoing}
+                      onClick={() => settle.undo(settlement.id)}
                       aria-label={`Undo payment from ${settlement.fromMemberName} to ${settlement.toMemberName}`}
                     >
                       <HugeiconsIcon
@@ -446,108 +256,17 @@ export function HouseSettle({ room }: { room: RoomDto }) {
         </section>
       ) : null}
 
-      {canRecordCustom ? (
+      {settle.canRecordCustom ? (
         <button
           type="button"
           className="text-action mt-6 text-[15px]"
-          onClick={openCustom}
+          onClick={settle.recordCustom}
         >
           Record a payment
         </button>
       ) : null}
 
-      <PartialPaymentSheet
-        open={draft !== null && !proofOpen}
-        onOpenChange={(open) => {
-          if (!open && !recordMutation.isPending) {
-            setDraft(null)
-            setProofOpen(false)
-          }
-        }}
-        members={members}
-        fromId={draft?.fromId ?? ""}
-        toId={draft?.toId ?? ""}
-        onFromChange={(id) =>
-          setDraft((current) =>
-            current ? { ...current, fromId: id } : current
-          )
-        }
-        onToChange={(id) =>
-          setDraft((current) => (current ? { ...current, toId: id } : current))
-        }
-        lockPair={draft?.lockPair ?? true}
-        amountDigits={draft?.amountDigits ?? ""}
-        onAmountDigits={(digits) =>
-          setDraft((current) =>
-            current ? { ...current, amountDigits: digits } : current
-          )
-        }
-        fractionDigits={fractionDigits}
-        currency={room.currency}
-        suggestedCents={suggestedCents}
-        actorId={actorId}
-        onContinue={() => {
-          if (!draft) return
-          if (!canRecordPayment(role, actorId, draft.fromId, draft.toId)) {
-            toast.error("You can only record a payment you're part of")
-            return
-          }
-          setProofOpen(true)
-        }}
-      />
-
-      <PaymentProofSheet
-        transfer={proofTransfer}
-        summary={
-          proofTransfer
-            ? {
-                sentence: `${draftFromName} pays ${draftToName}`,
-                amountLabel: formatMoney(draftAmountCents, room.currency),
-              }
-            : null
-        }
-        currency={room.currency}
-        memberId={actorId ?? ""}
-        open={proofOpen && proofTransfer !== null}
-        saving={recordMutation.isPending}
-        onOpenChange={(open) => {
-          if (recordMutation.isPending) return
-          if (!open) setProofOpen(false)
-        }}
-        onConfirm={(proof) => {
-          if (!draft) return
-          recordMutation.mutate({
-            fromMemberId: draft.fromId,
-            toMemberId: draft.toId,
-            amountCents: draftAmountCents,
-            ...(proof ? { proof } : {}),
-          })
-        }}
-      />
-
-      <PayProfileSheet
-        room={room}
-        member={payMember}
-        viewerMemberId={actorId}
-        open={payMember !== null}
-        onOpenChange={(open) => {
-          if (!open) setPayMemberId(null)
-        }}
-      />
-
-      <PaymentProofDialog
-        open={viewing !== null}
-        onOpenChange={(open) => {
-          if (!open) setViewing(null)
-        }}
-        code={room.code}
-        settlementId={viewing?.id ?? null}
-        label={
-          viewing
-            ? `${viewing.fromMemberName} paid ${viewing.toMemberName} ${formatMoney(viewing.amountCents, viewing.currency)}`
-            : ""
-        }
-      />
+      {settle.sheets}
     </main>
   )
 }

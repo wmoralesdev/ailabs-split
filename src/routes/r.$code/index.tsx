@@ -26,18 +26,17 @@ import { CSS } from "@dnd-kit/utilities"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
-  ArrowRight01Icon,
   ArrowUpDownIcon,
-  Copy01Icon,
   Delete02Icon,
   DragDropVerticalIcon,
   Edit02Icon,
-  Link01Icon,
   ReceiptDollarIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { BankFxCalibrationSheet } from "@/components/bank-fx-calibration-sheet"
+import { RoomBalanceHero } from "@/components/balance-hero"
+import { RoomExitControl } from "@/components/room-exit-control"
 import { DinnerHome } from "@/components/dinner/dinner-home"
 import { HouseHome } from "@/components/house/house-home"
 import { CategoryChips } from "@/components/category-chips"
@@ -70,8 +69,6 @@ import {
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
 import { formatRelativeTime } from "@/lib/format-relative-time"
-import { copyText } from "@/lib/invite-link"
-import { memberLink } from "@/lib/member-storage"
 import { parseRoomKind } from "@/lib/room-kind"
 import { roomKeys, roomQueryOptions } from "@/lib/room-query"
 import { useRoomIdentity } from "@/lib/room-identity"
@@ -79,7 +76,6 @@ import {
   computeNetsWithSettlements,
   convertToBase,
   formatMoney,
-  simplifyTransfers,
 } from "@/lib/settle"
 import { cn } from "@/lib/utils"
 import type {
@@ -203,7 +199,6 @@ function RoomHomePage() {
     () => new Set(pendingExpenseIds),
     [pendingExpenseIds]
   )
-  const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
   )
@@ -364,8 +359,6 @@ function RoomHomePage() {
     )
   }, [room])
 
-  const transfers = useMemo(() => simplifyTransfers(nets), [nets])
-
   if (!room) {
     return isPending ? <RoomHomeSkeleton /> : null
   }
@@ -397,107 +390,26 @@ function RoomHomePage() {
       : (listExpenses.find((expense) => expense.id === selectedExpenseId) ??
         null)
 
-  async function copyCode() {
-    await copyText(room!.code)
-    setCopied("code")
-    window.setTimeout(() => setCopied(null), 1500)
-  }
-
-  async function copyMyLink() {
-    if (!me) return
-    await copyText(memberLink(room!.code, me.name))
-    setCopied("link")
-    window.setTimeout(() => setCopied(null), 1500)
-  }
-
   return (
     <PullToRefresh disabled={!online || reordering} onRefresh={() => refetch()}>
       <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
-          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+          <h1 className="truncate font-display text-[34px] leading-tight font-bold tracking-tight">
             {room.name}
           </h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            <p className="text-[13px] text-muted-foreground tabular-nums">
-              You spent {formatMoney(spentCents, room.currency)}
-            </p>
-            <button
-              type="button"
-              onClick={() => void copyCode()}
-              className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-xs font-medium text-primary transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span className="font-display tracking-widest text-foreground">
-                {room.code}
-              </span>
-              <HugeiconsIcon icon={Copy01Icon} size={12} strokeWidth={2} />
-              {copied === "code" ? "Copied" : "Copy"}
-            </button>
-            <Badge variant="secondary">Base {room.currency}</Badge>
-          </div>
+          <p className="mt-0.5 text-[15px] text-muted-foreground tabular-nums">
+            Trip · {room.currency} · You spent{" "}
+            {formatMoney(spentCents, room.currency)}
+          </p>
         </header>
 
-        <section className="group-list mt-4">
-          <div className={cn("group-row", "gap-2.5 py-1.5 pr-2")}>
-            <Avatar className="size-7 shrink-0">
-              <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
-                {me ? initials(me.name) : "?"}
-              </AvatarFallback>
-            </Avatar>
-            <button
-              type="button"
-              className="min-w-0 flex-1 rounded-sm py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={!me}
-              onClick={() => setPayOpen(true)}
-            >
-              <span className="block truncate text-[15px]">
-                You · {me?.name ?? "Unknown"}
-              </span>
-              <MyPayLine pay={me?.pay ?? null} />
-            </button>
-            <button
-              type="button"
-              onClick={() => void copyMyLink()}
-              className="icon-hit size-9 shrink-0"
-              aria-label={
-                copied === "link"
-                  ? "Personal link copied"
-                  : "Copy my device link"
-              }
-              title={
-                copied === "link"
-                  ? "Personal link copied"
-                  : "Copy my device link"
-              }
-            >
-              <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              onClick={switchIdentity}
-              className="text-action min-h-11 shrink-0 px-2 text-[15px]"
-            >
-              Switch
-            </button>
-          </div>
-        </section>
+        {room.expenses.length > 0 ? (
+          <RoomBalanceHero room={room} memberId={memberId} />
+        ) : null}
 
         <section className="mt-6">
           <div className="flex items-end justify-between gap-3">
             <h2 className="font-display text-lg font-semibold">Balances</h2>
-            {transfers.length > 0 ? (
-              <Link
-                to="/r/$code/settle"
-                params={{ code: room.code }}
-                className="text-action gap-1 text-[15px]"
-              >
-                Settle
-                <HugeiconsIcon
-                  icon={ArrowRight01Icon}
-                  size={14}
-                  strokeWidth={2}
-                />
-              </Link>
-            ) : null}
           </div>
           <ul className="group-list mt-1">
             {nets.map((line) => {
@@ -643,6 +555,44 @@ function RoomHomePage() {
             </ul>
           )}
         </section>
+        <section className="group-list mt-8">
+          <div className={cn("group-row", "gap-2.5 py-1.5 pr-2")}>
+            <Avatar className="size-7 shrink-0">
+              <AvatarFallback className="bg-accent text-[11px] font-semibold text-accent-foreground">
+                {me ? initials(me.name) : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              className="min-w-0 flex-1 rounded-sm py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={!me}
+              onClick={() => setPayOpen(true)}
+            >
+              <span className="block truncate text-[15px]">
+                You · {me?.name ?? "Unknown"}
+              </span>
+              <MyPayLine pay={me?.pay ?? null} />
+            </button>
+            <button
+              type="button"
+              onClick={switchIdentity}
+              className="text-action min-h-11 shrink-0 px-2 text-[15px]"
+            >
+              Not you?
+            </button>
+          </div>
+        </section>
+
+        <div className="mt-8 mb-4">
+          <RoomExitControl
+            code={room.code}
+            name={room.name}
+            kind={room.kind}
+            owned={room.owned}
+            placement="page"
+          />
+        </div>
+
         <ExpenseDetailSheet
           room={room}
           expense={selectedExpense}

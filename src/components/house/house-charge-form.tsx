@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { HouseCategoryChips } from "@/components/house/house-category-chips"
@@ -26,6 +24,7 @@ import {
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
 import type { CompressedImage } from "@/lib/compress-image"
+import { runClientTicketOcr } from "@/lib/ocr-log"
 import { isHouseCategory, suggestHouseCategory } from "@/lib/house-categories"
 import type { HouseCategory } from "@/lib/house-categories"
 import { defaultParticipants, dueThisMonth } from "@/lib/house-ledger"
@@ -439,19 +438,26 @@ export function HouseChargeForm({
     }
     setScanPending(true)
     try {
-      const compressed = await compressImageForOcr(file)
-      const draft = await scanHouseReceipt({
-        data: {
-          code: room.code,
-          imageBase64: compressed.base64,
-          mimeType: compressed.mimeType,
+      const scanned = await runClientTicketOcr({
+        kind: "house",
+        sourceBytes: file.size,
+        image: compressImageForOcr(file),
+        scan: async (compressed) => {
+          const draft = await scanHouseReceipt({
+            data: {
+              code: room.code,
+              imageBase64: compressed.base64,
+              mimeType: compressed.mimeType,
+            },
+          })
+          return { draft, image: compressed }
         },
       })
-      if (!draft.title && !draft.amountCents) {
+      if (!scanned.draft.title && !scanned.draft.amountCents) {
         toast.error("Could not read that photo. Try a clearer crop.")
         return
       }
-      applyDraft(draft, compressed)
+      applyDraft(scanned.draft, scanned.image)
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not read receipt"
@@ -510,21 +516,9 @@ export function HouseChargeForm({
 
   return (
     <main className="page-gutter mx-auto max-w-content pt-2 pb-8">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className="icon-hit -ml-3 size-11"
-          onClick={() =>
-            void navigate({ to: "/r/$code", params: { code: room.code } })
-          }
-          aria-label="Back to house"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
-        </button>
-        <h1 className="font-display text-[22px] font-bold tracking-tight">
-          {editing ? "Edit charge" : "Add charge"}
-        </h1>
-      </div>
+      <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+        {editing ? "Edit charge" : "Add charge"}
+      </h1>
 
       <form
         className="mt-4 flex flex-col gap-5"

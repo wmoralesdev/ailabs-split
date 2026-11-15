@@ -63,7 +63,7 @@ test.describe("bill copy", () => {
     await openDinnerCreate(page)
     await expect(page).toHaveTitle("Split — bills and trips")
     const billChip = page
-      .getByRole("group", { name: "Mode" })
+      .getByRole("group", { name: "What are you splitting?" })
       .getByRole("button", { name: "Bill" })
     await expect(billChip).toHaveAttribute("aria-pressed", "true")
     await expect(page.getByText("One bill, tonight")).toBeVisible()
@@ -75,7 +75,7 @@ test.describe("bill copy", () => {
       page.getByRole("button", { name: "Create without a ticket" })
     ).toBeVisible()
     await expect(
-      page.getByRole("group", { name: "Mode" }).getByRole("button", {
+      page.getByRole("group", { name: "What are you splitting?" }).getByRole("button", {
         name: "Dinner",
         exact: true,
       })
@@ -122,9 +122,8 @@ test.describe("bill copy", () => {
       waitUntil: "domcontentloaded",
     })
     await waitForHydration(guestPage)
-    await guestPage.getByRole("tab", { name: "Join" }).click()
     await guestPage.getByLabel("Code", { exact: true }).fill(code)
-    const joinPanel = guestPage.getByRole("tabpanel", { name: "Join" })
+    const joinPanel = guestPage.getByRole("region", { name: "Start or join" })
     await expect(joinPanel.getByText(/Joining bill/i)).toBeVisible()
     await expect(joinPanel.getByText(name)).toBeVisible()
     await shot(guestPage, "join-bill.png")

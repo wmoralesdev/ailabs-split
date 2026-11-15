@@ -17,7 +17,7 @@ export async function revealCreateHouseForm(page: Page) {
 
 export async function pickHouseMode(page: Page) {
   const houseChip = page
-    .getByRole("group", { name: "Mode" })
+    .getByRole("group", { name: "What are you splitting?" })
     .getByRole("button", { name: "House" })
   await expect(async () => {
     await houseChip.click()

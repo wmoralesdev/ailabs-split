@@ -1,35 +1,27 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowRight01Icon,
-  Copy01Icon,
   Edit02Icon,
-  Link01Icon,
+  Invoice03Icon,
 } from "@hugeicons/core-free-icons"
-import { toast } from "sonner"
 
+import { RoomBalanceHero } from "@/components/balance-hero"
 import { RenameDinnerSheet } from "@/components/dinner/dinner-name"
-import { OwingAmount } from "@/components/dinner/owing-amount"
 import { PullToRefresh } from "@/components/pull-to-refresh"
-import { PayAccountButton } from "@/components/pay-account-button"
 import { MyPayLine, PayProfileSheet } from "@/components/pay-profile-sheet"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
-import { copyText } from "@/lib/invite-link"
 import { dinnerBill, dinnerCanEdit } from "@/lib/dinner-bill"
 import { computeDinnerSplit } from "@/lib/dinner-split"
 import { formatRelativeTime } from "@/lib/format-relative-time"
-import { memberLink } from "@/lib/member-storage"
 import { compressTicketNow, startPendingDinnerScan } from "@/lib/ticket-scan"
 import { useRequireSignIn } from "@/lib/use-auth-user"
 import { useOnlineStatus } from "@/lib/online-status"
-import {
-  computeNetsWithSettlements,
-  formatMoney,
-  simplifyTransfers,
-} from "@/lib/settle"
+import { formatMoney } from "@/lib/settle"
+import { shareRoomSummary } from "@/lib/use-room-settle"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
 export function DinnerHome({
@@ -47,80 +39,50 @@ export function DinnerHome({
   const me = room.members.find((member) => member.id === memberId)
   const bill = dinnerBill(room.checks)
   const canEdit = dinnerCanEdit(room)
-  const [copied, setCopied] = useState<"code" | "link" | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
-
-  const nets = useMemo(() => {
-    return computeNetsWithSettlements(
-      room.members,
-      room.expenses
-        .filter((expense) => !expense.isPersonal)
-        .map((expense) => ({
-          paidById: expense.paidById,
-          shares: expense.shares.map((share) => ({
-            memberId: share.memberId,
-            amountCents: share.amountCents,
-          })),
-        })),
-      room.settlements.map((settlement) => ({
-        fromMemberId: settlement.fromMemberId,
-        toMemberId: settlement.toMemberId,
-        amountCents: settlement.amountCents,
-      }))
-    )
-  }, [room])
-
-  const transfers = useMemo(() => simplifyTransfers(nets), [nets])
-
-  async function copyCode() {
-    await copyText(room.code)
-    setCopied("code")
-    window.setTimeout(() => setCopied(null), 1500)
-  }
-
-  async function copyMyLink() {
-    if (!me) return
-    await copyText(memberLink(room.code, me.name))
-    setCopied("link")
-    toast.success("Your personal link is copied")
-    window.setTimeout(() => setCopied(null), 1500)
-  }
+  const confirmed = bill?.status === "CONFIRMED"
+  const split = bill
+    ? computeDinnerSplit({
+        items: bill.payload.items,
+        adjustments: bill.payload.adjustments,
+        tip: bill.payload.tip,
+        notedTotalCents: bill.payload.notedTotalCents,
+      })
+    : null
+  const partById = new Map<string, number>(
+    (split?.shares ?? [])
+      .filter((share) => share.totalCents > 0)
+      .map((share) => [share.memberId, share.totalCents])
+  )
 
   return (
     <PullToRefresh disabled={!online} onRefresh={() => refetch()}>
       <main className="page-gutter mx-auto max-w-content pt-2">
         <header>
-          <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-            <span className="font-medium text-foreground">Bill</span>
-            <span aria-hidden>·</span>
-            <span>{room.currency}</span>
-          </div>
-          <h1 className="mt-0.5">
+          <h1 className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate font-display text-[34px] leading-tight font-bold tracking-tight">
+              {room.name}
+            </span>
             {canEdit ? (
               <button
                 type="button"
                 onClick={() => setRenameOpen(true)}
                 aria-haspopup="dialog"
                 aria-label={`Rename ${room.name}`}
-                className="flex min-h-11 w-full items-center gap-2 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="icon-hit size-10 shrink-0"
               >
-                <span className="min-w-0 flex-1 font-display text-[28px] leading-tight font-bold tracking-tight">
-                  {room.name}
-                </span>
-                <HugeiconsIcon
-                  icon={Edit02Icon}
-                  size={18}
-                  strokeWidth={2}
-                  className="shrink-0 text-muted-foreground"
-                />
+                <HugeiconsIcon icon={Edit02Icon} size={18} strokeWidth={2} />
               </button>
-            ) : (
-              <span className="block font-display text-[28px] leading-tight font-bold tracking-tight">
-                {room.name}
-              </span>
-            )}
+            ) : null}
           </h1>
+          <p className="mt-0.5 text-[15px] text-muted-foreground tabular-nums">
+            Bill · {room.currency}
+            {split ? ` · ${formatMoney(split.totalCents, room.currency)}` : ""}
+            {bill && split && billStatus(bill, split.unassignedItemIds.length)
+              ? ` · ${billStatus(bill, split.unassignedItemIds.length)}`
+              : ""}
+          </p>
         </header>
         {canEdit ? (
           <RenameDinnerSheet
@@ -143,7 +105,6 @@ export function DinnerHome({
             room={room}
             bill={bill}
             memberId={memberId}
-            transfers={transfers}
             canEdit={canEdit}
           />
         ) : canEdit ? (
@@ -152,82 +113,91 @@ export function DinnerHome({
           <WaitingOnBill />
         )}
 
-        <section className="mt-6" aria-labelledby="people-heading">
-          <div className="flex items-baseline justify-between gap-3">
+        <section className="mt-8" aria-labelledby="people-heading">
+          <div className="flex items-baseline justify-between gap-3 px-1">
             <h2
               id="people-heading"
-              className="font-display text-lg font-semibold"
+              className="text-[13px] font-medium text-muted-foreground"
             >
               People
             </h2>
-            <button
-              type="button"
-              onClick={() => void copyCode()}
-              className="icon-hit min-h-11 gap-1.5 rounded-full px-2 text-[13px] font-medium"
-              aria-label={`Copy bill code ${room.code}`}
-            >
-              <span className="font-display tracking-widest text-foreground">
-                {room.code}
-              </span>
-              <HugeiconsIcon icon={Copy01Icon} size={13} strokeWidth={2} />
-              {copied === "code" ? "Copied" : "Copy"}
-            </button>
+            <p className="text-[13px] text-muted-foreground tabular-nums">
+              {room.members.length} at the table
+            </p>
           </div>
-          {bill ? (
-            <PeopleShares room={room} bill={bill} memberId={memberId} />
-          ) : (
-            <ul className="flex flex-wrap gap-1.5" aria-label="At the table">
-              {room.members.map((member) => (
-                <li key={member.id} className="person-chip">
-                  {member.name}
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
-            {room.members.length}{" "}
-            {room.members.length === 1 ? "person" : "people"} · the table joins
-            with the code
-            {canEdit ? ", or add them on the bill." : "."}
-          </p>
-          <div className="mt-3 flex min-h-13 items-center gap-1 rounded-xl bg-card pr-1.5 pl-3.5">
-            <button
-              type="button"
-              className="min-w-0 flex-1 rounded-sm py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={!me}
-              onClick={() => setPayOpen(true)}
-            >
-              <span className="block truncate text-[15px]">
-                You · {me?.name ?? "Unknown"}
-              </span>
-              <MyPayLine pay={me?.pay ?? null} />
-            </button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => void copyMyLink()}
-              aria-label={
-                copied === "link"
-                  ? "Personal link copied"
-                  : "Copy my device link"
+          <ul className="group-list group-list-inset mt-1">
+            {room.members.map((member) => {
+              const part = partById.get(member.id)
+              if (member.id === memberId) {
+                return (
+                  <li key={member.id} className="flex items-stretch">
+                    <button
+                      type="button"
+                      className="group-row-hit min-w-0 flex-1 text-left"
+                      onClick={() => setPayOpen(true)}
+                    >
+                      <PersonAvatar name={member.name} self />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">
+                          <span className="font-medium">{member.name}</span>
+                          <span className="text-muted-foreground"> · you</span>
+                        </span>
+                        {member.pay || part == null ? (
+                          <MyPayLine pay={member.pay ?? null} />
+                        ) : (
+                          <span className="block text-[13px] text-muted-foreground tabular-nums">
+                            Your part {formatMoney(part, room.currency)}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mr-2 self-center text-primary"
+                      onClick={switchIdentity}
+                    >
+                      Not you?
+                    </Button>
+                  </li>
+                )
               }
-            >
-              <HugeiconsIcon icon={Link01Icon} size={16} strokeWidth={2} />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-primary"
-              onClick={switchIdentity}
-            >
-              Not you?
-            </Button>
-          </div>
+              return (
+                <li key={member.id} className="group-row min-h-14">
+                  <PersonAvatar name={member.name} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {member.name}
+                    </span>
+                    {part != null ? (
+                      <span className="block text-[13px] text-muted-foreground tabular-nums">
+                        Their part {formatMoney(part, room.currency)}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          {room.members.length < 2 ? (
+            <p className="mt-2 px-1 text-[13px] leading-snug text-muted-foreground">
+              Tap Invite so the table joins
+              {canEdit ? ", or add them on the bill." : "."}
+            </p>
+          ) : null}
         </section>
 
-        <div className="mt-8 mb-4">
+        <div className="mt-8 mb-4 flex flex-col">
+          {confirmed ? (
+            <button
+              type="button"
+              className="text-action w-full justify-center text-[15px]"
+              onClick={() => void shareRoomSummary(room)}
+            >
+              Share summary
+            </button>
+          ) : null}
           <RoomExitControl
             code={room.code}
             name={room.name}
@@ -243,8 +213,14 @@ export function DinnerHome({
 
 function WaitingOnBill() {
   return (
-    <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
-      <h2 id="ticket-heading" className="font-display text-lg font-semibold">
+    <section
+      className="mt-5 rounded-3xl bg-card px-4 pt-5 pb-4"
+      aria-labelledby="ticket-heading"
+    >
+      <h2
+        id="ticket-heading"
+        className="font-display text-[28px] leading-tight font-bold tracking-tight"
+      >
         Waiting on the bill
       </h2>
       <p className="mt-0.5 text-[15px] text-muted-foreground">
@@ -254,51 +230,19 @@ function WaitingOnBill() {
   )
 }
 
-function PeopleShares({
-  room,
-  bill,
-  memberId,
-}: {
-  room: RoomDto
-  bill: CheckDto
-  memberId: string
-}) {
-  const split = computeDinnerSplit({
-    items: bill.payload.items,
-    adjustments: bill.payload.adjustments,
-    tip: bill.payload.tip,
-    notedTotalCents: bill.payload.notedTotalCents,
-  })
-  const centsById = new Map(
-    split.shares.map((share) => [share.memberId, share.totalCents])
-  )
-  return (
-    <ul className="group-list mt-2.5" aria-label="At the table">
-      {room.members.map((member) => (
-        <li key={member.id} className="group-row justify-between">
-          <span className="min-w-0 truncate text-[15px]">
-            {member.name}
-            {member.id === memberId ? (
-              <span className="text-muted-foreground"> (you)</span>
-            ) : null}
-          </span>
-          <OwingAmount
-            cents={centsById.get(member.id) ?? 0}
-            currency={room.currency}
-          />
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function StartBillCard({ code }: { code: string }) {
   const navigate = useNavigate()
   const [pending, setPending] = useState(false)
   const requireSignIn = useRequireSignIn()
   return (
-    <section className="surface mt-4 p-4" aria-labelledby="ticket-heading">
-      <h2 id="ticket-heading" className="font-display text-lg font-semibold">
+    <section
+      className="mt-5 rounded-3xl bg-card px-4 pt-5 pb-4"
+      aria-labelledby="ticket-heading"
+    >
+      <h2
+        id="ticket-heading"
+        className="font-display text-[28px] leading-tight font-bold tracking-tight"
+      >
         Split the ticket
       </h2>
       <p className="mt-0.5 text-[15px] text-muted-foreground">
@@ -331,17 +275,48 @@ function StartBillCard({ code }: { code: string }) {
   )
 }
 
+/** Tickets are just tickets: say what is left, never "draft". */
+function billStatus(bill: CheckDto, unassigned: number): string | null {
+  if (bill.status === "CONFIRMED") return bill.isPrecuenta ? "Precuenta" : null
+  if (unassigned > 0) {
+    return `${unassigned} ${unassigned === 1 ? "item" : "items"} to assign`
+  }
+  return "Not saved yet"
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("")
+}
+
+function PersonAvatar({ name, self = false }: { name: string; self?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={
+        self
+          ? "flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-[13px] font-semibold text-primary-foreground"
+          : "flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-[13px] font-semibold text-foreground"
+      }
+    >
+      {initials(name)}
+    </span>
+  )
+}
+
 function BillCard({
   room,
   bill,
   memberId,
-  transfers,
   canEdit,
 }: {
   room: RoomDto
   bill: CheckDto
   memberId: string
-  transfers: ReturnType<typeof simplifyTransfers>
   canEdit: boolean
 }) {
   const split = computeDinnerSplit({
@@ -351,118 +326,66 @@ function BillCard({
     notedTotalCents: bill.payload.notedTotalCents,
   })
   const confirmed = bill.status === "CONFIRMED"
-  const iOwe = transfers.filter((transfer) => transfer.fromId === memberId)
-  const owedToMe = transfers.filter((transfer) => transfer.toId === memberId)
-  const oweCents = iOwe.reduce((sum, t) => sum + t.amountCents, 0)
-  const owedCents = owedToMe.reduce((sum, t) => sum + t.amountCents, 0)
-  const payeePay =
-    iOwe.length === 1
-      ? (room.members.find((member) => member.id === iOwe[0].toId)?.pay ?? null)
-      : null
-
-  let headline: string
-  let detail: string
-  const moneyHeadline = oweCents > 0 || owedCents > 0
-  if (!confirmed) {
-    headline = "Draft in progress"
-    detail = canEdit
-      ? "Assign every item, then confirm to see who owes what."
-      : "The host is still assigning items."
-  } else if (oweCents > 0) {
-    headline = `You owe ${formatMoney(oweCents, room.currency)}`
-    detail =
-      iOwe.length === 1
-        ? `Pay ${iOwe[0].toName}`
-        : `To ${iOwe.map((t) => t.toName).join(" and ")}`
-  } else if (owedCents > 0) {
-    headline = `You get back ${formatMoney(owedCents, room.currency)}`
-    detail =
-      owedToMe.length === 1
-        ? `From ${owedToMe[0].fromName}`
-        : `From ${owedToMe.length} people`
-  } else if (transfers.length > 0) {
-    headline = "You owe nothing"
-    detail = `${transfers.length} ${transfers.length === 1 ? "payment" : "payments"} left between others`
-  } else {
-    headline = "You owe nothing"
-    detail = "Nothing to pay."
-  }
-
-  const status = confirmed
-    ? "Confirmed"
-    : bill.isPrecuenta
-      ? "Precuenta · draft"
-      : "Draft"
+  const lines = bill.payload.items.length
 
   return (
-    <section className="mt-4" aria-labelledby="bill-heading">
-      <div className="surface p-4">
-        <p className="eyebrow">
-          <span id="bill-heading">The bill</span> ·{" "}
-          {formatMoney(split.totalCents, bill.currency)} · {status}
-        </p>
-        <p
-          className={
-            moneyHeadline
-              ? "mt-1 font-display text-[22px] leading-tight font-bold tracking-tight tabular-nums"
-              : "mt-1 font-display text-[22px] leading-tight font-bold tracking-tight text-muted-foreground"
-          }
+    <>
+      {confirmed ? (
+        <RoomBalanceHero room={room} memberId={memberId} />
+      ) : (
+        <section
+          className="mt-5 rounded-3xl bg-card px-4 pt-5 pb-4"
+          aria-labelledby="bill-heading"
         >
-          {headline}
-        </p>
-        <p className="mt-0.5 text-[15px] text-muted-foreground">{detail}</p>
-        {confirmed && iOwe.length === 1 && payeePay ? (
-          <PayAccountButton
-            pay={payeePay}
-            ownerLabel={`${iOwe[0].toName}'s`}
-            className="mt-3"
-          />
-        ) : null}
-        {!confirmed ? (
+          <p className="text-[15px] font-medium text-muted-foreground">
+            {billStatus(bill, split.unassignedItemIds.length) ?? "The ticket"}
+          </p>
+          <h2
+            id="bill-heading"
+            className="mt-1 font-display text-[28px] leading-tight font-bold tracking-tight"
+          >
+            {canEdit ? "Assign the items" : "The host is on it"}
+          </h2>
+          <p className="mt-1 text-[15px] text-muted-foreground">
+            {canEdit
+              ? "Tap who had what and save. Everyone sees what they owe."
+              : "You'll see what you owe once every item has someone."}
+          </p>
           <Link
             to="/r/$code/check/$checkId"
             params={{ code: room.code, checkId: bill.id }}
-            className="split-cta mt-3.5 w-full"
+            className="split-cta mt-4 w-full"
           >
             {canEdit ? "Assign the items" : "See the items"}
             <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
           </Link>
-        ) : transfers.length > 0 ? (
-          <Link
-            to="/r/$code/settle"
-            params={{ code: room.code }}
-            className="split-cta mt-3.5 w-full"
-          >
-            {oweCents > 0 ? "Pay and mark it done" : "See who owes what"}
-            <HugeiconsIcon icon={ArrowRight01Icon} size={18} strokeWidth={2} />
-          </Link>
-        ) : null}
-      </div>
+        </section>
+      )}
       <Link
         to="/r/$code/check/$checkId"
         params={{ code: room.code, checkId: bill.id }}
-        className="group-list group-row-hit mt-2.5 w-full text-left"
+        className="group-row-hit mt-3 w-full overflow-hidden rounded-2xl bg-card text-left"
       >
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold">
-            {bill.paidByName} paid
-          </p>
-          <p className="truncate text-[13px] text-muted-foreground">
-            {bill.payload.items.length}{" "}
-            {bill.payload.items.length === 1 ? "line" : "lines"} ·{" "}
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+          <HugeiconsIcon icon={Invoice03Icon} size={18} strokeWidth={1.8} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">The ticket</span>
+          <span className="block truncate text-[13px] text-muted-foreground">
+            {bill.paidByName} paid · {lines} {lines === 1 ? "line" : "lines"} ·{" "}
             {formatRelativeTime(bill.createdAt)}
-          </p>
-        </div>
-        <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+          </span>
+        </span>
+        <span className="shrink-0 font-semibold tabular-nums">
           {formatMoney(split.totalCents, bill.currency)}
         </span>
         <HugeiconsIcon
           icon={ArrowRight01Icon}
           size={16}
           strokeWidth={2}
-          className="shrink-0 text-muted-foreground"
+          className="-ml-1 shrink-0 text-muted-foreground"
         />
       </Link>
-    </section>
+    </>
   )
 }

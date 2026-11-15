@@ -1,7 +1,4 @@
 import { useState } from "react"
-import { useNavigate } from "@tanstack/react-router"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons"
 
 import { RecurringTemplateSheet } from "@/components/house/recurring-template-sheet"
 import { Button } from "@/components/ui/button"
@@ -32,7 +29,6 @@ function templateLine(
 }
 
 export function HouseRecurring({ room }: { room: RoomDto }) {
-  const navigate = useNavigate()
   const role = room.house?.viewer.role ?? "VISITOR"
   const actorId = room.house?.viewer.memberId ?? null
   const members = room.house?.members ?? []
@@ -60,21 +56,9 @@ export function HouseRecurring({ room }: { room: RoomDto }) {
 
   return (
     <main className="page-gutter mx-auto w-full max-w-content pt-2 pb-8">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className="icon-hit -ml-3 size-11"
-          onClick={() =>
-            void navigate({ to: "/r/$code", params: { code: room.code } })
-          }
-          aria-label="Back to house"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
-        </button>
-        <h1 className="font-display text-[22px] font-bold tracking-tight">
-          Recurring
-        </h1>
-      </div>
+      <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+        Recurring
+      </h1>
 
       {active.length === 0 ? (
         <div className="surface mt-6 px-4 py-4">

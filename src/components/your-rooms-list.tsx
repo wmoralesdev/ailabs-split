@@ -1,9 +1,7 @@
-import { useNavigate } from "@tanstack/react-router"
-
 import { HouseRowBalance } from "@/components/house/house-row-balance"
-import { RoomExitControl } from "@/components/room-exit-control"
+import { RoomListRow, RoomListSection, RoomRowTime } from "@/components/room-list"
 import { formatRecentTripOpened } from "@/lib/recent-trips"
-import { roomKindLabel } from "@/lib/room-kind"
+import { parseRoomKind } from "@/lib/room-kind"
 import type { OwnedRoomDto } from "@/server/rooms"
 
 export function YourRoomsList({
@@ -13,69 +11,38 @@ export function YourRoomsList({
   rooms: OwnedRoomDto[]
   onChanged?: () => void
 }) {
-  const navigate = useNavigate()
-
   if (rooms.length === 0) return null
 
   return (
-    <section
-      className="animate-rise-delay mt-8"
-      aria-label="Your bills and trips"
-    >
-      <h2 className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-        Yours
-      </h2>
-      <ul className="group-list mt-2">
-        {rooms.map((room) => {
-          const kind = roomKindLabel(room.kind)
+    <RoomListSection title="Yours" label="Your bills, trips, and houses">
+      {(editing) =>
+        rooms.map((room) => {
+          const kind = parseRoomKind(room.kind)
           return (
-            <li key={room.code} className="flex items-stretch">
-              <button
-                type="button"
-                className="group-row-hit min-w-0 flex-1 text-left"
-                aria-label={`Open ${room.name}`}
-                onClick={() =>
-                  void navigate({
-                    to: "/r/$code",
-                    params: { code: room.code },
-                  })
-                }
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-foreground">
-                    {room.name}
-                  </span>
-                  <span className="mt-0.5 flex min-w-0 items-baseline gap-2 text-[13px] text-muted-foreground">
-                    <span className="font-display tracking-[0.18em] uppercase">
-                      {room.code}
-                    </span>
-                    <span aria-hidden>·</span>
-                    <span>{kind}</span>
-                  </span>
-                </span>
-                {room.kind === "HOUSEHOLD" ? (
+            <RoomListRow
+              key={room.code}
+              code={room.code}
+              name={room.name}
+              kind={kind}
+              owned={room.owned}
+              editing={editing}
+              onChanged={onChanged}
+              meta={
+                kind === "HOUSEHOLD" ? (
                   <HouseRowBalance
                     balanceCents={room.balanceCents}
                     currency={room.currency}
                   />
                 ) : (
-                  <span className="shrink-0 self-center text-[13px] text-muted-foreground tabular-nums">
+                  <RoomRowTime>
                     {formatRecentTripOpened(new Date(room.createdAt).getTime())}
-                  </span>
-                )}
-              </button>
-              <RoomExitControl
-                code={room.code}
-                name={room.name}
-                kind={room.kind}
-                owned={room.owned}
-                placement="row"
-                onDone={onChanged}
-              />
-            </li>
+                  </RoomRowTime>
+                )
+              }
+            />
           )
-        })}
-      </ul>
-    </section>
+        })
+      }
+    </RoomListSection>
   )
 }

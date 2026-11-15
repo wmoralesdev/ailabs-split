@@ -1,18 +1,14 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons"
 
+import { HouseBalanceHero } from "@/components/balance-hero"
 import { DueThisMonth } from "@/components/house/due-this-month"
 import { HouseChargeSheet } from "@/components/house/house-charge-sheet"
 import { PullToRefresh } from "@/components/pull-to-refresh"
 import { RoomExitControl } from "@/components/room-exit-control"
 import { houseCategoryHint } from "@/lib/house-categories"
-import {
-  houseMemberOnCharges,
-  houseNets,
-  viewerHeroCopy,
-} from "@/lib/house-ledger"
 import { formatDay, formatMonth } from "@/lib/house-month"
 import { canAddCharge } from "@/lib/house-permissions"
 import { useOnlineStatus } from "@/lib/online-status"
@@ -55,14 +51,6 @@ export function HouseHome({
   const canAdd = canAddCharge(role)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const nets = useMemo(
-    () => houseNets(room.members, room.expenses, room.settlements),
-    [room]
-  )
-  const myNet = nets.find((row) => row.memberId === actorId)?.netCents ?? 0
-  const guestWithoutCharges =
-    role === "GUEST" &&
-    (!actorId || !houseMemberOnCharges(actorId, room.expenses))
   const recurringCount = (room.house?.templates ?? []).filter(
     (template) => !template.archivedAt
   ).length
@@ -74,42 +62,17 @@ export function HouseHome({
 
   return (
     <PullToRefresh disabled={!online} onRefresh={() => refetch()}>
-      <main className="page-gutter mx-auto w-full max-w-content pt-6 pb-8">
+      <main className="page-gutter mx-auto w-full max-w-content pt-2 pb-8">
         <header>
-          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+          <h1 className="truncate font-display text-[34px] leading-tight font-bold tracking-tight">
             {room.name}
           </h1>
-          <p className="mt-1 text-[15px] text-muted-foreground">
+          <p className="mt-0.5 text-[15px] text-muted-foreground">
             House · {housemateLabel}
           </p>
         </header>
 
-        <div className="mt-6 flex items-end justify-between gap-3">
-          <p className="font-display text-[22px] leading-tight font-semibold tracking-tight">
-            {viewerHeroCopy(myNet, room.currency, { guestWithoutCharges })}
-          </p>
-          {myNet !== 0 ? (
-            <Link
-              to="/r/$code/settle"
-              params={{ code: room.code }}
-              className="text-action text-[15px]"
-            >
-              Settle up
-            </Link>
-          ) : null}
-        </div>
-        {canAdd && months.length > 0 ? (
-          <p className="mt-2">
-            <Link
-              to="/r/$code/new"
-              params={{ code: room.code }}
-              search={{}}
-              className="text-action text-[15px]"
-            >
-              Scan a receipt
-            </Link>
-          </p>
-        ) : null}
+        <HouseBalanceHero room={room} />
 
         <DueThisMonth room={room} />
 

@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react"
 import { Link, createFileRoute, getRouteApi } from "@tanstack/react-router"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Share01Icon, Tick02Icon, UndoIcon } from "@hugeicons/core-free-icons"
-import { toast } from "sonner"
+import { Tick02Icon, UndoIcon } from "@hugeicons/core-free-icons"
 
 import {
   BankFxCalibrationSheet,
@@ -11,12 +10,7 @@ import {
   formatFxAdjustmentLabel,
 } from "@/components/bank-fx-calibration-sheet"
 import { HouseSettle } from "@/components/house/house-settle"
-import {
-  PaymentProofButton,
-  PaymentProofDialog,
-} from "@/components/payment-proof-dialog"
-import { PaymentProofSheet } from "@/components/payment-proof-sheet"
-import { PayProfileSheet } from "@/components/pay-profile-sheet"
+import { PaymentProofButton } from "@/components/payment-proof-dialog"
 import {
   SettleEmptyState,
   TransferCard,
@@ -26,31 +20,19 @@ import { Button } from "@/components/ui/button"
 import { formatRelativeTime } from "@/lib/format-relative-time"
 import { parseRoomKind } from "@/lib/room-kind"
 import type { RoomKind } from "@/lib/room-kind"
-import { copyText } from "@/lib/invite-link"
 import { useRoomIdentity } from "@/lib/room-identity"
-import { roomKeys, roomQueryOptions } from "@/lib/room-query"
-import {
-  buildTripSummary,
-  computeNetsWithSettlements,
-  convertToBase,
-  formatMoney,
-  formatTransferSentence,
-  simplifyTransfers,
-} from "@/lib/settle"
+import { roomQueryOptions } from "@/lib/room-query"
+import { formatMoney } from "@/lib/settle"
 import type { Transfer } from "@/lib/settle"
-import type {
-  DeleteSettlementInput,
-  RecordSettlementInput,
-} from "@/lib/schemas"
-import { deleteSettlement, recordSettlement } from "@/server/rooms"
-import type { SettlementDto } from "@/server/rooms"
+import { useRoomSettle } from "@/lib/use-room-settle"
+import type { RoomDto } from "@/server/rooms"
 
 const roomRoute = getRouteApi("/r/$code")
 
 function emptySettleHint(kind: RoomKind): string {
   switch (kind) {
     case "DINNER":
-      return "Confirm the bill to see who owes what."
+      return "Finish the ticket to see who owes what."
     case "HOUSEHOLD":
       return "Add a charge to get started."
     case "TRIP":
@@ -91,234 +73,58 @@ export const Route = createFileRoute("/r/$code/settle")({
 function SettlePage() {
   const { code } = roomRoute.useParams()
   const { memberId } = useRoomIdentity()
-  const queryClient = useQueryClient()
   const { data: room } = useQuery(roomQueryOptions(code, memberId))
-  const [calibrationOpen, setCalibrationOpen] = useState(false)
-  const [pendingKey, setPendingKey] = useState<string | null>(null)
-  const [pendingTransfer, setPendingTransfer] = useState<Transfer | null>(null)
-  const [viewing, setViewing] = useState<SettlementDto | null>(null)
-  const [payMemberId, setPayMemberId] = useState<string | null>(null)
-
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: roomKeys.room(code) })
-
-  const deleteMutation = useMutation({
-    mutationFn: (input: DeleteSettlementInput) =>
-      deleteSettlement({ data: input }),
-    onSuccess: async () => {
-      await invalidate()
-      toast.success("Payment undone")
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not undo payment"
-      )
-    },
-  })
-
-  const recordMutation = useMutation({
-    mutationFn: (input: RecordSettlementInput) =>
-      recordSettlement({ data: input }),
-    onSuccess: async (settlement) => {
-      setPendingTransfer(null)
-      await invalidate()
-      toast.success("Payment recorded", {
-        description: `${settlement.fromMemberName} paid ${settlement.toMemberName} ${formatMoney(settlement.amountCents, settlement.currency)}`,
-        action: {
-          label: "Undo",
-          onClick: () =>
-            deleteMutation.mutate({
-              code,
-              settlementId: settlement.id,
-            }),
-        },
-      })
-    },
-    onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not record payment"
-      )
-    },
-    onSettled: () => setPendingKey(null),
-  })
-
-  const transfers = useMemo(() => {
-    if (!room) return []
-    const nets = computeNetsWithSettlements(
-      room.members,
-      room.expenses
-        .filter((expense) => !expense.isPersonal)
-        .map((expense) => ({
-          paidById: expense.paidById,
-          shares: expense.shares.map((share) => ({
-            memberId: share.memberId,
-            amountCents: convertToBase(
-              share.amountCents,
-              expense.currency,
-              room.currency,
-              room.fxRates,
-              room.fxAdjustmentBps
-            ),
-          })),
-        })),
-      room.settlements.map((settlement) => ({
-        fromMemberId: settlement.fromMemberId,
-        toMemberId: settlement.toMemberId,
-        amountCents: convertToBase(
-          settlement.amountCents,
-          settlement.currency,
-          room.currency,
-          room.fxRates,
-          room.fxAdjustmentBps
-        ),
-      }))
-    )
-    return simplifyTransfers(nets)
-  }, [room])
-
-  const totalCents = transfers.reduce(
-    (sum, transfer) => sum + transfer.amountCents,
-    0
-  )
-
-  const hasForeignExpenses = useMemo(() => {
-    if (!room) return false
-    return room.expenses.some((expense) => expense.currency !== room.currency)
-  }, [room])
 
   if (!room) return null
   if (parseRoomKind(room.kind) === "HOUSEHOLD") {
     return <HouseSettle room={room} />
   }
+  return <RoomSettle room={room} memberId={memberId} />
+}
 
+/** The full ledger of a trip or bill: every transfer left and every payment made. */
+function RoomSettle({ room, memberId }: { room: RoomDto; memberId: string }) {
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const settle = useRoomSettle(room, memberId)
+  const { transfers, mine, others, paidCount, stepCount } = settle
+
+  const hasForeignExpenses = useMemo(
+    () => room.expenses.some((expense) => expense.currency !== room.currency),
+    [room]
+  )
   const adjustmentBps = room.fxAdjustmentBps
   const sampleCount = room.fxCalibrationSamples.length
   const hasBankMatch = Number.isFinite(adjustmentBps) && adjustmentBps !== 0
-  const household = parseRoomKind(room.kind) === "HOUSEHOLD"
-  const mine = transfers.filter(
-    (transfer) => transfer.fromId === memberId || transfer.toId === memberId
-  )
-  const others = transfers.filter(
-    (transfer) => transfer.fromId !== memberId && transfer.toId !== memberId
-  )
-  const paidCount = room.settlements.length
-  const stepCount = paidCount + transfers.length
-  const payMember =
-    room.members.find((member) => member.id === payMemberId) ?? null
 
-  function payeeProps(transfer: Transfer) {
-    const payee = room?.members.find((member) => member.id === transfer.toId)
-    return {
-      payee: payee?.pay ?? null,
-      onPayeeDetails:
-        payee && !payee.payLocked ? () => setPayMemberId(payee.id) : undefined,
-    }
-  }
-
-  async function shareSummary() {
-    if (!room) return
-    const text = buildTripSummary({
-      name: room.name,
-      code: room.code,
-      currency: room.currency,
-      expenses: room.expenses,
-      settlements: room.settlements,
-      transfers,
-    })
-    const share = "share" in navigator ? navigator.share.bind(navigator) : null
-    if (share) {
-      try {
-        await share({ title: `${room.name} summary`, text })
-      } catch {
-        // Dismissed share sheet.
-      }
-      return
-    }
-    await navigator.clipboard.writeText(text)
-    toast.success("Summary copied")
-  }
-
-  async function sendReminder(transfer: Transfer) {
-    if (!room) return
-    const text = formatTransferSentence(transfer, room.currency)
-    const share = "share" in navigator ? navigator.share.bind(navigator) : null
-    if (share) {
-      try {
-        await share({ text })
-      } catch {
-        // Dismissed share sheet.
-      }
-      return
-    }
-    await copyText(text)
-    toast.success("Copied, paste it in the group chat")
-  }
-
-  function markPaid(transfer: Transfer) {
-    setPendingTransfer(transfer)
-  }
-
-  function confirmPaid(proof?: { base64: string; mimeType: "image/jpeg" }) {
-    if (!room || !pendingTransfer) return
-    setPendingKey(transferKey(pendingTransfer))
-    recordMutation.mutate({
-      code: room.code,
-      fromMemberId: pendingTransfer.fromId,
-      toMemberId: pendingTransfer.toId,
-      amountCents: pendingTransfer.amountCents,
-      currency: room.currency,
-      ...(proof ? { proof } : {}),
-    })
+  function renderTransfer(transfer: Transfer) {
+    const toMe = transfer.toId === memberId
+    return (
+      <TransferCard
+        key={transferKey(transfer)}
+        transfer={transfer}
+        currency={room.currency}
+        memberId={memberId}
+        {...(toMe ? {} : settle.payeeProps(transfer))}
+        pending={settle.isPending(transfer)}
+        disabled={settle.recording}
+        onMarkPaid={() => settle.markPaid(transfer)}
+        onRemind={() => void settle.remind(transfer)}
+      />
+    )
   }
 
   return (
     <main className="page-gutter mx-auto max-w-content pt-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
-            Settle up
-          </h1>
-          <p className="mt-0.5 text-[15px] text-muted-foreground">
-            {transfers.length === 0
-              ? paidCount > 0
-                ? `All ${paidCount} ${paidCount === 1 ? "payment" : "payments"} done`
-                : `Amounts in ${room.currency}`
-              : `${formatMoney(totalCents, room.currency)} left · ${paidCount} of ${stepCount} paid`}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="mt-1 bg-card font-semibold text-primary"
-          onClick={() => void shareSummary()}
-        >
-          <HugeiconsIcon icon={Share01Icon} size={14} strokeWidth={2} />
-          Share summary
-        </Button>
-      </div>
-
-      {stepCount > 0 ? (
-        <div
-          className="mt-3 flex gap-1"
-          role="progressbar"
-          aria-label="Payments done"
-          aria-valuemin={0}
-          aria-valuemax={stepCount}
-          aria-valuenow={paidCount}
-        >
-          {Array.from({ length: stepCount }, (_, index) => (
-            <span
-              key={index}
-              className={
-                index < paidCount
-                  ? "h-1 flex-1 rounded-full bg-foreground"
-                  : "h-1 flex-1 rounded-full bg-border"
-              }
-            />
-          ))}
-        </div>
-      ) : null}
+      <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+        All payments
+      </h1>
+      <p className="mt-0.5 text-[15px] text-muted-foreground">
+        {transfers.length === 0
+          ? paidCount > 0
+            ? `All ${paidCount} ${paidCount === 1 ? "payment" : "payments"} done`
+            : `Amounts in ${room.currency}`
+          : `${formatMoney(settle.totalCents, room.currency)} left · ${paidCount} of ${stepCount} paid`}
+      </p>
 
       {parseRoomKind(room.kind) === "TRIP" && hasForeignExpenses ? (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -366,21 +172,8 @@ function SettlePage() {
           <h2 id="yours-heading" className="group-label">
             Yours
           </h2>
-          <ul className="flex flex-col gap-2.5">
-            {mine.map((transfer) => (
-              <TransferCard
-                key={transferKey(transfer)}
-                transfer={transfer}
-                currency={room.currency}
-                memberId={memberId}
-                emphasis
-                {...payeeProps(transfer)}
-                pending={pendingKey === transferKey(transfer)}
-                disabled={recordMutation.isPending || household}
-                onMarkPaid={() => markPaid(transfer)}
-                onRemind={() => void sendReminder(transfer)}
-              />
-            ))}
+          <ul className="group-list">
+            {mine.map((transfer) => renderTransfer(transfer))}
           </ul>
         </section>
       ) : null}
@@ -391,29 +184,9 @@ function SettlePage() {
             {mine.length > 0 ? "Between others" : "Who pays whom"}
           </h2>
           <ul className="group-list">
-            {others.map((transfer) => (
-              <TransferCard
-                key={transferKey(transfer)}
-                transfer={transfer}
-                currency={room.currency}
-                memberId={memberId}
-                {...payeeProps(transfer)}
-                pending={pendingKey === transferKey(transfer)}
-                disabled={recordMutation.isPending || household}
-                onMarkPaid={() => markPaid(transfer)}
-                onRemind={() => void sendReminder(transfer)}
-              />
-            ))}
+            {others.map((transfer) => renderTransfer(transfer))}
           </ul>
         </section>
-      ) : null}
-
-      {parseRoomKind(room.kind) === "TRIP" ? (
-        <BankFxCalibrationSheet
-          room={room}
-          open={calibrationOpen}
-          onOpenChange={setCalibrationOpen}
-        />
       ) : null}
 
       {room.settlements.length > 0 ? (
@@ -453,7 +226,7 @@ function SettlePage() {
                 {settlement.hasProof ? (
                   <PaymentProofButton
                     fromName={settlement.fromMemberName}
-                    onClick={() => setViewing(settlement)}
+                    onClick={() => settle.viewProof(settlement)}
                   />
                 ) : null}
                 <Button
@@ -461,13 +234,8 @@ function SettlePage() {
                   variant="ghost"
                   size="sm"
                   className="shrink-0 text-primary"
-                  onClick={() =>
-                    deleteMutation.mutate({
-                      code: room.code,
-                      settlementId: settlement.id,
-                    })
-                  }
-                  disabled={deleteMutation.isPending || household}
+                  onClick={() => settle.undo(settlement.id)}
+                  disabled={settle.undoing}
                   aria-label={`Undo payment from ${settlement.fromMemberName} to ${settlement.toMemberName}`}
                 >
                   <HugeiconsIcon icon={UndoIcon} size={14} strokeWidth={2} />
@@ -479,40 +247,24 @@ function SettlePage() {
         </section>
       ) : null}
 
-      <PaymentProofSheet
-        transfer={pendingTransfer}
-        currency={room.currency}
-        memberId={memberId}
-        open={pendingTransfer !== null}
-        saving={recordMutation.isPending}
-        onOpenChange={(next) => {
-          if (recordMutation.isPending) return
-          if (!next) setPendingTransfer(null)
-        }}
-        onConfirm={confirmPaid}
-      />
-      <PayProfileSheet
-        room={room}
-        member={payMember}
-        viewerMemberId={memberId || null}
-        open={payMember !== null}
-        onOpenChange={(next) => {
-          if (!next) setPayMemberId(null)
-        }}
-      />
-      <PaymentProofDialog
-        open={viewing !== null}
-        onOpenChange={(next) => {
-          if (!next) setViewing(null)
-        }}
-        code={room.code}
-        settlementId={viewing?.id ?? null}
-        label={
-          viewing
-            ? `${viewing.fromMemberName} paid ${viewing.toMemberName} ${formatMoney(viewing.amountCents, viewing.currency)}`
-            : ""
-        }
-      />
+      {room.expenses.length > 0 ? (
+        <button
+          type="button"
+          className="text-action mt-6 w-full justify-center text-[15px]"
+          onClick={() => void settle.shareSummary()}
+        >
+          Share summary
+        </button>
+      ) : null}
+
+      {parseRoomKind(room.kind) === "TRIP" ? (
+        <BankFxCalibrationSheet
+          room={room}
+          open={calibrationOpen}
+          onOpenChange={setCalibrationOpen}
+        />
+      ) : null}
+      {settle.sheets}
     </main>
   )
 }

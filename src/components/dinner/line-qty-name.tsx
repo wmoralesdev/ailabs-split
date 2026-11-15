@@ -24,13 +24,11 @@ export function LineQtyName({
 
   return (
     <span className={cn("flex min-w-0 items-start gap-2.5", className)}>
-      <span
-        className="line-qty pt-0.5"
-        aria-hidden={showQty ? undefined : true}
-        aria-label={showQty ? `Qty ${count}` : undefined}
-      >
-        {showQty ? count : null}
-      </span>
+      {showQty ? (
+        <span className="line-qty pt-0.5" aria-label={`Qty ${count}`}>
+          {count}
+        </span>
+      ) : null}
       <span className="min-w-0 flex-1">
         <span className={cn("block", nameClassName)}>{name}</span>
         {children}

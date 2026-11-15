@@ -1,5 +1,4 @@
 import { defineConfig } from "vite"
-import { devtools } from "@tanstack/devtools-vite"
 import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import { nitro } from "nitro/vite"
 import viteReact from "@vitejs/plugin-react"
@@ -17,7 +16,6 @@ const config = defineConfig({
   // Public Clerk key only — never add a prefix that would leak CLERK_SECRET_KEY.
   envPrefix: ["VITE_", "CLERK_PUBLISHABLE_"],
   plugins: [
-    ...(process.env.E2E ? [] : [devtools()]),
     tailwindcss(),
     tanstackStart(),
     // Nitro targets Vercel on CI (`VERCEL=1`); local builds use node-server.

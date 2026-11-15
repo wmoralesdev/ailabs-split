@@ -96,11 +96,15 @@ test("landing and dinner controls show hover and focus-visible", async ({
     page.getByRole("button", { name: "Create without a ticket" }),
     "03-create-without-ticket"
   )
-  await hoverShot(page, page.getByRole("tab", { name: "Join" }), "04-join-tab")
+  await hoverShot(
+    page,
+    page.getByRole("button", { name: "Have a code? Join" }),
+    "04-join-link"
+  )
   await hoverShot(
     page,
     page
-      .getByRole("group", { name: "Mode" })
+      .getByRole("group", { name: "What are you splitting?" })
       .getByRole("button", { name: /Trip/ }),
     "05-mode-trip"
   )
@@ -156,7 +160,7 @@ test("landing and dinner controls show hover and focus-visible", async ({
   await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
   await waitForHydration(page)
   const tripChip = page
-    .getByRole("group", { name: "Mode" })
+    .getByRole("group", { name: "What are you splitting?" })
     .getByRole("button", { name: /Trip/ })
   await tripChip.click()
   await expect(tripChip).toHaveAttribute("aria-pressed", "true")
@@ -177,7 +181,7 @@ test("every visible control on landing answers a real mouse hover", async ({
 }) => {
   await openLanding(page)
   const tripChip = page
-    .getByRole("group", { name: "Mode" })
+    .getByRole("group", { name: "What are you splitting?" })
     .getByRole("button", { name: /Trip/ })
   if ((await tripChip.getAttribute("aria-pressed")) !== "true") {
     await tripChip.click()

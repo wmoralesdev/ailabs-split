@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons/core-free-icons"
 
+import { ChipRow } from "@/components/chip-row"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,7 +54,7 @@ export function NameListInput({
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
       {fixed.length + names.length > 0 ? (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Added so far">
+        <ChipRow role="list" aria-label="Added so far" bleed followEnd>
           {fixed.map((name) => (
             <li key={name} className="person-chip bg-muted">
               {name}
@@ -74,7 +75,7 @@ export function NameListInput({
               </button>
             </li>
           ))}
-        </ul>
+        </ChipRow>
       ) : null}
       <div className="flex gap-2">
         <Input

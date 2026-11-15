@@ -10,9 +10,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { CreateTripSuccessSheet } from "@/components/create-trip-success-sheet"
 import { OnboardingSplash } from "@/components/onboarding-splash"
 import { PageShell } from "@/components/page-shell"
+import { InviteButton } from "@/components/invite-sheet"
+import { RoomFab } from "@/components/room-fab"
 import { RoomShell } from "@/components/room-shell"
-import { RoomTabBar } from "@/components/room-tab-bar"
-import { ShareTripButton } from "@/components/share-trip-button"
 import { SyncStatus } from "@/components/sync-status"
 import { Skeleton } from "@/components/ui/skeleton"
 import { HouseRoomLayout } from "@/components/house/house-room-layout"
@@ -346,14 +346,21 @@ function RoomLayout() {
         headerRight={
           <>
             <SyncStatus />
-            <ShareTripButton
+            <InviteButton
               code={room.code}
               name={room.name}
               kind={room.kind}
+              meName={
+                room.members.find((member) => member.id === memberId)?.name
+              }
             />
           </>
         }
-        footer={<RoomTabBar code={code} kind={room.kind} />}
+        fab={
+          parseRoomKind(room.kind) === "TRIP" ? (
+            <RoomFab code={code} label="Add expense" />
+          ) : null
+        }
       >
         <Outlet />
       </RoomShell>

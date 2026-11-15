@@ -9,7 +9,6 @@ import { toast } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
-  ArrowLeft01Icon,
   Delete02Icon,
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
@@ -21,7 +20,6 @@ import { ItemSplitSheet } from "@/components/dinner/item-split-sheet"
 import { LineQtyName } from "@/components/dinner/line-qty-name"
 import { OcrReview } from "@/components/dinner/ocr-review"
 import { OwingAmount } from "@/components/dinner/owing-amount"
-import { RoomExitControl } from "@/components/room-exit-control"
 import { TicketPhotoPicker } from "@/components/ticket-photo-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -57,6 +55,7 @@ import {
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
+import { runClientTicketOcr } from "@/lib/ocr-log"
 import { useOnlineStatus } from "@/lib/online-status"
 import { useRequireSignIn } from "@/lib/use-auth-user"
 import { hasPendingTicket, takePendingTicket } from "@/lib/pending-ticket"
@@ -67,7 +66,7 @@ import { roomKeys } from "@/lib/room-query"
 import { formatMoney } from "@/lib/settle"
 import { cn } from "@/lib/utils"
 import { scanReceipt } from "@/server/ocr"
-import { confirmCheck, revertCheck, upsertCheck } from "@/server/checks"
+import { confirmCheck, upsertCheck } from "@/server/checks"
 import { renameRoom } from "@/server/rooms"
 import type { CheckDto, RoomDto } from "@/server/rooms"
 
@@ -118,6 +117,7 @@ export function CheckEditor({
   const [feePercent, setFeePercent] = useState("")
   const [feeUnit, setFeeUnit] = useState<ManualFeeUnit>("amount")
   const [showFee, setShowFee] = useState(false)
+  const [addingItem, setAddingItem] = useState(false)
 
   const nameById = useMemo(
     () => new Map(room.members.map((member) => [member.id, member.name])),
@@ -153,8 +153,12 @@ export function CheckEditor({
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: roomKeys.room(room.code) })
 
+  /**
+   * One save: the ticket is stored as it is. When every item has someone,
+   * it also becomes the bill everyone owes against.
+   */
   const saveMutation = useMutation({
-    mutationFn: async (confirmAfter: boolean) => {
+    mutationFn: async () => {
       if (readOnly) {
         throw new Error("Only the person who started this can edit it")
       }
@@ -170,48 +174,29 @@ export function CheckEditor({
         },
       })
       setCheckId(saved.id)
-      if (confirmAfter) {
+      if (split.canConfirm && saved.status !== "CONFIRMED") {
         return await confirmCheck({
           data: { code: room.code, checkId: saved.id },
         })
       }
       return saved
     },
-    onSuccess: async (saved, confirmAfter) => {
-      if (confirmAfter) {
-        toast.success("Bill confirmed")
-        // Leave /check before invalidate; the index route redirects to the
-        // saved bill and would win a race against this home navigation.
-        await navigate({ to: "/r/$code", params: { code: room.code } })
-        await invalidate()
-        return
-      }
+    onSuccess: async (saved) => {
+      const left = split.unassignedItemIds.length
+      toast.success(
+        saved.status === "CONFIRMED"
+          ? "Ticket saved"
+          : left > 0
+            ? `Ticket saved · ${left} ${left === 1 ? "item" : "items"} to assign`
+            : "Ticket saved"
+      )
+      // Leave /check before invalidate; the index route redirects to the
+      // saved bill and would win a race against this home navigation.
+      await navigate({ to: "/r/$code", params: { code: room.code } })
       await invalidate()
-      toast.success("Draft saved")
-      if (!check) {
-        await navigate({
-          to: "/r/$code/check/$checkId",
-          params: { code: room.code, checkId: saved.id },
-          replace: true,
-        })
-      }
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Could not save")
-    },
-  })
-
-  const revertMutation = useMutation({
-    mutationFn: async () => {
-      if (readOnly) {
-        throw new Error("Only the person who started this can edit it")
-      }
-      if (!checkId) return
-      return await revertCheck({ data: { code: room.code, checkId } })
-    },
-    onSuccess: async () => {
-      await invalidate()
-      toast.success("Moved back to draft")
     },
   })
 
@@ -255,18 +240,21 @@ export function CheckEditor({
       toast.error("Scanning needs a connection")
       return
     }
-    const compressed = compressImageForOcr(file)
     await awaitOcrDraft(
-      compressed.then((image) =>
-        scanReceipt({
-          data: {
-            code: room.code,
-            imageBase64: image.base64,
-            mimeType: image.mimeType,
-            mode: "dinner",
-          },
-        })
-      ),
+      runClientTicketOcr({
+        kind: "dinner",
+        sourceBytes: file.size,
+        image: compressImageForOcr(file),
+        scan: (image) =>
+          scanReceipt({
+            data: {
+              code: room.code,
+              imageBase64: image.base64,
+              mimeType: image.mimeType,
+              mode: "dinner",
+            },
+          }),
+      }),
       nameFromTicket
     )
   }
@@ -416,8 +404,6 @@ export function CheckEditor({
   const unassignedCount = payableItems.filter(
     (item) => item.split.mode === "UNASSIGNED"
   ).length
-  const backHome = () =>
-    void navigate({ to: "/r/$code", params: { code: room.code } })
 
   if (ocrPending && payload.items.length === 0) {
     return (
@@ -425,7 +411,7 @@ export function CheckEditor({
         className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2"
         aria-busy
       >
-        <EditorHeader title="Reading ticket…" pending onBack={backHome} />
+        <EditorHeader title="Reading ticket…" pending />
         <p className="mt-1 text-[15px] text-muted-foreground" role="status">
           Pulling the items, tip and total off the photo.
         </p>
@@ -444,7 +430,7 @@ export function CheckEditor({
   if (phase === "review") {
     return (
       <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
-        <EditorHeader title="Check the ticket" onBack={backHome} />
+        <EditorHeader title="Check the ticket" />
         <div className="mt-4 flex flex-col gap-5 pb-6">
           <DinnerNameField
             code={room.code}
@@ -478,9 +464,26 @@ export function CheckEditor({
 
   return (
     <main className="page-gutter mx-auto flex min-h-full max-w-content flex-col pt-2">
-      <EditorHeader title={billName.trim() || "The bill"} onBack={backHome} />
+      <header>
+        <DinnerNameField
+          code={room.code}
+          value={billName}
+          savedName={room.name}
+          onChange={setBillName}
+          id="dinner-name-assign"
+          readOnly={readOnly}
+          variant="title"
+        />
+        <p className="mt-0.5 text-[15px] text-muted-foreground tabular-nums">
+          Ticket · {room.currency}
+          {payableItems.length > 0
+            ? ` · ${payableItems.length} ${payableItems.length === 1 ? "item" : "items"}`
+            : ""}
+          {isPrecuenta ? " · Precuenta" : ""}
+        </p>
+      </header>
 
-      <div className="mt-3 flex flex-col gap-6 pb-6">
+      <div className="mt-8 flex flex-col gap-10 pb-8">
         {payload.items.length === 0 && isOnline && !readOnly ? (
           <TicketPhotoPicker
             pending={ocrPending}
@@ -501,15 +504,6 @@ export function CheckEditor({
           </p>
         ) : null}
 
-        <DinnerNameField
-          code={room.code}
-          value={billName}
-          savedName={room.name}
-          onChange={setBillName}
-          id="dinner-name-assign"
-          readOnly={readOnly}
-        />
-
         <BillPeople
           room={room}
           selfMemberId={selfMemberId}
@@ -526,7 +520,7 @@ export function CheckEditor({
           <div className="flex items-baseline justify-between gap-3">
             <h2
               id="items-heading"
-              className="font-display text-lg font-semibold"
+              className="text-[13px] font-medium text-muted-foreground"
             >
               Items
             </h2>
@@ -554,15 +548,7 @@ export function CheckEditor({
             ) : null}
           </div>
           {payableItems.length > 0 ? (
-            <p className="text-[13px] leading-snug text-muted-foreground">
-              {readOnly
-                ? "Who had each item."
-                : "Tap who shared each item. Tap the item for parts or amounts."}
-            </p>
-          ) : null}
-
-          {payableItems.length > 0 ? (
-            <ul className="group-list mt-2.5">
+            <ul className="group-list mt-3">
               {payableItems.map((item) => (
                 <ItemCard
                   key={item.id}
@@ -584,7 +570,20 @@ export function CheckEditor({
             </ul>
           ) : null}
 
-          {readOnly ? null : (
+          {readOnly ? null : payableItems.length > 0 && !addingItem ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="btn-tint mt-2.5 w-full"
+              onClick={() => {
+                setAddingItem(true)
+                window.setTimeout(() => itemNameRef.current?.focus(), 0)
+              }}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={2} />
+              Add an item
+            </Button>
+          ) : (
             <form
               className="surface mt-2.5 flex flex-col gap-3 p-3.5"
               onSubmit={(event) => {
@@ -701,7 +700,7 @@ export function CheckEditor({
           >
             <h2
               id="extras-heading"
-              className="font-display text-lg font-semibold"
+              className="text-[13px] font-medium text-muted-foreground"
             >
               Tip and fees
             </h2>
@@ -758,8 +757,7 @@ export function CheckEditor({
                 <div>
                   <Label htmlFor="custom-tip">Add tip</Label>
                   <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-                    Only if you want one. Nothing is added unless the ticket
-                    prints it.
+                    Only if the ticket didn&apos;t include one.
                   </p>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -948,7 +946,7 @@ export function CheckEditor({
           <section aria-labelledby="by-person-heading">
             <h2
               id="by-person-heading"
-              className="font-display text-lg font-semibold"
+              className="text-[13px] font-medium text-muted-foreground"
             >
               By person
             </h2>
@@ -971,68 +969,41 @@ export function CheckEditor({
           </section>
         ) : null}
 
-        <div className="flex flex-col gap-1">
-          {!readOnly && (payload.items.length > 0 || checkId) ? (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled={saveMutation.isPending}
-                onClick={() => saveMutation.mutate(false)}
-              >
-                Save draft for later
-              </Button>
-              {check?.status === "CONFIRMED" ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => revertMutation.mutate()}
-                >
-                  Move back to draft
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-          <RoomExitControl
-            code={room.code}
-            name={room.name}
-            kind={room.kind}
-            owned={room.owned}
-            placement="page"
-          />
-        </div>
       </div>
 
       {readOnly ? null : (
         <div className="action-bar mt-auto">
-          <div className="mb-2 flex items-baseline justify-between gap-3">
-            <p className="font-display text-xl font-bold tabular-nums">
-              {formatMoney(split.totalCents, room.currency)}
-            </p>
-            {split.confirmBlockReason ? (
+          <div className="flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-[22px] leading-tight font-bold tabular-nums">
+                {formatMoney(split.totalCents, room.currency)}
+              </p>
               <p
-                className="text-right text-[13px] font-medium text-destructive"
-                role="alert"
+                className="truncate text-[13px] text-muted-foreground"
+                role="status"
               >
-                {split.confirmBlockReason}
+                {payableItems.length === 0
+                  ? "Add the items"
+                  : unassignedCount > 0
+                    ? `${unassignedCount} ${unassignedCount === 1 ? "item" : "items"} to assign`
+                    : (split.confirmBlockReason ??
+                      `Split ${split.shares.length} ${split.shares.length === 1 ? "way" : "ways"}`)}
               </p>
-            ) : payableItems.length > 0 ? (
-              <p className="text-[13px] text-muted-foreground">
-                Split between {split.shares.length}{" "}
-                {split.shares.length === 1 ? "person" : "people"}
-              </p>
-            ) : null}
+            </div>
+            <Button
+              type="button"
+              className="h-12 shrink-0 px-7 text-[17px] font-semibold"
+              disabled={
+                saveMutation.isPending ||
+                payableItems.length === 0 ||
+                // A ticket people already owe against stays complete.
+                (check?.status === "CONFIRMED" && !split.canConfirm)
+              }
+              onClick={() => saveMutation.mutate()}
+            >
+              {saveMutation.isPending ? "Saving…" : "Save ticket"}
+            </Button>
           </div>
-          <Button
-            type="button"
-            className="cta-lg"
-            disabled={!split.canConfirm || saveMutation.isPending}
-            onClick={() => saveMutation.mutate(true)}
-          >
-            {saveMutation.isPending ? "Saving…" : "Confirm bill"}
-          </Button>
         </div>
       )}
 
@@ -1102,14 +1073,15 @@ function ItemCard({
   const evenShare =
     perPerson.length > 0 && perPerson.every((cents) => cents === perPerson[0])
 
-  let summary: string
+  // The chips already say who; the row only adds what the chips can't:
+  // a missing owner, or what each person pays when it is shared.
+  let summary: string | null
   if (unassigned) {
     summary = "Who had this?"
+  } else if (item.split.mode === "EQUAL" && perPerson.length <= 1) {
+    summary = null
   } else if (item.split.mode === "EQUAL" && evenShare) {
-    summary =
-      perPerson.length === 1
-        ? `${nameById.get(item.split.memberIds[0]) ?? "One person"} pays it all`
-        : `${formatMoney(perPerson[0], currency)} each`
+    summary = `${formatMoney(perPerson[0], currency)} each`
   } else if (item.split.mode === "EQUAL") {
     summary = `About ${formatMoney(Math.round(item.amountCents / perPerson.length), currency)} each`
   } else {
@@ -1123,23 +1095,20 @@ function ItemCard({
           <LineQtyName
             name={item.name}
             quantity={item.quantity}
-            nameClassName="text-[15px] font-semibold"
+            nameClassName="truncate text-[15px] font-semibold"
           >
-            {item.modifiers.length > 0 ? (
-              <span className="block text-[13px] text-muted-foreground">
-                {item.modifiers.join(" · ")}
+            {summary ? (
+              <span
+                className={cn(
+                  "block text-[13px]",
+                  unassigned
+                    ? "font-medium text-destructive"
+                    : "text-muted-foreground"
+                )}
+              >
+                {summary}
               </span>
             ) : null}
-            <span
-              className={cn(
-                "block text-[13px]",
-                unassigned
-                  ? "font-medium text-destructive"
-                  : "text-muted-foreground"
-              )}
-            >
-              {summary}
-            </span>
           </LineQtyName>
         </span>
         <span className="shrink-0 text-[15px] font-semibold tabular-nums">
@@ -1198,30 +1167,16 @@ function ItemCard({
 
 function EditorHeader({
   title,
-  onBack,
   pending = false,
 }: {
   title: string
-  onBack: () => void
   pending?: boolean
 }) {
   return (
-    <div className="flex items-center gap-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-lg"
-        className="-ml-3"
-        onClick={onBack}
-        aria-label="Back"
-      >
-        <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
-      </Button>
-      <h1 className="flex min-w-0 items-center gap-2 truncate font-display text-[22px] font-bold tracking-tight">
-        {pending ? <Spinner className="size-5 shrink-0" /> : null}
-        {title}
-      </h1>
-    </div>
+    <h1 className="flex min-w-0 items-center gap-2 truncate font-display text-[28px] leading-tight font-bold tracking-tight">
+      {pending ? <Spinner className="size-5 shrink-0" /> : null}
+      {title}
+    </h1>
   )
 }
 

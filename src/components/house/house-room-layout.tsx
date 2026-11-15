@@ -5,8 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { HouseGate } from "@/components/house/house-gate"
 import { RoomShell } from "@/components/room-shell"
-import { RoomTabBar } from "@/components/room-tab-bar"
-import { ShareTripButton } from "@/components/share-trip-button"
+import { InviteButton } from "@/components/invite-sheet"
+import { RoomFab } from "@/components/room-fab"
 import { SyncStatus } from "@/components/sync-status"
 import {
   forgetMember,
@@ -180,19 +180,13 @@ export function HouseRoomLayout({
         headerRight={
           <>
             <SyncStatus />
-            <ShareTripButton
-              code={room.code}
-              name={room.name}
-              kind={room.kind}
-            />
+            <InviteButton code={room.code} name={room.name} kind={room.kind} />
           </>
         }
-        footer={
-          <RoomTabBar
-            code={code}
-            kind={room.kind}
-            canAdd={canAddCharge(room.house?.viewer.role ?? "VISITOR")}
-          />
+        fab={
+          canAddCharge(room.house?.viewer.role ?? "VISITOR") ? (
+            <RoomFab code={code} label="Add charge" />
+          ) : null
         }
       >
         <Outlet />

@@ -22,7 +22,6 @@ async function joinDinner(
   await skipCookieBanner(page)
   await page.goto("/?stay=true&tab=join", { waitUntil: "domcontentloaded" })
   await waitForHydration(page)
-  await page.getByRole("tab", { name: "Join" }).click()
   await page.getByLabel("Code", { exact: true }).fill(code)
   await expect(page.getByText(dinnerName)).toBeVisible()
   await page.getByRole("button", { name: /add my name/i }).click()

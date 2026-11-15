@@ -7,8 +7,6 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router"
 import type { QueryClient } from "@tanstack/react-query"
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
-import { TanStackDevtools } from "@tanstack/react-devtools"
 
 import { AuthModal } from "@/components/auth-modal"
 import { SiteNotice } from "@/components/site-notice"
@@ -144,17 +142,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             <PwaUpdatePrompt />
           </AppProviders>
         </ThemeProvider>
-        {import.meta.env.DEV && import.meta.env.VITE_E2E !== "1" ? (
-          <TanStackDevtools
-            config={{ position: "bottom-right" }}
-            plugins={[
-              {
-                name: "Tanstack Router",
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-            ]}
-          />
-        ) : null}
         <Scripts />
       </body>
     </html>

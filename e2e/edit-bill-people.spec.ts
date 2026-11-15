@@ -103,7 +103,6 @@ test("edit and remove a guest on the dinner bill", async ({
   await skipCookieBanner(guestPage)
   await guestPage.goto("/?stay=true&tab=join")
   await waitForHydration(guestPage)
-  await guestPage.getByRole("tab", { name: "Join" }).click()
   await guestPage.getByLabel("Code", { exact: true }).fill(dinnerCode)
   await expect(guestPage.getByText(dinnerName)).toBeVisible()
   await guestPage.getByRole("button", { name: /add my name/i }).click()

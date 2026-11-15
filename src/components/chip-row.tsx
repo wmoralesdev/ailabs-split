@@ -13,16 +13,21 @@ export function ChipRow({
   role,
   "aria-label": ariaLabel,
   bleed = false,
+  followEnd = false,
   className,
 }: {
   children: ReactNode
   role?: string
   "aria-label"?: string
   bleed?: boolean
+  /** Lists people add to: a new chip scrolls into view at the end. */
+  followEnd?: boolean
   className?: string
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const followEndRef = useRef(followEnd)
+  followEndRef.current = followEnd
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
@@ -35,10 +40,26 @@ export function ChipRow({
       wrap.toggleAttribute("data-scroll-right", max - scroller.scrollLeft > 1)
     }
 
+    let count = scroller.childElementCount
+    const onMutate = () => {
+      const next = scroller.childElementCount
+      if (followEndRef.current && next > count) {
+        const reduce = window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches
+        scroller.scrollTo({
+          left: scroller.scrollWidth,
+          behavior: reduce ? "auto" : "smooth",
+        })
+      }
+      count = next
+      update()
+    }
+
     update()
     const ro = new ResizeObserver(update)
     ro.observe(scroller)
-    const mo = new MutationObserver(update)
+    const mo = new MutationObserver(onMutate)
     mo.observe(scroller, { childList: true, subtree: true })
     scroller.addEventListener("scroll", update, { passive: true })
     window.addEventListener("resize", update)

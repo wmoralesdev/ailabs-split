@@ -23,7 +23,6 @@ import { RecentTripsList } from "@/components/recent-trips-list"
 import { OnboardingSplash } from "@/components/onboarding-splash"
 import { PageShell } from "@/components/page-shell"
 import { SiteLogo } from "@/components/site-logo"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { ToSettleCard } from "@/components/to-settle-card"
 import { WithDisplayName } from "@/components/with-display-name"
 import { YourRoomsList } from "@/components/your-rooms-list"
@@ -40,7 +39,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { BaseCurrencyPicker } from "@/components/base-currency-picker"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatFxRate } from "@/lib/format-fx-rate"
 import { nextCreatorName } from "@/lib/clerk-display-name"
 import {
@@ -162,7 +160,9 @@ function LandingPage() {
   const [listsRevision, setListsRevision] = useState(0)
   const { stay, tab, code: joinCode, kind: kindSearch } = Route.useSearch()
   const userId = useSignedInUserId()
-  const defaultTab = tab === "join" ? "join" : "create"
+  const [mode, setMode] = useState<"create" | "join">(
+    tab === "join" || joinCode ? "join" : "create"
+  )
   const [kind, setKind] = useState<LandingKind>("TRIP")
   useEffect(() => {
     if (kindSearch === "house") {
@@ -241,10 +241,7 @@ function LandingPage() {
     <PageShell innerClassName="flex min-h-dvh flex-col pt-2">
       <header className="flex h-11 items-center justify-between">
         <SiteLogo />
-        <div className="flex items-center gap-1">
-          <AuthControls />
-          <ThemeToggle />
-        </div>
+        <AuthControls />
       </header>
 
       <div className="animate-rise mt-3">
@@ -255,61 +252,68 @@ function LandingPage() {
           Split
         </h1>
         <p className="mt-1 text-[15px] leading-snug text-muted-foreground">
-          {landingTagline(kind)}
+          {mode === "join"
+            ? "Type the code someone sent you."
+            : landingTagline(kind)}
         </p>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="animate-rise-delay mt-5">
-        <TabsList className="segmented w-full grid-cols-2 group-data-horizontal/tabs:h-9">
-          <TabsTrigger value="create" className="segmented-item">
-            Create
-          </TabsTrigger>
-          <TabsTrigger value="join" className="segmented-item">
-            Join
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent
-          value="create"
-          className="tab-panel mt-4 flex flex-col text-base"
-        >
-          <div
-            className="mb-5 grid grid-cols-3 gap-2"
-            role="group"
-            aria-label="Mode"
+      <section
+        aria-label="Start or join"
+        className="animate-rise-delay mt-5 flex flex-col text-base"
+      >
+        <div className="mb-2 flex min-h-11 items-center justify-between gap-3">
+          <h2 className="text-[13px] font-medium text-muted-foreground">
+            {mode === "join" ? "Join with a code" : "Start a new one"}
+          </h2>
+          <button
+            type="button"
+            className="text-action text-[15px]"
+            onClick={() => setMode(mode === "join" ? "create" : "join")}
           >
-            <ModeButton
-              label="Bill"
-              detail="Tonight"
-              icon={Restaurant01Icon}
-              active={kind === "DINNER"}
-              onClick={() => pickKind("DINNER")}
-            />
-            <ModeButton
-              label="Trip"
-              detail="Days"
-              icon={Airplane01Icon}
-              active={kind === "TRIP"}
-              onClick={() => pickKind("TRIP")}
-            />
-            <ModeButton
-              label="House"
-              detail="Months"
-              icon={Home01Icon}
-              active={kind === "HOUSEHOLD"}
-              onClick={() => pickKind("HOUSEHOLD")}
-            />
-          </div>
-          {landingCreateForm(kind, {
-            navigate,
-            displayName,
-            signedIn: Boolean(userId),
-            yours,
-          })}
-        </TabsContent>
-        <TabsContent value="join" className="tab-panel mt-6 text-base">
+            {mode === "join" ? "Start one instead" : "Have a code? Join"}
+          </button>
+        </div>
+        {mode === "join" ? (
           <JoinForm navigate={navigate} initialCode={joinCode} />
-        </TabsContent>
-      </Tabs>
+        ) : (
+          <>
+            <div
+              className="mb-5 grid grid-cols-3 gap-2"
+              role="group"
+              aria-label="What are you splitting?"
+            >
+              <ModeButton
+                label="Bill"
+                detail="Tonight"
+                icon={Restaurant01Icon}
+                active={kind === "DINNER"}
+                onClick={() => pickKind("DINNER")}
+              />
+              <ModeButton
+                label="Trip"
+                detail="Days"
+                icon={Airplane01Icon}
+                active={kind === "TRIP"}
+                onClick={() => pickKind("TRIP")}
+              />
+              <ModeButton
+                label="House"
+                detail="Months"
+                icon={Home01Icon}
+                active={kind === "HOUSEHOLD"}
+                onClick={() => pickKind("HOUSEHOLD")}
+              />
+            </div>
+            {landingCreateForm(kind, {
+              navigate,
+              displayName,
+              signedIn: Boolean(userId),
+              yours,
+            })}
+          </>
+        )}
+      </section>
       <div className="pb-safe pb-10">
         <ToSettleCard
           yours={yours}
@@ -410,16 +414,16 @@ function ModeButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex flex-col items-start gap-2 rounded-2xl border px-3 pt-3 pb-3 text-left transition-[background-color,border-color,color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
+        "flex flex-col items-start gap-2 rounded-2xl border-2 bg-card px-3 pt-3 pb-3 text-left text-foreground transition-[background-color,border-color] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]",
         active
-          ? "border-foreground bg-foreground text-background hover:bg-foreground/90"
-          : "border-transparent bg-card text-foreground hover:bg-muted"
+          ? "border-primary bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))]"
+          : "border-transparent hover:bg-muted"
       )}
     >
       <span
         className={cn(
-          "inline-flex size-8 items-center justify-center rounded-lg",
-          active ? "bg-background/15" : "bg-muted"
+          "inline-flex size-8 items-center justify-center rounded-lg transition-colors",
+          active ? "bg-primary text-primary-foreground" : "bg-muted"
         )}
       >
         <HugeiconsIcon icon={icon} size={18} strokeWidth={1.8} />
@@ -429,10 +433,7 @@ function ModeButton({
           {label}
         </span>
         <span
-          className={cn(
-            "mt-0.5 block text-[13px]",
-            active ? "text-background/70" : "text-muted-foreground"
-          )}
+          className="mt-0.5 block text-[13px] text-muted-foreground"
         >
           {detail}
         </span>
@@ -495,7 +496,7 @@ function CreateFormFields({
   const [memberDraft, setMemberDraft] = useState("")
   const [membersError, setMembersError] = useState<string | null>(null)
   const [extras, setExtras] = useState<Record<string, string>>({})
-  const [showExtras, setShowExtras] = useState(false)
+  const [editCurrency, setEditCurrency] = useState(false)
   const [fxDate, setFxDate] = useState<string | null>(null)
   const [fxLoading, setFxLoading] = useState(false)
 
@@ -564,7 +565,6 @@ function CreateFormFields({
   }, [baseCurrency, extras])
 
   function toggleExtra(code: string) {
-    setShowExtras(true)
     setExtras((prev) => {
       const next = { ...prev }
       if (code in next) {
@@ -591,7 +591,7 @@ function CreateFormFields({
   function onSubmit(values: CreateValues) {
     const unique = mergeNames([values.creatorName, ...members], memberDraft)
     if (unique.length < 2) {
-      setMembersError("Add at least two members")
+      setMembersError("Add at least one more person")
       return
     }
 
@@ -618,7 +618,6 @@ function CreateFormFields({
   }
 
   const extraCodes = Object.keys(extras)
-  const extrasOpen = showExtras || extraCodes.length > 0
 
   return (
     <Form {...form}>
@@ -651,7 +650,7 @@ function CreateFormFields({
                   <Input
                     placeholder="Ana"
                     autoComplete="given-name"
-                    enterKeyHint="done"
+                    enterKeyHint="next"
                     {...field}
                   />
                 </FormControl>
@@ -660,69 +659,54 @@ function CreateFormFields({
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="baseCurrency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Base currency</FormLabel>
-                <FormControl>
-                  <BaseCurrencyPicker
-                    value={field.value}
-                    onChange={onBaseCurrencyChange}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Balances and settle-up use this currency.
-                </FormDescription>
-              </FormItem>
-            )}
+          <NameListInput
+            id="trip-members"
+            label="Who else is going"
+            names={members}
+            draft={memberDraft}
+            onNamesChange={(next) => {
+              setMembers(next)
+              setMembersError(null)
+            }}
+            onDraftChange={setMemberDraft}
+            placeholder="Type a name"
+            hint="Add at least one. The rest can join with the code."
+            error={membersError}
           />
         </div>
 
-        <NameListInput
-          id="trip-members"
-          label="Members"
-          names={members}
-          draft={memberDraft}
-          onNamesChange={(next) => {
-            setMembers(next)
-            setMembersError(null)
-          }}
-          onDraftChange={setMemberDraft}
-          placeholder="Type a name"
-          hint="At least two people, you included."
-          error={membersError}
-        />
+        {editCurrency ? (
+          <div className="flex flex-col gap-4">
+            <FormField
+              control={form.control}
+              name="baseCurrency"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <FormLabel>Settle up in</FormLabel>
+                    <button
+                      type="button"
+                      className="text-action min-h-8 text-[15px]"
+                      onClick={() => setEditCurrency(false)}
+                    >
+                      Done
+                    </button>
+                  </div>
+                  <FormControl>
+                    <BaseCurrencyPicker
+                      value={field.value}
+                      onChange={onBaseCurrencyChange}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Balances and payments use this currency.
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
 
-        <div className="flex flex-col gap-3">
-          {!extrasOpen ? (
-            <button
-              type="button"
-              onClick={() => setShowExtras(true)}
-              className="text-action text-[15px]"
-            >
-              Add other currencies
-            </button>
-          ) : (
-            <>
-              <div className="flex items-baseline justify-between gap-3">
-                <Label>Other currencies</Label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (extraCodes.length === 0) setShowExtras(false)
-                  }}
-                  className={cn(
-                    "text-xs font-medium text-muted-foreground transition-colors",
-                    extraCodes.length === 0
-                      ? "text-action min-h-8 text-xs"
-                      : "pointer-events-none opacity-0"
-                  )}
-                >
-                  Hide
-                </button>
-              </div>
+            <div className="flex flex-col gap-2">
+              <Label>Also spending in</Label>
               <div className="flex flex-wrap gap-1.5">
                 {CURRENCY_OPTIONS.filter((o) => o.code !== baseCurrency).map(
                   (o) => {
@@ -731,6 +715,7 @@ function CreateFormFields({
                       <button
                         key={o.code}
                         type="button"
+                        aria-pressed={on}
                         onClick={() => toggleExtra(o.code)}
                         className={cn(
                           "landing-chip",
@@ -760,6 +745,7 @@ function CreateFormFields({
                           }))
                         }
                         placeholder="rate"
+                        aria-label={`${code} per ${baseCurrency}`}
                         className="flex-1"
                         size="sm"
                       />
@@ -775,9 +761,28 @@ function CreateFormFields({
                   </p>
                 </div>
               ) : null}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <p className="min-w-0 text-[15px] text-muted-foreground">
+              Settle up in{" "}
+              <span className="font-semibold text-foreground">
+                {baseCurrency}
+              </span>
+              {extraCodes.length > 0 ? (
+                <> · also {extraCodes.join(", ")}</>
+              ) : null}
+            </p>
+            <button
+              type="button"
+              className="text-action shrink-0 text-[15px]"
+              onClick={() => setEditCurrency(true)}
+            >
+              Change currency
+            </button>
+          </div>
+        )}
 
         <div className="form-dock">
           <Button

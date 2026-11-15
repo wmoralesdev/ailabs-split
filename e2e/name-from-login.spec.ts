@@ -73,7 +73,7 @@ test.describe("Name from login", () => {
     await signInE2e(page, { displayName: "Walter" })
     await openLanding(page)
     const tripChip = page
-      .getByRole("group", { name: "Mode" })
+      .getByRole("group", { name: "What are you splitting?" })
       .getByRole("button", { name: "Trip" })
     await tripChip.click()
     await expect(tripChip).toHaveAttribute("aria-pressed", "true")

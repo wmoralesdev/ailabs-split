@@ -1,8 +1,7 @@
 import { useRef, useState } from "react"
-import { useNavigate } from "@tanstack/react-router"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Add01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons"
+import { Add01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
 import { HousePersonSheet } from "@/components/house/house-person-sheet"
@@ -56,7 +55,6 @@ function memberSubtitle(member: HouseMemberDto, today: string): string {
 
 export function HousePeople({ room }: { room: RoomDto }) {
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const today = localIsoDate()
   const house = room.house
   const role = house?.viewer.role ?? "VISITOR"
@@ -301,21 +299,9 @@ export function HousePeople({ room }: { room: RoomDto }) {
 
   return (
     <main className="page-gutter mx-auto w-full max-w-content pt-2 pb-8">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className="icon-hit -ml-3 size-11"
-          onClick={() =>
-            void navigate({ to: "/r/$code", params: { code: room.code } })
-          }
-          aria-label="Back to house"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
-        </button>
-        <h1 className="font-display text-[22px] font-bold tracking-tight">
-          People
-        </h1>
-      </div>
+      <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+        People
+      </h1>
 
       <PersonList title="Housemates" rows={housemates} />
       {housemates.some((member) => !member.claimed) ? (

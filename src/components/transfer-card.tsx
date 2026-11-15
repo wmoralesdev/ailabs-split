@@ -68,11 +68,26 @@ export function TransferCard({
     : `Add ${transfer.toName}'s account`
 
   if (!emphasis) {
+    const other = iPay ? transfer.toName : transfer.fromName
+    const relation = iPay
+      ? "you pay"
+      : iGet
+        ? "pays you"
+        : `pays ${transfer.toName}`
+    const shortMark = iPay ? "I paid" : iGet ? "Received" : "Mark paid"
     return (
-      <li className="group-row min-h-14">
+      <li className="group-row min-h-16 gap-3 py-3">
+        <Avatar className="size-10 shrink-0">
+          <AvatarFallback className="bg-muted text-[13px] font-semibold text-foreground">
+            {initials(other)}
+          </AvatarFallback>
+        </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px]">{sentence}</p>
-          <p className="text-[15px] font-semibold tabular-nums">
+          <p className="truncate text-[15px]">
+            <span className="font-medium">{other}</span>{" "}
+            <span className="text-muted-foreground">{relation}</span>
+          </p>
+          <p className="font-display text-[17px] font-semibold tabular-nums">
             {formatMoney(transfer.amountCents, currency)}
           </p>
           {payee ? (
@@ -82,28 +97,51 @@ export function TransferCard({
               variant="inline"
               className="-my-1.5"
             />
+          ) : onPayeeDetails ? (
+            <button
+              type="button"
+              className="text-action -my-1.5 text-[13px]"
+              onClick={onPayeeDetails}
+            >
+              {addPayeeLabel}
+            </button>
           ) : null}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="text-muted-foreground"
+          className="shrink-0 text-muted-foreground"
           onClick={onRemind}
-          aria-label={`Remind ${transfer.fromName}`}
+          aria-label={
+            iPay
+              ? `Share payment to ${transfer.toName}`
+              : `Remind ${transfer.fromName}`
+          }
         >
           <HugeiconsIcon icon={Share01Icon} size={16} strokeWidth={2} />
         </Button>
         {canMark ? (
           <Button
             type="button"
-            variant="secondary"
             size="sm"
-            className="bg-muted font-semibold text-primary"
+            className="shrink-0 gap-1 font-semibold"
             onClick={onMarkPaid}
             disabled={disabled}
+            aria-label={markLabel}
           >
-            {pending ? "Saving…" : markLabel}
+            {pending ? (
+              "Saving…"
+            ) : (
+              <>
+                <HugeiconsIcon
+                  icon={CheckmarkCircle02Icon}
+                  size={15}
+                  strokeWidth={2}
+                />
+                {shortMark}
+              </>
+            )}
           </Button>
         ) : null}
       </li>

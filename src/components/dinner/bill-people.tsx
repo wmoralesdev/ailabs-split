@@ -4,6 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
+import { ChipRow } from "@/components/chip-row"
 import { BillPersonSheet } from "@/components/dinner/bill-person-sheet"
 import { MemberPicker } from "@/components/member-picker"
 import { PayProfileSheet } from "@/components/pay-profile-sheet"
@@ -49,7 +50,7 @@ function removeBlockReason({
       expense.shares.some((share) => share.memberId === memberId)
     )
   ) {
-    return "Move the bill back to draft first."
+    return "Give their items to someone else and save the ticket first."
   }
   if (
     room.settlements.some(
@@ -86,6 +87,7 @@ export function BillPeople({
   const [draft, setDraft] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [payMemberId, setPayMemberId] = useState<string | null>(null)
+  const [changingPayer, setChangingPayer] = useState(false)
   const members = room.members
   const payMember = members.find((member) => member.id === payMemberId) ?? null
   const editing = members.find((member) => member.id === editingId) ?? null
@@ -221,7 +223,7 @@ export function BillPeople({
       <div className="flex items-baseline justify-between gap-3">
         <h2
           id="bill-people-heading"
-          className="font-display text-lg font-semibold"
+          className="text-[13px] font-medium text-muted-foreground"
         >
           People
         </h2>
@@ -229,7 +231,13 @@ export function BillPeople({
           {members.length} {members.length === 1 ? "person" : "people"}
         </p>
       </div>
-      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="At the table">
+      <ChipRow
+        role="list"
+        aria-label="At the table"
+        bleed
+        followEnd
+        className="mt-2"
+      >
         {members.map((member) => (
           <li key={member.id}>
             {readOnly ? (
@@ -246,7 +254,7 @@ export function BillPeople({
             )}
           </li>
         ))}
-      </ul>
+      </ChipRow>
       {readOnly ? null : (
         <form
           className="mt-2.5 flex gap-2"
@@ -288,14 +296,38 @@ export function BillPeople({
             </span>
           </p>
         ) : (
-          <div className="mt-4 grid gap-2">
-            <Label htmlFor="bill-paid-by">Paid by</Label>
-            <MemberPicker
-              id="bill-paid-by"
-              members={members}
-              value={paidById}
-              onChange={onPaidByChange}
-            />
+          <div className="mt-3">
+            {changingPayer ? (
+              <div className="grid gap-2">
+                <Label htmlFor="bill-paid-by">Who paid the ticket?</Label>
+                <MemberPicker
+                  id="bill-paid-by"
+                  members={members}
+                  value={paidById}
+                  onChange={(id) => {
+                    onPaidByChange(id)
+                    setChangingPayer(false)
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-[15px] text-muted-foreground">
+                  Paid by{" "}
+                  <span className="font-semibold text-foreground">
+                    {members.find((member) => member.id === paidById)?.name ??
+                      "someone at the table"}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  className="text-action shrink-0 text-[15px]"
+                  onClick={() => setChangingPayer(true)}
+                >
+                  Change
+                </button>
+              </div>
+            )}
           </div>
         )
       ) : null}

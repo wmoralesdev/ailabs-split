@@ -8,7 +8,6 @@ import { z } from "zod"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
-  ArrowLeft01Icon,
   MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 
@@ -48,6 +47,7 @@ import {
   formatAtmAmountInput,
 } from "@/lib/atm-amount"
 import { compressImageForOcr } from "@/lib/compress-image"
+import { runClientTicketOcr } from "@/lib/ocr-log"
 import { rememberLastCurrency, resolveLastCurrency } from "@/lib/last-currency"
 import { useOnlineStatus } from "@/lib/online-status"
 import { parseRoomKind } from "@/lib/room-kind"
@@ -458,13 +458,18 @@ function AddExpenseForm({
     }
     setOcrPending(true)
     try {
-      const compressed = await compressImageForOcr(file)
-      const draft = await scanReceipt({
-        data: {
-          code: room.code,
-          imageBase64: compressed.base64,
-          mimeType: compressed.mimeType,
-        },
+      const draft = await runClientTicketOcr({
+        kind: "trip",
+        sourceBytes: file.size,
+        image: compressImageForOcr(file),
+        scan: (compressed) =>
+          scanReceipt({
+            data: {
+              code: room.code,
+              imageBase64: compressed.base64,
+              mimeType: compressed.mimeType,
+            },
+          }),
       })
       if (draft.title)
         form.setValue("title", draft.title, { shouldValidate: true })
@@ -572,21 +577,9 @@ function AddExpenseForm({
 
   return (
     <main className="page-gutter mx-auto max-w-content pt-2 pb-6">
-      <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-lg"
-          className="-ml-3"
-          onClick={() => navigate({ to: "/r/$code", params: { code } })}
-          aria-label="Back to trip"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} strokeWidth={2} />
-        </Button>
-        <h1 className="font-display text-[22px] font-bold tracking-tight">
-          Add expense
-        </h1>
-      </div>
+      <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+        Add expense
+      </h1>
 
       <Form {...form}>
         <form

@@ -103,7 +103,6 @@ test.describe("dinner split", () => {
     const guestPage = await guest.newPage()
     await guestPage.goto("/?stay=true&tab=join")
     await waitForHydration(guestPage)
-    await guestPage.getByRole("tab", { name: "Join" }).click()
     await guestPage.getByLabel("Code", { exact: true }).fill(dinnerCode)
     await expect(guestPage.getByText("Pizza night")).toBeVisible()
     await guestPage.getByRole("button", { name: /add my name/i }).click()
@@ -226,7 +225,7 @@ test.describe("dinner split", () => {
     await page.goto("/?stay=true", { waitUntil: "domcontentloaded" })
     await waitForHydration(page)
     await expect(
-      page.getByRole("group", { name: "Mode" }).getByRole("button", {
+      page.getByRole("group", { name: "What are you splitting?" }).getByRole("button", {
         name: "Bill",
       })
     ).toHaveAttribute("aria-pressed", "true")
@@ -236,7 +235,7 @@ test.describe("dinner split", () => {
   test("trip create still requires two members", async ({ page }) => {
     await openLanding(page)
     const tripChip = page
-      .getByRole("group", { name: "Mode" })
+      .getByRole("group", { name: "What are you splitting?" })
       .getByRole("button", {
         name: "Trip",
       })
@@ -245,7 +244,7 @@ test.describe("dinner split", () => {
     await page.getByLabel("Trip name").fill("Weekend")
     await page.getByLabel("Your name").fill("Ana")
     await page.getByRole("button", { name: "Create trip" }).click()
-    await expect(page.getByText("Add at least two members")).toBeVisible()
+    await expect(page.getByText("Add at least one more person")).toBeVisible()
   })
 })
 
